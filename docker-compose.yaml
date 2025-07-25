@@ -14,10 +14,15 @@ services:
       - ./certs/client-cert.pem:/etc/openvpn/certs/client-cert.pem
       - ./certs/client-key.pem:/etc/openvpn/certs/client-key.pem
       - ./certs/ca-cert.pem:/etc/openvpn/certs/ca-cert.pem
-      - ./config/client.conf:/etc/openvpn/config/client.conf
+      - ./client.conf:/etc/openvpn/client.conf
     restart: unless-stopped
     hostname: vpn-client
     container_name: openvpn-client
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - sys_admin
   openvpnserver:
     image: openvpn:test
     networks:
@@ -31,7 +36,13 @@ services:
       - ./certs/server-key.pem:/etc/openvpn/certs/server-key.pem
       - ./certs/ca-cert.pem:/etc/openvpn/certs/ca-cert.pem
       - ./certs/dh2048.pem:/etc/openvpn/certs/dh2048.pem
-      - ./config/server.conf:/etc/openvpn/config/server.conf
+      - ./server.conf:/etc/openvpn/server.conf
     restart: unless-stopped
+    devices:
+      - /dev/net/tun:/dev/net/tun
     hostname: vpn-server
     container_name: openvpn-server
+    cap_add:
+      - net_admin
+      - sys_admin
+
