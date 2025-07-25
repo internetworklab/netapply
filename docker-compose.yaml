@@ -1,0 +1,37 @@
+networks:
+  openvpn-test:
+    driver: bridge
+services:
+  openvpnclient:
+    image: openvpn:test
+    networks:
+      - openvpn-test
+    command:
+      - openvpn
+      - "--config"
+      - "/etc/openvpn/client.conf"
+    volumes:
+      - ./certs/client-cert.pem:/etc/openvpn/certs/client-cert.pem
+      - ./certs/client-key.pem:/etc/openvpn/certs/client-key.pem
+      - ./certs/ca-cert.pem:/etc/openvpn/certs/ca-cert.pem
+      - ./config/client.conf:/etc/openvpn/config/client.conf
+    restart: unless-stopped
+    hostname: vpn-client
+    container_name: openvpn-client
+  openvpnserver:
+    image: openvpn:test
+    networks:
+      - openvpn-test
+    command:
+      - openvpn
+      - "--config"
+      - "/etc/openvpn/server.conf"
+    volumes:
+      - ./certs/server-cert.pem:/etc/openvpn/certs/server-cert.pem
+      - ./certs/server-key.pem:/etc/openvpn/certs/server-key.pem
+      - ./certs/ca-cert.pem:/etc/openvpn/certs/ca-cert.pem
+      - ./certs/dh2048.pem:/etc/openvpn/certs/dh2048.pem
+      - ./config/server.conf:/etc/openvpn/config/server.conf
+    restart: unless-stopped
+    hostname: vpn-server
+    container_name: openvpn-server
