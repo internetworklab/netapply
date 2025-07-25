@@ -13,7 +13,6 @@ services:
     volumes:
       - ./certs/client-cert.pem:/etc/openvpn/certs/client-cert.pem
       - ./certs/client-key.pem:/etc/openvpn/certs/client-key.pem
-      - ./certs/ca-cert.pem:/etc/openvpn/certs/ca-cert.pem
       - ./client.conf:/etc/openvpn/client.conf
     restart: unless-stopped
     hostname: vpn-client
@@ -34,7 +33,6 @@ services:
     volumes:
       - ./certs/server-cert.pem:/etc/openvpn/certs/server-cert.pem
       - ./certs/server-key.pem:/etc/openvpn/certs/server-key.pem
-      - ./certs/ca-cert.pem:/etc/openvpn/certs/ca-cert.pem
       - ./certs/dh2048.pem:/etc/openvpn/certs/dh2048.pem
       - ./server.conf:/etc/openvpn/server.conf
     restart: unless-stopped

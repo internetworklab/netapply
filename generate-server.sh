@@ -1,10 +1,12 @@
 #!/bin/bash
 
-# Generate server private key
-openssl genrsa -out certs/server-key.pem 2048
+openssl req -x509 -newkey ec \
+  -pkeyopt ec_paramgen_curve:secp384r1 \
+  -keyout certs/server-key.pem \
+  -out certs/server-cert.pem \
+  -nodes \
+  -sha256 \
+  -days 365 \
+  -subj '/CN=vpn-server'
 
-# Generate server certificate request
-openssl req -new -key certs/server-key.pem -out certs/server.csr -subj "/C=US/ST=CA/L=San Francisco/O=MyOrg/CN=vpn-server"
-
-# Sign server certificate
-openssl ca -config ./openssl.cnf -extensions server_cert -days 365 -notext -md sha256 -in certs/server.csr -out certs/server-cert.pem -batch
+openssl x509 -fingerprint -sha256 -in certs/server-cert.pem -noout 
