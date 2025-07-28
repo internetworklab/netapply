@@ -1,0 +1,51 @@
+networks:
+  openvpn-test:
+    driver: bridge
+services:
+  openvpnclient:
+    image: openvpn:test
+    tty: true
+    stdin_open: true
+    networks:
+      - openvpn-test
+    command:
+      - /bin/bash
+    # - openvpn
+    # - "--config"
+    # - "/etc/openvpn/client.conf"
+    volumes:
+      - ./certs/client-cert.pem:/etc/openvpn/certs/client-cert.pem
+      - ./certs/client-key.pem:/etc/openvpn/certs/client-key.pem
+      - ./client.conf:/etc/openvpn/client.conf
+    restart: unless-stopped
+    hostname: vpn-client
+    container_name: openvpn-client
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - sys_admin
+  openvpnserver:
+    image: openvpn:test
+    tty: true
+    stdin_open: true
+    networks:
+      - openvpn-test
+    command:
+      - /bin/bash
+      # - openvpn
+      # - "--config"
+      # - "/etc/openvpn/server.conf"
+    volumes:
+      - ./certs/server-cert.pem:/etc/openvpn/certs/server-cert.pem
+      - ./certs/server-key.pem:/etc/openvpn/certs/server-key.pem
+      - ./certs/dh2048.pem:/etc/openvpn/certs/dh2048.pem
+      - ./server.conf:/etc/openvpn/server.conf
+    restart: unless-stopped
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    hostname: vpn-server
+    container_name: openvpn-server
+    cap_add:
+      - net_admin
+      - sys_admin
