@@ -1,11 +1,15 @@
 networks:
   openvpn-test:
-    driver: bridge
+    external: true
+  ss:
+    external: true
 services:
   openvpnclient:
-    image: openvpn:test
+    image: openvpn:latest
+    pull_policy: never
     networks:
       - openvpn-test
+      - ss
     command:
       - openvpn
       - "--config"
@@ -23,7 +27,8 @@ services:
       - net_admin
       - sys_admin
   openvpnserver:
-    image: openvpn:test
+    image: openvpn:latest
+    pull_policy: never
     networks:
       - openvpn-test
     command:
