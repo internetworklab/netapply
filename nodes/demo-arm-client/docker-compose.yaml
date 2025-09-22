@@ -1,0 +1,29 @@
+networks:
+  openvpn-test:
+    external: true
+  ss:
+    external: true
+services:
+  openvpnclient:
+    image: openvpn:latest
+    pull_policy: never
+    networks:
+      - openvpn-test
+      - ss
+    command:
+      - openvpn
+      - "--config"
+      - "/etc/openvpn/client.conf"
+    volumes:
+      - ./certs/client-cert.pem:/etc/openvpn/certs/client-cert.pem
+      - ./certs/client-key.pem:/etc/openvpn/certs/client-key.pem
+      - ./client.conf:/etc/openvpn/client.conf
+    restart: unless-stopped
+    hostname: vpn-client
+    container_name: openvpn-client
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - net_admin
+      - sys_admin
+  
