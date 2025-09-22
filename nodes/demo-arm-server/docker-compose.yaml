@@ -1,0 +1,28 @@
+networks:
+  openvpn-test:
+    external: true
+services:
+  openvpnserver:
+    image: openvpn:latest
+    pull_policy: never
+    networks:
+      - openvpn-test
+    command:
+      - openvpn
+      - "--config"
+      - "/etc/openvpn/server.conf"
+    volumes:
+      - ./certs/server-cert.pem:/etc/openvpn/certs/server-cert.pem
+      - ./certs/server-key.pem:/etc/openvpn/certs/server-key.pem
+      - ./certs/dh2048.pem:/etc/openvpn/certs/dh2048.pem
+      - ./server.conf:/etc/openvpn/server.conf
+    restart: unless-stopped
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    ports:
+      - 21194:1194/tcp
+    hostname: openvpn-server
+    container_name: openvpn-server
+    cap_add:
+      - net_admin
+      - sys_admin
