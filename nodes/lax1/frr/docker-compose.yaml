@@ -8,7 +8,7 @@ services:
       - ./config/daemons:/etc/frr/daemons
       - ./ospf.conf:/misc/ospf.conf
     container_name: frr
-    hostname: pi
+    hostname: lax1
     stdin_open: true
     tty: true
     init: false
