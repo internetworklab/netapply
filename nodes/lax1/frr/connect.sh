@@ -1,36 +1,36 @@
 #!/bin/bash
 
-container1="openvpn-server"
-container2="frr"
+scriptPath=$(realpath $0)
+scriptDir=$(dirname $scriptPath)
 
-pid1=$(docker inspect $container1 --format {{.State.Pid}})
-pid2=$(docker inspect $container2 --format {{.State.Pid}})
-echo "pid1: $pid1"
-echo "pid2: $pid2"
+cd $scriptDir
 
-ip l add veth1 netns $pid1 type veth peer name veth1 netns $pid2 &> /dev/null
+./connect/connect_openvpn.sh
 
-ns1=$(docker inspect $container1 --format {{.NetworkSettings.SandboxKey}})
+#connect wg
+for wgConf in $scriptDir/connect/wg/*.conf; do
+    go run ./connect/connect_wg.go $wgConf
+done
+
 ns2=$(docker inspect $container2 --format {{.NetworkSettings.SandboxKey}})
-echo "ns1: $ns1"
-echo "ns2: $ns2"    
+echo "ns2: $ns2"
 
-ipcmd1="nsenter --net=$ns1 ip"
-ipcmd2="nsenter --net=$ns2 ip"
-
-$ipcmd1 l set veth1 up
-$ipcmd2 l set veth1 up
-
-$ipcmd1 l add br0 type bridge &> /dev/null
-$ipcmd1 l set br0 up
-$ipcmd1 l set veth1 master br0
-$ipcmd1 l set tap0 master br0
-$ipcmd1 l set tap0 up
-
-$ipcmd2 a add 10.9.0.1 peer 10.9.0.2/32 dev veth1 &> /dev/null
-
+# connect dummy
 $ipcmd2 l add v5-dummy type dummy &> /dev/null
 $ipcmd2 l set v5-dummy up
 $ipcmd2 a add 10.3.64.1/24 dev v5-dummy &> /dev/null
 
+# setup bridge
+$ipcmd2 l add br42 type bridge &> /dev/null
+$ipcmd2 l set br42 up
+
+# connect vxlan
+$ipcmd2 l add vx42 type vxlan id 42 local 10.3.64.1 dstport 4789 nolearning &> /dev/null
+$ipcmd2 l set vx42 up
+$ipcmd2 l set vx42 master br42
+
+# configure ospf
 docker exec $container2 vtysh -f /misc/ospf.conf
+
+# configure bgp
+docker exec $container2 vtysh -f /misc/bgp.conf
