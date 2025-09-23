@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"unsafe"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -40,12 +39,12 @@ func (ovp *OpenVPN2HttpProxy) ToCLIArgs() []string {
 
 type OpenVPN2Proto string
 
-func (ovp *OpenVPN2Proto) ToCLIArgs() []string {
+func (ovp OpenVPN2Proto) ToCLIArgs() []string {
 	res := make([]string, 0)
 
-	if ovp != nil {
-		fmt.Printf("A P P E N D I N G: %v\n", *ovp)
-		res = append(res, string(*ovp))
+	x := string(ovp)
+	if x != "" {
+		res = append(res, x)
 	}
 
 	return res
@@ -234,16 +233,12 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 					}
 				}
 			} else if !v.Field(i).IsZero() {
-				fmt.Println("Calling")
-				retval := reflect.NewAt(v.Field(i).Type(), unsafe.Pointer(reflect.ValueOf(v.Field(i).Interface()).Pointer())).MethodByName("ToCLIArgs").Call(nil)
-				retval1 := retval[0].Interface()
-				if retval1, ok := retval1.([]string); ok {
-					for _, x := range retval1 {
-						fmt.Printf("elem: %v\n", x)
+				retval := v.Field(i).MethodByName("ToCLIArgs").Call(nil)
+				if len(retval) > 0 {
+					if retval1, ok := (retval[0].Interface()).([]string); ok {
+						res = append(res, retval1...)
 					}
-					fmt.Printf("array len: %d\n", len(retval1))
 				}
-				fmt.Printf("Len: %d\n", len(retval))
 			}
 		}
 	}
