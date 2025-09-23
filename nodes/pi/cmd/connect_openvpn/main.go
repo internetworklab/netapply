@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"unsafe"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -39,17 +38,6 @@ func (ovp *OpenVPN2HttpProxy) ToCLIArgs() []string {
 }
 
 type OpenVPN2Proto string
-
-// func (ovp OpenVPN2Proto) ToCLIArgs() []string {
-// 	res := make([]string, 0)
-
-// 	x := string(ovp)
-// 	if x != "" {
-// 		res = append(res, x)
-// 	}
-
-// 	return res
-// }
 
 func (ovp *OpenVPN2Proto) ToCLIArgs() []string {
 	if ovp == nil {
@@ -251,8 +239,10 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 
 				valType := v.Field(i).Type()
 
-				valptr := unsafe.Pointer(uintptr(unsafe.Pointer(ovInstPtr)) + v.Type().Field(i).Offset)
-				valobj := reflect.NewAt(valType, valptr)
+				// Create a new instance of the field type
+				valobj := reflect.New(valType)
+				// Set the value from the original field
+				valobj.Elem().Set(v.Field(i))
 
 				retval := valobj.MethodByName("ToCLIArgs").Call(nil)
 				if len(retval) > 0 {
