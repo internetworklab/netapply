@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"unsafe"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -39,10 +40,25 @@ func (ovp *OpenVPN2HttpProxy) ToCLIArgs() []string {
 
 type OpenVPN2Proto string
 
-func (ovp OpenVPN2Proto) ToCLIArgs() []string {
+// func (ovp OpenVPN2Proto) ToCLIArgs() []string {
+// 	res := make([]string, 0)
+
+// 	x := string(ovp)
+// 	if x != "" {
+// 		res = append(res, x)
+// 	}
+
+// 	return res
+// }
+
+func (ovp *OpenVPN2Proto) ToCLIArgs() []string {
+	if ovp == nil {
+		return nil
+	}
+
 	res := make([]string, 0)
 
-	x := string(ovp)
+	x := string(*ovp)
 	if x != "" {
 		res = append(res, x)
 	}
@@ -221,8 +237,7 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 			res = append(res, fmt.Sprintf("--%s", firstTag))
 
 			kind := v.Field(i).Kind()
-			name := v.Type().Field(i).Name
-			fmt.Printf("[%s]: %s: %v\n", name, kind, val)
+
 			if kind == reflect.Ptr && !v.Field(i).IsNil() {
 				method := v.Field(i).MethodByName("ToCLIArgs")
 				if !method.IsZero() {
@@ -233,12 +248,19 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 					}
 				}
 			} else if !v.Field(i).IsZero() {
-				retval := v.Field(i).MethodByName("ToCLIArgs").Call(nil)
+
+				valType := v.Field(i).Type()
+
+				valptr := unsafe.Pointer(uintptr(unsafe.Pointer(ovInstPtr)) + v.Type().Field(i).Offset)
+				valobj := reflect.NewAt(valType, valptr)
+
+				retval := valobj.MethodByName("ToCLIArgs").Call(nil)
 				if len(retval) > 0 {
 					if retval1, ok := (retval[0].Interface()).([]string); ok {
 						res = append(res, retval1...)
 					}
 				}
+
 			}
 		}
 	}
