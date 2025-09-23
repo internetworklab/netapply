@@ -13,7 +13,10 @@ for wgConf in $scriptDir/connect/wg/*.conf; do
 done
 
 ns2=$(docker inspect $container2 --format {{.NetworkSettings.SandboxKey}})
-echo "ns2: $ns2"
+if [ -z "$ns2" ]; then
+    echo "ns2 not found"
+    exit 1
+fi
 
 # connect dummy
 $ipcmd2 l add v5-dummy type dummy &> /dev/null
@@ -30,7 +33,7 @@ $ipcmd2 l set vx42 up
 $ipcmd2 l set vx42 master br42
 
 # configure ospf
-docker exec $container2 vtysh -f /misc/ospf.conf
+docker exec $container2 vtysh -f /etc/frr/routers/ospf.conf
 
 # configure bgp
-docker exec $container2 vtysh -f /misc/bgp.conf
+docker exec $container2 vtysh -f /etc/frr/routers/bgp.conf

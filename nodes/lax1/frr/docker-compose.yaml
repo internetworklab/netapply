@@ -6,7 +6,7 @@ services:
     volumes:
       - frrconfig:/etc/frr
       - ./config/daemons:/etc/frr/daemons
-      - ./ospf.conf:/misc/ospf.conf
+      - ./routers:/etc/frr/routers
     container_name: frr
     hostname: lax1
     stdin_open: true

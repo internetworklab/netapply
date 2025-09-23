@@ -1,0 +1,81 @@
+controlplane:
+  ospf:
+    - vrf: default
+      router_id: 10.3.64.1
+      interfaces:
+        - name: v5-dummy
+          area: 0.0.0.0
+          passive: true
+        - name: veth1
+          area: 0.0.0.0
+          network: point-to-point
+  bgp:
+    - vrf: default
+      router_id: 10.3.64.1
+dataplane:
+  openvpn:
+    - name: tap0
+      dh_cert_file: /path/to/dh2048.pem
+      cert_file: /path/to/cert.pem
+      cert_key_file: /path/to/key.pem
+      pin_sha256: "06:00:DD:D5:77:82:A0:E6:E5:5F:C4:A0:F5:D3:5A:98:23:6E:E5:DC:86:D3:AB:60:9F:01:1B:97:D4:A6:60:BE"
+      tuntap: tap
+      container:
+        docker:
+          name: openvpn-server
+  wireguard:
+    - name: wg-lax1-mnz1
+      privatekey: yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+      peers:
+        - publickey: xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
+          endpoint: 192.95.5.67:1234
+          allowedips:
+            - "0.0.0.0/0"
+            - "::/0"
+      addresses:
+        - peer: "10.192.122.3/32"
+          local: "10.192.122.3"
+      mtu: 1420
+      container:
+        docker:
+          name: frr
+  vxlan:
+    - vxlan_id: 42
+      local_ip: "10.3.64.1"
+      mtu: 1370
+      name: vx42
+      nolearning: true
+      container:
+        docker:
+          name: frr
+  veth:
+    - name: veth1
+      container:
+        docker:
+          name: openvpn-server
+      peer:
+        name: veth1
+        container:
+          docker:
+            name: frr
+  bridge:
+    - name: br42
+      slave_interfaces:
+        - name: vx42
+      container:
+        docker:
+          name: frr
+    - name: br0
+      slave_interfaces:
+        - name: tap0
+        - name: veth1
+      container:
+        docker:
+          name: openvpn-server
+virtual_interface:
+  dummy:
+    - name: v5-dummy
+      cidr: "10.3.64.1/24"
+      container:
+        docker:
+          name: frr

@@ -2,14 +2,17 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 
+	"encoding/json"
+	"strings"
+
 	netlink "github.com/vishvananda/netlink"
 	wgctrl "golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+	yaml "gopkg.in/yaml.v3"
 )
 
 type WGConfigIface struct {
@@ -94,9 +97,16 @@ func loadWGConfig(configPath string) (*WGConfig, error) {
 		return nil, err
 	}
 	defer file.Close()
-	err = json.NewDecoder(file).Decode(wgConfObj)
+	if strings.HasSuffix(configPath, ".json") {
+		err = json.NewDecoder(file).Decode(wgConfObj)
+
+	} else if strings.HasSuffix(configPath, ".yaml") {
+		err = yaml.NewDecoder(file).Decode(wgConfObj)
+	} else {
+		return nil, fmt.Errorf("invalid config file: %s", configPath)
+	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to decode config file: %s", err)
 	}
 	return wgConfObj, nil
 }
@@ -107,7 +117,7 @@ func setupWGInterface(wgConf *WGConfig) error {
 	link, err := netlink.LinkByName(ifaceName)
 	if err != nil {
 		if _, ok := err.(netlink.LinkNotFoundError); !ok {
-			return err
+			return fmt.Errorf("failed to get link: %s", err)
 		}
 
 		link := new(netlink.Wireguard)
@@ -116,7 +126,7 @@ func setupWGInterface(wgConf *WGConfig) error {
 	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to find or add link: %s", err)
 	}
 
 	if wgConf.MTU != nil {
@@ -125,7 +135,7 @@ func setupWGInterface(wgConf *WGConfig) error {
 
 	wgCtrl, err := wgctrl.New()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create wgctrl: %s", err)
 	}
 	defer wgCtrl.Close()
 
@@ -133,7 +143,7 @@ func setupWGInterface(wgConf *WGConfig) error {
 	if wgConf.Interface.PrivateKeyFile != nil {
 		pkBytes, err := os.ReadFile(*wgConf.Interface.PrivateKeyFile)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to read private key file: %s", err)
 		}
 		pk = string(bytes.TrimSpace(pkBytes))
 	} else if wgConf.Interface.PrivateKey != nil {
@@ -144,7 +154,7 @@ func setupWGInterface(wgConf *WGConfig) error {
 
 	pkObj, err := wgtypes.ParseKey(pk)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse private key: %s", err)
 	}
 
 	wgConfObj := new(wgtypes.Config)
@@ -164,7 +174,8 @@ func setupWGInterface(wgConf *WGConfig) error {
 	for _, addr := range wgConf.Addresses {
 		addrConf, err := addr.ToAddrConf()
 		if err != nil {
-			return err
+			fmt.Fprintf(os.Stderr, "Failed to convert WG config addr to addr config: %v\n", err)
+			continue
 		}
 
 		if err := netlink.AddrAdd(link, addrConf); err != nil {
@@ -174,8 +185,7 @@ func setupWGInterface(wgConf *WGConfig) error {
 
 	err = wgCtrl.ConfigureDevice(ifaceName, *wgConfObj)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to configure WG interface: %v\n", err)
-		return err
+		return fmt.Errorf("failed to configure WG interface: %s", err)
 	}
 	return nil
 
