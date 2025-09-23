@@ -9,6 +9,7 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"unsafe"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -28,7 +29,27 @@ type OpenVPN2HttpProxy struct {
 	Port int    `json:"port"`
 }
 
+func (ovp *OpenVPN2HttpProxy) ToCLIArgs() []string {
+	res := make([]string, 0)
+	if ovp != nil {
+		res = append(res, ovp.Host)
+		res = append(res, fmt.Sprintf("%d", ovp.Port))
+	}
+	return res
+}
+
 type OpenVPN2Proto string
+
+func (ovp *OpenVPN2Proto) ToCLIArgs() []string {
+	res := make([]string, 0)
+
+	if ovp != nil {
+		fmt.Printf("A P P E N D I N G: %v\n", *ovp)
+		res = append(res, string(*ovp))
+	}
+
+	return res
+}
 
 const (
 	OpenVPN2ProtoTCP       OpenVPN2Proto = "tcp"
@@ -51,9 +72,28 @@ type OpenVPN2KeepaliveConfig struct {
 	PatienceSecs int `json:"patience_secs"`
 }
 
+func (ovp *OpenVPN2KeepaliveConfig) ToCLIArgs() []string {
+
+	res := make([]string, 0)
+	if ovp != nil {
+		res = append(res, fmt.Sprintf("%d", ovp.IntervalSecs))
+		res = append(res, fmt.Sprintf("%d", ovp.PatienceSecs))
+	}
+	return res
+}
+
 type OpenVPN2RemoteConfig struct {
 	Host string `json:"host"`
 	Port int    `json:"port"`
+}
+
+func (ovp *OpenVPN2RemoteConfig) ToCLIArgs() []string {
+	res := make([]string, 0)
+	if ovp != nil {
+		res = append(res, ovp.Host)
+		res = append(res, fmt.Sprintf("%d", ovp.Port))
+	}
+	return res
 }
 
 type OpenVPN2RemoteTLSCertType string
@@ -62,6 +102,14 @@ const (
 	OpenVPN2RemoteTLSCertTypeServer OpenVPN2RemoteTLSCertType = "server"
 	OpenVPN2RemoteTLSCertTypeClient OpenVPN2RemoteTLSCertType = "client"
 )
+
+func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() []string {
+	res := make([]string, 0)
+	if ovp != nil {
+		res = append(res, fmt.Sprintf("%v", *ovp))
+	}
+	return res
+}
 
 type OpenVPN2Instance struct {
 	Name               string                     `openvpn2:"-"`
@@ -170,8 +218,33 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 			res = append(res, fmt.Sprintf("--%s", firstTag))
 			res = append(res, fmt.Sprintf("%v", typedval))
 		default:
+
 			res = append(res, fmt.Sprintf("--%s", firstTag))
-			res = append(res, "<todo>")
+
+			kind := v.Field(i).Kind()
+			name := v.Type().Field(i).Name
+			fmt.Printf("[%s]: %s: %v\n", name, kind, val)
+			if kind == reflect.Ptr && !v.Field(i).IsNil() {
+				method := v.Field(i).MethodByName("ToCLIArgs")
+				if !method.IsZero() {
+					if retval := method.Call(nil); len(retval) > 0 {
+						if retval1, ok := (retval[0].Interface()).([]string); ok {
+							res = append(res, retval1...)
+						}
+					}
+				}
+			} else if !v.Field(i).IsZero() {
+				fmt.Println("Calling")
+				retval := reflect.NewAt(v.Field(i).Type(), unsafe.Pointer(reflect.ValueOf(v.Field(i).Interface()).Pointer())).MethodByName("ToCLIArgs").Call(nil)
+				retval1 := retval[0].Interface()
+				if retval1, ok := retval1.([]string); ok {
+					for _, x := range retval1 {
+						fmt.Printf("elem: %v\n", x)
+					}
+					fmt.Printf("array len: %d\n", len(retval1))
+				}
+				fmt.Printf("Len: %d\n", len(retval))
+			}
 		}
 	}
 
