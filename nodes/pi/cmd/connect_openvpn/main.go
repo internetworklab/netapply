@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -24,6 +25,10 @@ func getContainerName(service string, instance string) string {
 
 const servicename string = "ping"
 
+const labelKeyService string = "service"
+const labelKeyInstance string = "instance"
+const labelKeyTarget string = "target"
+
 func startPing(cli *client.Client, instance *Instance, imagename string) error {
 	ctx := context.Background()
 	instancename := instance.Name
@@ -34,7 +39,11 @@ func startPing(cli *client.Client, instance *Instance, imagename string) error {
 		Cmd:       []string{"ping", instance.Target},
 		Tty:       true,
 		OpenStdin: true,
-		Labels:    map[string]string{"service": "ping"},
+		Labels: map[string]string{
+			labelKeyService:  servicename,
+			labelKeyInstance: instancename,
+			labelKeyTarget:   instance.Target,
+		},
 	}, &container.HostConfig{
 		AutoRemove: true,
 	}, nil, nil, containername)
@@ -94,7 +103,15 @@ func down(servicename string, cli *client.Client) {
 		if err := cli.ContainerStop(context.Background(), cont.ID, container.StopOptions{}); err != nil {
 			panic(err)
 		}
-		log.Printf("Container %s is stopped", cont.Names[0])
+		labelsStr := ""
+		if cont.Labels != nil {
+			v, err := json.Marshal(cont.Labels)
+			if err != nil {
+				log.Fatalf("failed to marshal labels for %s: %v", cont.Names[0], err)
+			}
+			labelsStr = string(v)
+		}
+		log.Printf("Container %s %s is stopped", cont.Names[0], labelsStr)
 	}
 }
 
