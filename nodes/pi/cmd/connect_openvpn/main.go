@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"reflect"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"gopkg.in/yaml.v3"
@@ -133,12 +131,14 @@ type DockerPortMapping struct {
 }
 
 type DockerContainerConfig struct {
-	ContainerName string                       `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	Capabilities  []string                     `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
-	Hostname      string                       `yaml:"hostname,omitempty" json:"hostname,omitempty"`
-	Ports         map[string]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Volumes       []DockerMountConfig          `yaml:"volumes,omitempty" json:"volumes,omitempty"`
-	Devices       []DockerDeviceMapping        `yaml:"devices,omitempty" json:"devices,omitempty"`
+	ExecutablePath string                       `yaml:"executable_path" json:"executable_path"`
+	Image          string                       `yaml:"image" json:"image"`
+	ContainerName  string                       `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Capabilities   []string                     `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
+	Hostname       string                       `yaml:"hostname,omitempty" json:"hostname,omitempty"`
+	Ports          map[string]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Volumes        []DockerMountConfig          `yaml:"volumes,omitempty" json:"volumes,omitempty"`
+	Devices        []DockerDeviceMapping        `yaml:"devices,omitempty" json:"devices,omitempty"`
 }
 
 type OpenVPN2Instance struct {
@@ -171,6 +171,83 @@ type OpenVPN2Instance struct {
 	ResolvRetry         *string                    `openvpn2:"resolv-retry" yaml:"resolv_retry,omitempty"`
 	LLAddr              *string                    `openvpn2:"lladdr" yaml:"lladdr,omitempty"`
 	DockerContainer     *DockerContainerConfig     `openvpn2:"-" yaml:"docker_container,omitempty"`
+}
+
+type CtxKey string
+
+const ctxKeyDockerCli CtxKey = "docker_cli"
+
+func dockerCliFromCtx(ctx context.Context) (*client.Client, error) {
+	cli, ok := ctx.Value(ctxKeyDockerCli).(*client.Client)
+	if !ok {
+		return nil, fmt.Errorf("docker cli is not set in context")
+	}
+
+	return cli, nil
+}
+
+func setDockerCliInCtx(ctx context.Context, cli *client.Client) context.Context {
+	return context.WithValue(ctx, ctxKeyDockerCli, cli)
+}
+func getContainerName(service string, instance string) string {
+	return fmt.Sprintf("%s-%s", service, instance)
+}
+
+func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) error {
+
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	if ovpInst.DockerContainer == nil {
+		return fmt.Errorf("docker container config is not set, currently only support to run in docker container")
+	}
+
+	cmd := make([]string, 0)
+	exec := "openvpn"
+	if ovpInst.DockerContainer.ExecutablePath != "" {
+		exec = ovpInst.DockerContainer.ExecutablePath
+	}
+	cmd = append(cmd, exec)
+	cmd = append(cmd, ovpInst.ToCLIArgs()...)
+
+	containerConfig := &container.Config{
+		Image:     ovpInst.DockerContainer.Image,
+		Cmd:       cmd,
+		Tty:       true,
+		OpenStdin: true,
+		Labels: map[string]string{
+			labelKeyService:  servicename,
+			labelKeyInstance: ovpInst.Name,
+		},
+	}
+	hostConfig := &container.HostConfig{
+		AutoRemove: true,
+	}
+
+	containerName := ovpInst.DockerContainer.ContainerName
+	if containerName == "" {
+		containerName = getContainerName(servicename, ovpInst.Name)
+	}
+
+	resp, err := cli.ContainerCreate(
+		ctx,
+		containerConfig,
+		hostConfig,
+		nil,
+		nil,
+		containerName,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create container: %w", err)
+	}
+
+	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+
+	return nil
 }
 
 const (
@@ -234,9 +311,9 @@ type DataplaneConfig struct {
 }
 
 type NodeConfig struct {
-	Controlplane     ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
-	Dataplane        DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
-	VirtualInterface VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
+	Controlplane     *ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
+	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+	VirtualInterface *VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
 }
 
 type GlobalConfig struct {
@@ -361,83 +438,31 @@ type Instance struct {
 	Target string
 }
 
-func getContainerName(service string, instance string) string {
-	return fmt.Sprintf("%s-%s", service, instance)
-}
-
-const servicename string = "ping"
-
 const labelKeyService string = "service"
 const labelKeyInstance string = "instance"
-const labelKeyTarget string = "target"
 
-func startPing(cli *client.Client, instance *Instance, imagename string) error {
-	ctx := context.Background()
-	instancename := instance.Name
-	containername := getContainerName(servicename, instancename)
-
-	resp, err := cli.ContainerCreate(ctx, &container.Config{
-		Image:     imagename,
-		Cmd:       []string{"ping", instance.Target},
-		Tty:       true,
-		OpenStdin: true,
-		Labels: map[string]string{
-			labelKeyService:  servicename,
-			labelKeyInstance: instancename,
-			labelKeyTarget:   instance.Target,
-		},
-	}, &container.HostConfig{
-		AutoRemove: true,
-	}, nil, nil, containername)
-	if err != nil {
-		return fmt.Errorf("failed to create container for %s: %w", instance.Name, err)
-	}
-
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("failed to start container for %s: %w", instance.Name, err)
-	}
-
-	return nil
-}
-
-func up(servicename string, cli *client.Client) error {
-
-	imgname := "busybox:latest"
-	pingInstances := []Instance{
-		{Name: "loopback", Target: "127.0.0.1"},
-		{Name: "loopback6", Target: "::1"},
-		{Name: "alidns1", Target: "223.5.5.5"},
-		{Name: "alidns2", Target: "223.6.6.6"},
-	}
-	ctx := context.Background()
-	log.Println("Pulling image", imgname)
-	reader, err := cli.ImagePull(ctx, imgname, image.PullOptions{})
-	if err != nil {
-		return fmt.Errorf("failed to pull image: %w", err)
-	}
-
-	defer reader.Close()
-
-	// cli.ImagePull is asynchronous.
-	// The reader needs to be read completely for the pull operation to complete.
-	// If stdout is not required, consider using io.Discard instead of os.Stdout.
-	io.Copy(os.Stdout, reader)
-
-	log.Printf("Starting %s containers", servicename)
-	for _, instance := range pingInstances {
-		if err := startPing(cli, &instance, imgname); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to start ping for %s: %v\n", instance.Name, err)
+func up(ctx context.Context, servicename string, nodeConfig *NodeConfig) error {
+	if nodeConfig.Dataplane != nil {
+		for _, ovpInst := range nodeConfig.Dataplane.OpenVPN {
+			if err := ovpInst.Start(ctx, servicename); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to start openvpn for %s: %v\n", ovpInst.Name, err)
+			}
+			log.Println("Container is started for", ovpInst.Name)
 		}
-		log.Println("Container is started for", instance.Name)
 	}
 
 	return nil
 }
 
-func down(servicename string, cli *client.Client) error {
+func down(ctx context.Context, servicename string) error {
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
 	dockerArgs := filters.NewArgs()
 	dockerArgs.Add("label", fmt.Sprintf("%s=%s", labelKeyService, servicename))
-	containers, err := cli.ContainerList(context.Background(), container.ListOptions{
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: dockerArgs,
 	})
 	if err != nil {
@@ -466,8 +491,13 @@ func down(servicename string, cli *client.Client) error {
 const tagName string = "openvpn2"
 
 func main() {
+	ctx := context.Background()
+	configFilePath := "./config.yaml"
+	command := "up"
+	nodeName := "pi"
+	servicename := "openvpn"
 
-	configFile, err := os.Open(os.Args[1])
+	configFile, err := os.Open(configFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -478,34 +508,28 @@ func main() {
 		panic(err)
 	}
 
-	cliArgs := globalConfig.Nodes["pi"].Dataplane.OpenVPN[0].ToCLIArgs()
-	for idx, arg := range cliArgs {
-		fmt.Printf("[%d] %s\n", idx, arg)
+	nodeConfig, ok := globalConfig.Nodes[nodeName]
+	if !ok {
+		panic("node config not found")
 	}
 
-	return
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		panic(err)
+	}
+	defer cli.Close()
 
-	if len(os.Args) > 1 {
-		cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
-		if err != nil {
-			panic(err)
-		}
-		defer cli.Close()
+	switch command {
+	case "up":
+		err = up(setDockerCliInCtx(ctx, cli), servicename, &nodeConfig)
+	case "down":
+		err = down(setDockerCliInCtx(ctx, cli), servicename)
+	default:
+		panic("command is unknown")
+	}
 
-		command := os.Args[1]
-		switch command {
-		case "up":
-			err = up(servicename, cli)
-		case "down":
-			err = down(servicename, cli)
-		default:
-			panic("command in os.Args[1] is unknown")
-		}
-
-		if err != nil {
-			panic(err)
-		}
-	} else {
-		panic("command in os.Args[1] is required")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to %s: %v\n", command, err)
+		os.Exit(1)
 	}
 }

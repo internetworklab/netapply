@@ -28,7 +28,9 @@ nodes:
           up_cmd: /up-wrapper.sh
           script_security_level: 3
           docker_container:
-            container_name: "openvpn-client"
+            executable_path: "openvpn"
+            image: openvpn:latest
+            container_name: "openvpn-connector-1"
             cap_add:
               - net_admin
               - sys_admin
