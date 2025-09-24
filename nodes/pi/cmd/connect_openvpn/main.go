@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -141,6 +143,8 @@ type DockerContainerConfig struct {
 	Ports          map[string][]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
 	Volumes        []DockerMountConfig            `yaml:"volumes,omitempty" json:"volumes,omitempty"`
 	Devices        []DockerDeviceMapping          `yaml:"devices,omitempty" json:"devices,omitempty"`
+	AutoRemove     *bool                          `yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
+	Networks       []string                       `yaml:"networks,omitempty" json:"networks,omitempty"`
 }
 
 type OpenVPN2Instance struct {
@@ -154,8 +158,8 @@ type OpenVPN2Instance struct {
 	NoBind              *bool                      `openvpn2:"no-bind" yaml:"no_bind,omitempty"`
 	PersistTun          *bool                      `openvpn2:"persist-tun" yaml:"persist_tun,omitempty"`
 	HttpProxy           *OpenVPN2RemoteConfig      `openvpn2:"http-proxy" yaml:"http_proxy,omitempty"`
-	CertFile            string                     `openvpn2:"cert-file" yaml:"cert_file"`
-	KeyFile             string                     `openvpn2:"key-file" yaml:"key_file"`
+	CertFile            string                     `openvpn2:"cert" yaml:"cert_file"`
+	KeyFile             string                     `openvpn2:"key" yaml:"key_file"`
 	DHPEMFile           *string                    `openvpn2:"dh" yaml:"dh,omitempty"`
 	PeerFingerprint     string                     `openvpn2:"peer-fingerprint" yaml:"peer_fingerprint"`
 	RemoteCertTls       *OpenVPN2RemoteTLSCertType `openvpn2:"remote-cert-tls" yaml:"remote_cert_tls,omitempty"`
@@ -195,6 +199,19 @@ func getContainerName(service string, instance string) string {
 	return fmt.Sprintf("%s-%s", service, instance)
 }
 
+func resolvePath(path string) string {
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return path
+	}
+
+	return filepath.Join(wd, path)
+}
+
 func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) error {
 
 	cli, err := dockerCliFromCtx(ctx)
@@ -224,8 +241,18 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 			labelKeyInstance: ovpInst.Name,
 		},
 	}
-	hostConfig := &container.HostConfig{
-		AutoRemove: true,
+
+	networkConfig := &network.NetworkingConfig{}
+	if ovpInst.DockerContainer.Networks != nil {
+		networkConfig.EndpointsConfig = make(map[string]*network.EndpointSettings)
+		for _, networkName := range ovpInst.DockerContainer.Networks {
+			networkConfig.EndpointsConfig[networkName] = &network.EndpointSettings{}
+		}
+	}
+
+	hostConfig := &container.HostConfig{}
+	if ovpInst.DockerContainer.AutoRemove != nil {
+		hostConfig.AutoRemove = *ovpInst.DockerContainer.AutoRemove
 	}
 
 	if ovpInst.DockerContainer.Capabilities != nil {
@@ -256,7 +283,7 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 		for _, volumeMount := range ovpInst.DockerContainer.Volumes {
 			volumeMounts = append(volumeMounts, mount.Mount{
 				Type:   volumeMount.Type,
-				Source: volumeMount.Source,
+				Source: resolvePath(volumeMount.Source),
 				Target: volumeMount.Target,
 			})
 		}
@@ -271,7 +298,7 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 				perm = *deviceMount.CgroupPermissions
 			}
 			deviceMounts = append(deviceMounts, container.DeviceMapping{
-				PathOnHost:        deviceMount.PathOnHost,
+				PathOnHost:        resolvePath(deviceMount.PathOnHost),
 				PathInContainer:   deviceMount.PathInContainer,
 				CgroupPermissions: perm,
 			})
@@ -288,7 +315,7 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 		ctx,
 		containerConfig,
 		hostConfig,
-		nil,
+		networkConfig,
 		nil,
 		containerName,
 	)
@@ -499,6 +526,7 @@ func up(ctx context.Context, servicename string, nodeConfig *NodeConfig) error {
 		for _, ovpInst := range nodeConfig.Dataplane.OpenVPN {
 			if err := ovpInst.Start(ctx, servicename); err != nil {
 				fmt.Fprintf(os.Stderr, "failed to start openvpn for %s: %v\n", ovpInst.Name, err)
+				continue
 			}
 			log.Println("Container is started for", ovpInst.Name)
 		}

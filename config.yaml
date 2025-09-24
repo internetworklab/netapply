@@ -28,6 +28,9 @@ nodes:
           up_cmd: /up-wrapper.sh
           script_security_level: 3
           docker_container:
+            networks:
+              - ss
+            autoremove: true
             executable_path: "openvpn"
             image: openvpn:latest
             container_name: "openvpn-connector-1"
@@ -42,6 +45,9 @@ nodes:
                 - host_ip: "::"
                   host_port: 21194
             volumes:
+              - type: bind
+                source: "./nodes/pi/openvpn/up-wrapper.sh"
+                target: "/up-wrapper.sh"
               - type: bind
                 source: "./nodes/pi/openvpn/certs/client-cert.pem"
                 target: "/etc/openvpn/certs/client-cert.pem"
