@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -18,6 +19,8 @@ import (
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
+	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 	"gopkg.in/yaml.v3"
 )
 
@@ -261,6 +264,7 @@ type OpenVPN2Instance struct {
 type CtxKey string
 
 const ctxKeyDockerCli CtxKey = "docker_cli"
+const ctxKeyServiceName CtxKey = "service_name"
 
 func dockerCliFromCtx(ctx context.Context) (*client.Client, error) {
 	cli, ok := ctx.Value(ctxKeyDockerCli).(*client.Client)
@@ -271,9 +275,22 @@ func dockerCliFromCtx(ctx context.Context) (*client.Client, error) {
 	return cli, nil
 }
 
+func serviceNameFromCtx(ctx context.Context) (string, error) {
+	serviceName, ok := ctx.Value(ctxKeyServiceName).(string)
+	if !ok {
+		return "", fmt.Errorf("service name is not set in context")
+	}
+	return serviceName, nil
+}
+
 func setDockerCliInCtx(ctx context.Context, cli *client.Client) context.Context {
 	return context.WithValue(ctx, ctxKeyDockerCli, cli)
 }
+
+func setServiceNameInCtx(ctx context.Context, serviceName string) context.Context {
+	return context.WithValue(ctx, ctxKeyServiceName, serviceName)
+}
+
 func getContainerName(service string, instance string) string {
 	return fmt.Sprintf("%s-%s", service, instance)
 }
@@ -291,7 +308,11 @@ func resolvePath(path string) string {
 	return filepath.Join(wd, path)
 }
 
-func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) error {
+func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
+	servicename, err := serviceNameFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get service name from context: %w", err)
+	}
 
 	cli, err := dockerCliFromCtx(ctx)
 	if err != nil {
@@ -542,18 +563,207 @@ type ContainerConfig struct {
 }
 
 type VXLANConfig struct {
-	Name       string           `yaml:"name" json:"name"`
-	VXLANID    int              `yaml:"vxlan_id" json:"vxlan_id"`
-	LocalIP    *string          `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
-	MTU        *int             `yaml:"mtu,omitempty" json:"mtu,omitempty"`
-	Nolearning *bool            `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
-	Container  *ContainerConfig `yaml:"container,omitempty" json:"container,omitempty"`
+	Name          string  `yaml:"name" json:"name"`
+	VXLANID       int     `yaml:"vxlan_id" json:"vxlan_id"`
+	LocalIP       *string `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
+	MTU           *int    `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	Nolearning    *bool   `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
+	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+}
+
+func findContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
+		All: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	for _, container := range containers {
+		if container.Names[0] == containerName {
+			return &container, nil
+		}
+	}
+
+	return nil, fmt.Errorf("container %s not found", containerName)
+}
+
+func getNetNSHandle(ctx context.Context, cli *client.Client, containerName string) (netns.NsHandle, error) {
+	container, err := findContainer(ctx, cli, containerName)
+	if err != nil {
+		return -1, fmt.Errorf("failed to find container: %w", err)
+	}
+
+	if container == nil {
+		return -1, fmt.Errorf("container %s not found", containerName)
+	}
+
+	return netns.GetFromDocker(container.ID)
+}
+
+func withNsHandle(ctx context.Context, containerName *string, f func(h *netlink.Handle) error) error {
+	if containerName == nil {
+		handle, err := netlink.NewHandle()
+		if err != nil {
+			return fmt.Errorf("failed to create netlink handle: %w", err)
+		}
+		defer handle.Close()
+		return f(handle)
+	}
+
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+	nsHandle, err := getNetNSHandle(ctx, cli, *containerName)
+	if err != nil {
+		return fmt.Errorf("failed to get netns from docker: %w", err)
+	}
+	defer nsHandle.Close()
+
+	handle, err := netlink.NewHandleAt(nsHandle)
+	if err != nil {
+		return fmt.Errorf("failed to create netlink handle: %w", err)
+	}
+	defer handle.Close()
+
+	return f(handle)
+}
+
+func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
+	return withNsHandle(ctx, vxlanConfig.ContainerName, func(handle *netlink.Handle) error {
+		var err error
+
+		link := &netlink.Vxlan{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: vxlanConfig.Name,
+			},
+			VxlanId: vxlanConfig.VXLANID,
+		}
+
+		if vxlanConfig.LocalIP != nil {
+			srcAddr := net.ParseIP(*vxlanConfig.LocalIP)
+			if srcAddr == nil {
+				return fmt.Errorf("failed to parse local ip: %w", err)
+			}
+			link.SrcAddr = srcAddr
+		}
+
+		if vxlanConfig.MTU != nil {
+			link.MTU = *vxlanConfig.MTU
+		}
+
+		if vxlanConfig.Nolearning != nil {
+			link.Learning = !*vxlanConfig.Nolearning
+		}
+
+		err = handle.LinkAdd(link)
+		if err != nil {
+			return fmt.Errorf("failed to add vxlan link: %w", err)
+		}
+
+		err = handle.LinkSetUp(link)
+		if err != nil {
+			return fmt.Errorf("failed to set vxlan link up: %w", err)
+		}
+
+		return nil
+	})
+}
+
+type VethPairConfig struct {
+	Name          string          `yaml:"name" json:"name"`
+	ContainerName *string         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Peer          *VethPairConfig `yaml:"peer,omitempty" json:"peer,omitempty"`
+}
+
+func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
+	return withNsHandle(ctx, nil, func(handle *netlink.Handle) error {
+		cli, err := dockerCliFromCtx(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get docker cli from context: %w", err)
+		}
+
+		if vethPairConfig.Peer == nil {
+			return fmt.Errorf("peer is not set")
+		}
+
+		var primaryNsHandle *netns.NsHandle
+		var secondaryNsHandle *netns.NsHandle
+
+		if vethPairConfig.ContainerName != nil {
+			nsHd, err := getNetNSHandle(ctx, cli, *vethPairConfig.ContainerName)
+			if err != nil {
+				return fmt.Errorf("failed to get netns from docker: %w", err)
+			}
+			defer nsHd.Close()
+			primaryNsHandle = &nsHd
+		}
+
+		if vethPairConfig.Peer.ContainerName != nil {
+			nsHd, err := getNetNSHandle(ctx, cli, *vethPairConfig.Peer.ContainerName)
+			if err != nil {
+				return fmt.Errorf("failed to get netns from docker: %w", err)
+			}
+			defer nsHd.Close()
+			secondaryNsHandle = &nsHd
+		}
+
+		link := &netlink.Veth{}
+		link.Name = vethPairConfig.Name
+		if primaryNsHandle != nil {
+			link.Namespace = *primaryNsHandle
+		}
+
+		link.PeerName = vethPairConfig.Peer.Name
+
+		if secondaryNsHandle != nil {
+			link.PeerNamespace = *secondaryNsHandle
+		}
+
+		err = handle.LinkAdd(link)
+		if err != nil {
+			return fmt.Errorf("failed to add veth link: %w", err)
+		}
+
+		return nil
+	})
+}
+
+type BridgeConfig struct {
+	Name            string   `yaml:"name" json:"name"`
+	SlaveInterfaces []string `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
+	ContainerName   *string  `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+}
+
+func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
+	return withNsHandle(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+		link := &netlink.Bridge{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: bridgeConfig.Name,
+			},
+		}
+
+		err := handle.LinkAdd(link)
+		if err != nil {
+			return fmt.Errorf("failed to add bridge link: %w", err)
+		}
+
+		err = handle.LinkSetUp(link)
+		if err != nil {
+			return fmt.Errorf("failed to set bridge link up: %w", err)
+		}
+
+		return nil
+	})
 }
 
 type DataplaneConfig struct {
 	OpenVPN   []OpenVPN2Instance `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
 	WireGuard []WireGuardConfig  `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
 	VXLAN     []VXLANConfig      `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
+	VethPair  []VethPairConfig   `yaml:"veth_pair,omitempty" json:"veth_pair,omitempty"`
+	Bridge    []BridgeConfig     `yaml:"bridge,omitempty" json:"bridge,omitempty"`
 }
 
 type NodeConfig struct {
@@ -687,11 +897,11 @@ type Instance struct {
 const labelKeyService string = "service"
 const labelKeyInstance string = "instance"
 
-func up(ctx context.Context, servicename string, nodeConfig *NodeConfig) error {
+func up(ctx context.Context, nodeConfig *NodeConfig) error {
 
 	if nodeConfig.Dataplane != nil {
 		for _, ovpInst := range nodeConfig.Dataplane.OpenVPN {
-			if err := ovpInst.Start(ctx, servicename); err != nil {
+			if err := ovpInst.Create(ctx); err != nil {
 				fmt.Fprintf(os.Stderr, "failed to start openvpn for %s: %v\n", ovpInst.Name, err)
 				continue
 			}
@@ -807,7 +1017,12 @@ func up(ctx context.Context, servicename string, nodeConfig *NodeConfig) error {
 	return nil
 }
 
-func down(ctx context.Context, servicename string) error {
+func down(ctx context.Context) error {
+	servicename, err := serviceNameFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get service name from context: %w", err)
+	}
+
 	cli, err := dockerCliFromCtx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get docker cli from context: %w", err)
@@ -890,11 +1105,14 @@ func main() {
 	}
 	defer cli.Close()
 
+	ctx = setServiceNameInCtx(ctx, servicename)
+	ctx = setDockerCliInCtx(ctx, cli)
+
 	switch command {
 	case "up":
-		err = up(setDockerCliInCtx(ctx, cli), servicename, &nodeConfig)
+		err = up(ctx, &nodeConfig)
 	case "down":
-		err = down(setDockerCliInCtx(ctx, cli), servicename)
+		err = down(ctx)
 	default:
 		panic("command is unknown")
 	}

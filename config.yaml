@@ -17,7 +17,7 @@ nodes:
         - vrf: default
           router_id: "10.3.64.1"
           interfaces:
-            - name: v5-dummy
+            - name: dummy0
               area: "0.0.0.0"
               passive: true
             - name: veth1
@@ -33,7 +33,6 @@ nodes:
               safi: evpn
               advertise_all_vni: true
               advertise_svi_ip: true
-          # neighbors is a map of map[group][]PeerConfig
           neighbors:
             group1:
               asn: 65001
@@ -42,7 +41,6 @@ nodes:
               peers:
                 - address: "10.3.82.66"
                 - address: "10.3.98.66"
-
     dataplane:
       openvpn:
         - name: pi
@@ -102,6 +100,7 @@ nodes:
       dummy:
         - name: dummy0
           cidr: "10.3.64.1/24"
+          container_name: frr
   lax1:
     controlplane:
       container_name: frr
@@ -160,12 +159,12 @@ nodes:
       bridge:
         - name: br0
           slave_interfaces:
-            - name: veth1
+            - veth1
           container_name: frr
         - name: br0
           slave_interfaces:
-            - name: tap0
-            - name: veth1
+            - tap0
+            - veth1
           container_name: openvpn-connector-1
     virtual_interface:
       dummy:
