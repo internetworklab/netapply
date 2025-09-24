@@ -8,6 +8,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -149,6 +150,51 @@ type DockerContainerConfig struct {
 	AutoRemove    *bool                          `yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
 	Networks      []string                       `yaml:"networks,omitempty" json:"networks,omitempty"`
 	Command       []string                       `yaml:"command,omitempty" json:"command,omitempty"`
+}
+
+func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
+	containerConfig := &container.Config{}
+	hostConfig := &container.HostConfig{}
+	networkConfig := &network.NetworkingConfig{}
+	containerName := dockerConfig.ContainerName
+	if containerName == "" {
+		return fmt.Errorf("container name is not set")
+	}
+
+	dockerConfig.ApplyToContainerCreateConfig(containerConfig, hostConfig, networkConfig)
+	containerConfig.Cmd = dockerConfig.Command
+	containerConfig.Tty = true
+	containerConfig.OpenStdin = true
+	servicename, err := serviceNameFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get service name from context: %w", err)
+	}
+	containerConfig.Labels = map[string]string{
+		labelKeyService: servicename,
+	}
+
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	resp, err := cli.ContainerCreate(
+		ctx,
+		containerConfig,
+		hostConfig,
+		networkConfig,
+		nil,
+		containerName,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create container: %w", err)
+	}
+
+	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+
+	return nil
 }
 
 func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
@@ -521,9 +567,11 @@ func (bgpConf *BGPConfig) ToCLICommands() []string {
 }
 
 type ControlplaneConfig struct {
-	OSPF      []OSPFConfig           `yaml:"ospf,omitempty" json:"ospf,omitempty"`
-	BGP       []BGPConfig            `yaml:"bgp,omitempty" json:"bgp,omitempty"`
-	Container *DockerContainerConfig `yaml:"container,omitempty" json:"container,omitempty"`
+	OSPF              []OSPFConfig `yaml:"ospf,omitempty" json:"ospf,omitempty"`
+	BGP               []BGPConfig  `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	ContainerName     *string      `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	HostPatchDir      string       `yaml:"host_patch_dir,omitempty" json:"host_patch_dir,omitempty"`
+	ContainerPatchDir string       `yaml:"container_patch_dir,omitempty" json:"container_patch_dir,omitempty"`
 }
 
 type DummyConfig struct {
@@ -767,6 +815,7 @@ type DataplaneConfig struct {
 }
 
 type NodeConfig struct {
+	DockerContainers []DockerContainerConfig `yaml:"docker_containers,omitempty" json:"docker_containers,omitempty"`
 	Controlplane     *ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 	VirtualInterface *VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
@@ -898,6 +947,13 @@ const labelKeyService string = "service"
 const labelKeyInstance string = "instance"
 
 func up(ctx context.Context, nodeConfig *NodeConfig) error {
+	for _, dockerContainer := range nodeConfig.DockerContainers {
+		if err := dockerContainer.Create(ctx); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create docker container %s: %v\n", dockerContainer.ContainerName, err)
+			continue
+		}
+		log.Println("Container is created for", dockerContainer.ContainerName)
+	}
 
 	if nodeConfig.Dataplane != nil {
 		for _, ovpInst := range nodeConfig.Dataplane.OpenVPN {
@@ -914,94 +970,60 @@ func up(ctx context.Context, nodeConfig *NodeConfig) error {
 		configsToApply := make([]string, 0)
 
 		if nodeConfig.Controlplane.OSPF != nil {
-			ospfConfFile, err := os.CreateTemp("", "frr-ospf-")
+			ospfPatchPath := path.Join(nodeConfig.Controlplane.HostPatchDir, "ospf.conf")
+			ospfPatchFile, err := os.OpenFile(ospfPatchPath, os.O_RDWR|os.O_CREATE, 0644)
 			if err != nil {
-				return fmt.Errorf("failed to create temporary file: %w", err)
+				return fmt.Errorf("failed to open ospf patch file: %w", err)
 			}
-
-			// For now, we are not gonna delete the file after when it's been used,
-			// since it's not so large and for debugging purposes.
-			// defer os.Remove(ospfConfFile.Name()) // Clean up the file when done
-
-			defer ospfConfFile.Close() // Close the file
+			defer ospfPatchFile.Close()
 
 			for _, ospfConf := range nodeConfig.Controlplane.OSPF {
 				cmds := ospfConf.ToCLICommands()
 				for _, cmd := range cmds {
-					ospfConfFile.WriteString(cmd + "\n")
+					ospfPatchFile.WriteString(cmd + "\n")
 				}
 			}
-			configsToApply = append(configsToApply, ospfConfFile.Name())
+			configsToApply = append(configsToApply, path.Join(nodeConfig.Controlplane.ContainerPatchDir, path.Base(ospfPatchPath)))
 		}
 
 		if nodeConfig.Controlplane.BGP != nil {
-			bgpConfFile, err := os.CreateTemp("", "frr-bgp-")
+			bgpPatchPath := path.Join(nodeConfig.Controlplane.HostPatchDir, "bgp.conf")
+			bgpPatchFile, err := os.OpenFile(bgpPatchPath, os.O_RDWR|os.O_CREATE, 0644)
 			if err != nil {
 				return fmt.Errorf("failed to create temporary file: %w", err)
 			}
-			defer os.Remove(bgpConfFile.Name()) // Clean up the file when done
-			defer bgpConfFile.Close()           // Close the file
+			defer bgpPatchFile.Close()
+
 			for _, bgpConf := range nodeConfig.Controlplane.BGP {
 				cmds := bgpConf.ToCLICommands()
 				for _, cmd := range cmds {
-					bgpConfFile.WriteString(cmd + "\n")
+					bgpPatchFile.WriteString(cmd + "\n")
 				}
 			}
-			configsToApply = append(configsToApply, bgpConfFile.Name())
-		}
-
-		containerConfig := &container.Config{}
-		hostConfig := &container.HostConfig{}
-		networkConfig := &network.NetworkingConfig{}
-		nodeConfig.Controlplane.Container.ApplyToContainerCreateConfig(containerConfig, hostConfig, networkConfig)
-
-		extraMounts := make([]mount.Mount, 0)
-		if configsToApply != nil {
-			for _, configToApply := range configsToApply {
-				extraMounts = append(extraMounts, mount.Mount{
-					Type:   mount.TypeBind,
-					Source: configToApply,
-					Target: configToApply,
-				})
-			}
-			hostConfig.Mounts = append(hostConfig.Mounts, extraMounts...)
-		}
-
-		containerName := nodeConfig.Controlplane.Container.ContainerName
-		if containerName == "" {
-			return fmt.Errorf("router container name is required")
+			configsToApply = append(configsToApply, path.Join(nodeConfig.Controlplane.ContainerPatchDir, path.Base(bgpPatchPath)))
 		}
 
 		cli, err := dockerCliFromCtx(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get docker cli from context: %w", err)
 		}
-
-		resp, err := cli.ContainerCreate(
-			ctx,
-			containerConfig,
-			hostConfig,
-			networkConfig,
-			nil,
-			containerName,
-		)
+		cont, err := findContainer(ctx, cli, *nodeConfig.Controlplane.ContainerName)
 		if err != nil {
-			return fmt.Errorf("failed to create container: %w", err)
+			return fmt.Errorf("failed to find container: %w", err)
 		}
-		containerID := resp.ID
-		if err := cli.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
+		if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
 			return fmt.Errorf("failed to start container: %w", err)
 		}
 
-		for _, extraMount := range extraMounts {
+		for _, configToApply := range configsToApply {
 			execOptions := container.ExecOptions{
 				Cmd: []string{
 					"vtysh",
 					"-f",
-					extraMount.Target,
+					configToApply,
 				},
 			}
-			exec, err := cli.ContainerExecCreate(ctx, containerID, execOptions)
+			exec, err := cli.ContainerExecCreate(ctx, cont.ID, execOptions)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to create exec: %v\n", err)
 				continue
