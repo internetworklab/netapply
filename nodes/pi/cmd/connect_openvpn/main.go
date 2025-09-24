@@ -13,6 +13,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
+	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"gopkg.in/yaml.v3"
 )
@@ -109,6 +110,37 @@ func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() []string {
 	return res
 }
 
+type DockerMountConfig struct {
+	Type   mount.Type `yaml:"type" json:"type"`
+	Source string     `yaml:"source" json:"source"`
+	Target string     `yaml:"target" json:"target"`
+}
+
+type DockerDeviceMapping struct {
+	// For example, "/dev/net/tun"
+	PathOnHost string `yaml:"path_on_host" json:"path_on_host"`
+
+	// For example, "/dev/net/tun"
+	PathInContainer string `yaml:"path_in_container" json:"path_in_container"`
+
+	// Should use "rwm" mostly
+	CgroupPermissions *string `yaml:"cgroup_permissions,omitempty" json:"cgroup_permissions,omitempty"`
+}
+
+type DockerPortMapping struct {
+	HostIP   string `yaml:"host_ip" json:"host_ip"`
+	HostPort string `yaml:"host_port" json:"host_port"`
+}
+
+type DockerContainerConfig struct {
+	ContainerName string                       `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Capabilities  []string                     `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
+	Hostname      string                       `yaml:"hostname,omitempty" json:"hostname,omitempty"`
+	Ports         map[string]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Volumes       []DockerMountConfig          `yaml:"volumes,omitempty" json:"volumes,omitempty"`
+	Devices       []DockerDeviceMapping        `yaml:"devices,omitempty" json:"devices,omitempty"`
+}
+
 type OpenVPN2Instance struct {
 	Name                string                     `openvpn2:"-" yaml:"name"`
 	Client              *bool                      `openvpn2:"client" yaml:"client,omitempty"`
@@ -138,6 +170,7 @@ type OpenVPN2Instance struct {
 	ScriptSecurityLevel *int                       `openvpn2:"script-security" yaml:"script_security_level,omitempty"`
 	ResolvRetry         *string                    `openvpn2:"resolv-retry" yaml:"resolv_retry,omitempty"`
 	LLAddr              *string                    `openvpn2:"lladdr" yaml:"lladdr,omitempty"`
+	DockerContainer     *DockerContainerConfig     `openvpn2:"-" yaml:"docker_container,omitempty"`
 }
 
 const (
