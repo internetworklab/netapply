@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"gopkg.in/yaml.v3"
 )
 
 type OpenVPN2Role string
@@ -22,20 +23,6 @@ const (
 	OpenVPN2RoleClient OpenVPN2Role = "client"
 	OpenVPN2RoleServer OpenVPN2Role = "server"
 )
-
-type OpenVPN2HttpProxy struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
-}
-
-func (ovp *OpenVPN2HttpProxy) ToCLIArgs() []string {
-	res := make([]string, 0)
-	if ovp != nil {
-		res = append(res, ovp.Host)
-		res = append(res, fmt.Sprintf("%d", ovp.Port))
-	}
-	return res
-}
 
 type OpenVPN2Proto string
 
@@ -65,14 +52,22 @@ const (
 
 type OpenVPN2Topology string
 
+func (ovp *OpenVPN2Topology) ToCLIArgs() []string {
+	res := make([]string, 0)
+	if ovp != nil {
+		res = append(res, fmt.Sprintf("%v", *ovp))
+	}
+	return res
+}
+
 const (
 	OpenVPN2TopologySubnet OpenVPN2Topology = "subnet"
 	OpenVPN2TopologyNet30  OpenVPN2Topology = "net30"
 )
 
 type OpenVPN2KeepaliveConfig struct {
-	IntervalSecs int `json:"interval_secs"`
-	PatienceSecs int `json:"patience_secs"`
+	IntervalSecs int `json:"interval_secs" yaml:"interval_secs"`
+	PatienceSecs int `json:"patience_secs" yaml:"patience_secs"`
 }
 
 func (ovp *OpenVPN2KeepaliveConfig) ToCLIArgs() []string {
@@ -86,8 +81,8 @@ func (ovp *OpenVPN2KeepaliveConfig) ToCLIArgs() []string {
 }
 
 type OpenVPN2RemoteConfig struct {
-	Host string `json:"host"`
-	Port int    `json:"port"`
+	Host string `json:"host" yaml:"host"`
+	Port int    `json:"port" yaml:"port"`
 }
 
 func (ovp *OpenVPN2RemoteConfig) ToCLIArgs() []string {
@@ -115,35 +110,57 @@ func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() []string {
 }
 
 type OpenVPN2Instance struct {
-	Name               string                     `openvpn2:"-"`
-	Client             *bool                      `openvpn2:"client"`
-	Server             *bool                      `openvpn2:"server"`
-	Port               *int                       `openvpn2:"port"`
-	Dev                string                     `openvpn2:"dev"`
-	Proto              OpenVPN2Proto              `openvpn2:"proto"`
-	Remote             *OpenVPN2RemoteConfig      `openvpn2:"remote"`
-	NoBind             *bool                      `openvpn2:"no-bind"`
-	PersistTun         *bool                      `openvpn2:"persist-tun"`
-	HttpProxy          *OpenVPN2HttpProxy         `openvpn2:"http-proxy"`
-	CertFile           string                     `openvpn2:"cert-file"`
-	KeyFile            string                     `openvpn2:"key-file"`
-	DHPEMFile          *string                    `openvpn2:"dh"`
-	PeerFingerprint    string                     `openvpn2:"peer-fingerprint"`
-	RemoteCertTls      *OpenVPN2RemoteTLSCertType `openvpn2:"remote-cert-tls"`
-	Verb               *int                       `openvpn2:"verb"`
-	TLSServer          *bool                      `openvpn2:"tls-server"`
-	DataCiphers        *string                    `openvpn2:"data-ciphers"`
-	Topology           *OpenVPN2Topology          `openvpn2:"topology"`
-	ServerBridge       *bool                      `openvpn2:"server-bridge"`
-	ClientToClient     *bool                      `openvpn2:"client-to-client"`
-	KeepaliveIntvSecs  *OpenVPN2KeepaliveConfig   `openvpn2:"keepalive"`
-	StatusFile         *string                    `openvpn2:"status"`
-	ExplicitExitNotify *bool                      `openvpn2:"explicit-exit-notify"`
+	Name                string                     `openvpn2:"-" yaml:"name"`
+	Client              *bool                      `openvpn2:"client" yaml:"client,omitempty"`
+	Server              *bool                      `openvpn2:"server" yaml:"server,omitempty"`
+	Port                *int                       `openvpn2:"port" yaml:"port,omitempty"`
+	Dev                 string                     `openvpn2:"dev" yaml:"dev"`
+	Proto               OpenVPN2Proto              `openvpn2:"proto" yaml:"proto"`
+	Remote              *OpenVPN2RemoteConfig      `openvpn2:"remote" yaml:"remote,omitempty"`
+	NoBind              *bool                      `openvpn2:"no-bind" yaml:"no_bind,omitempty"`
+	PersistTun          *bool                      `openvpn2:"persist-tun" yaml:"persist_tun,omitempty"`
+	HttpProxy           *OpenVPN2RemoteConfig      `openvpn2:"http-proxy" yaml:"http_proxy,omitempty"`
+	CertFile            string                     `openvpn2:"cert-file" yaml:"cert_file"`
+	KeyFile             string                     `openvpn2:"key-file" yaml:"key_file"`
+	DHPEMFile           *string                    `openvpn2:"dh" yaml:"dh,omitempty"`
+	PeerFingerprint     string                     `openvpn2:"peer-fingerprint" yaml:"peer_fingerprint"`
+	RemoteCertTls       *OpenVPN2RemoteTLSCertType `openvpn2:"remote-cert-tls" yaml:"remote_cert_tls,omitempty"`
+	Verb                *int                       `openvpn2:"verb" yaml:"verb,omitempty"`
+	TLSServer           *bool                      `openvpn2:"tls-server" yaml:"tls_server,omitempty"`
+	DataCiphers         *string                    `openvpn2:"data-ciphers" yaml:"data_ciphers,omitempty"`
+	Topology            *OpenVPN2Topology          `openvpn2:"topology" yaml:"topology,omitempty"`
+	ServerBridge        *bool                      `openvpn2:"server-bridge" yaml:"server_bridge,omitempty"`
+	ClientToClient      *bool                      `openvpn2:"client-to-client" yaml:"client_to_client,omitempty"`
+	KeepaliveIntvSecs   *OpenVPN2KeepaliveConfig   `openvpn2:"keepalive" yaml:"keepalive,omitempty"`
+	StatusFile          *string                    `openvpn2:"status" yaml:"status_file,omitempty"`
+	ExplicitExitNotify  *bool                      `openvpn2:"explicit-exit-notify" yaml:"explicit_exit_notify,omitempty"`
+	UpCMD               *string                    `openvpn2:"up" yaml:"up_cmd,omitempty"`
+	ScriptSecurityLevel *int                       `openvpn2:"script-security" yaml:"script_security_level,omitempty"`
+	ResolvRetry         *string                    `openvpn2:"resolv-retry" yaml:"resolv_retry,omitempty"`
+	LLAddr              *string                    `openvpn2:"lladdr" yaml:"lladdr,omitempty"`
 }
 
 const (
 	OVTagFlagEmptyKey string = "emptykey"
 )
+
+type ControlplaneConfig struct {
+	OSPF interface{} `yaml:"ospf,omitempty" json:"ospf,omitempty"`
+	BGP  interface{} `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+}
+
+type DataplaneConfig struct {
+	OpenVPN []OpenVPN2Instance `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
+}
+
+type NodeConfig struct {
+	Controlplane ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
+	Dataplane    DataplaneConfig    `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+}
+
+type GlobalConfig struct {
+	Nodes map[string]NodeConfig `yaml:"nodes" json:"nodes"`
+}
 
 func parseTag(tag string) (map[string]string, []string, string) {
 	tags := make([]string, 0)
@@ -206,6 +223,7 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 				res = append(res, fmt.Sprintf("%v", *typedval))
 			}
 		case *string:
+
 			if typedval != nil {
 				res = append(res, fmt.Sprintf("--%s", firstTag))
 				res = append(res, fmt.Sprintf("%v", *typedval))
@@ -218,17 +236,17 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 			res = append(res, fmt.Sprintf("--%s", firstTag))
 			res = append(res, fmt.Sprintf("%v", typedval))
 		case string:
+
 			res = append(res, fmt.Sprintf("--%s", firstTag))
 			res = append(res, fmt.Sprintf("%v", typedval))
 		default:
 
-			res = append(res, fmt.Sprintf("--%s", firstTag))
-
 			kind := v.Field(i).Kind()
 
-			if kind == reflect.Ptr && !v.Field(i).IsNil() {
+			if kind == reflect.Pointer && !v.Field(i).IsNil() {
 				method := v.Field(i).MethodByName("ToCLIArgs")
 				if !method.IsZero() {
+					res = append(res, fmt.Sprintf("--%s", firstTag))
 					if retval := method.Call(nil); len(retval) > 0 {
 						if retval1, ok := (retval[0].Interface()).([]string); ok {
 							res = append(res, retval1...)
@@ -236,12 +254,11 @@ func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
 					}
 				}
 			} else if !v.Field(i).IsZero() {
+				res = append(res, fmt.Sprintf("--%s", firstTag))
 
 				valType := v.Field(i).Type()
 
-				// Create a new instance of the field type
 				valobj := reflect.New(valType)
-				// Set the value from the original field
 				valobj.Elem().Set(v.Field(i))
 
 				retval := valobj.MethodByName("ToCLIArgs").Call(nil)
@@ -303,6 +320,7 @@ func startPing(cli *client.Client, instance *Instance, imagename string) error {
 }
 
 func up(servicename string, cli *client.Client) error {
+
 	imgname := "busybox:latest"
 	pingInstances := []Instance{
 		{Name: "loopback", Target: "127.0.0.1"},
@@ -368,47 +386,20 @@ const tagName string = "openvpn2"
 
 func main() {
 
-	port := 1010
-	noBind := true
-	persistTun := true
-	dhPEMFile := "/path/to/dh.pem"
-	remoteTLSCertType := OpenVPN2RemoteTLSCertTypeServer
-	verb := 3
-	tlsServer := true
-	intv := OpenVPN2KeepaliveConfig{
-		IntervalSecs: 10,
-		PatienceSecs: 120,
+	configFile, err := os.Open(os.Args[1])
+	if err != nil {
+		panic(err)
 	}
-	statusFile := "openvpn-status.log"
-	explicitExitNotify := true
-	isclient := true
-	ovInst := OpenVPN2Instance{
-		Name:   "name1",
-		Client: &isclient,
-		Port:   &port,
-		Dev:    "tap0",
-		Proto:  OpenVPN2ProtoTCP,
-		Remote: &OpenVPN2RemoteConfig{
-			Host: "148.135.56.215",
-			Port: 21194,
-		},
-		NoBind:             &noBind,
-		PersistTun:         &persistTun,
-		CertFile:           "/path/to/cert.pem",
-		KeyFile:            "/path/to/key.pem",
-		DHPEMFile:          &dhPEMFile,
-		PeerFingerprint:    "06:00:DD:D5:77:82:A0:E6:E5:5F:C4:A0:F5:D3:5A:98:23:6E:E5:DC:86:D3:AB:60:9F:01:1B:97:D4:A6:60:BE",
-		RemoteCertTls:      &remoteTLSCertType,
-		Verb:               &verb,
-		TLSServer:          &tlsServer,
-		KeepaliveIntvSecs:  &intv,
-		StatusFile:         &statusFile,
-		ExplicitExitNotify: &explicitExitNotify,
+	defer configFile.Close()
+
+	globalConfig := new(GlobalConfig)
+	if err := yaml.NewDecoder(configFile).Decode(globalConfig); err != nil {
+		panic(err)
 	}
 
-	res := ovInst.ToCLIArgs()
-	for idx, x := range res {
-		fmt.Printf("[%d]: %s\n", idx, x)
+	cliArgs := globalConfig.Nodes["pi"].Dataplane.OpenVPN[0].ToCLIArgs()
+	for idx, arg := range cliArgs {
+		fmt.Printf("[%d] %s\n", idx, arg)
 	}
 
 	return

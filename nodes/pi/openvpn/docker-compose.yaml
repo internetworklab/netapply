@@ -12,12 +12,44 @@ services:
       - ss
     command:
       - openvpn
-      - "--config"
-      - "/etc/openvpn/client.conf"
+      - "--client"
+      - "--dev"
+      - "tap0"
+      - "--proto"
+      - "tcp"
+      - "--remote"
+      - "148.135.56.215"
+      - "21194"
+      - "--resolv-retry"
+      - "infinite"
+      - "--nobind"
+      - "--http-proxy"
+      - "ss"
+      - "8080"
+      - "--cert"
+      - "/etc/openvpn/certs/client-cert.pem"
+      - "--key"
+      - "/etc/openvpn/certs/client-key.pem"
+      - "--peer-fingerprint"
+      - "A6:79:F7:4A:0C:A6:4A:D1:6F:85:2E:25:8F:D8:C2:2A:62:4F:61:FB:4C:5C:38:11:5E:4E:39:51:93:11:DD:DF"
+      - "--remote-cert-tls"
+      - "server"
+      - "--verb"
+      - "3"
+      - "--keepalive"
+      - "30"
+      - "120"
+      - "--lladdr"
+      - "46:8e:19:6b:e2:58"
+      - "--up"
+      - "/up-wrapper.sh"
+      - "--script-security"
+      - "3"
     volumes:
       - ./certs/client-cert.pem:/etc/openvpn/certs/client-cert.pem
       - ./certs/client-key.pem:/etc/openvpn/certs/client-key.pem
       - ./client.conf:/etc/openvpn/client.conf
+      - ./up-wrapper.sh:/up-wrapper.sh
     restart: unless-stopped
     hostname: vpn-client
     container_name: openvpn-client

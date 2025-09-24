@@ -5,13 +5,28 @@ nodes:
       bgp: {}
     dataplane:
       openvpn:
-        - name: tap0
-          role: client
-          dh_cert_file: /path/to/dh2048.pem
-          cert_file: /path/to/cert.pem
-          cert_key_file: /path/to/key.pem
-          pin_sha256: "06:00:DD:D5:77:82:A0:E6:E5:5F:C4:A0:F5:D3:5A:98:23:6E:E5:DC:86:D3:AB:60:9F:01:1B:97:D4:A6:60:BE"
-          tuntap: tap
+        - name: pi
+          client: true
+          dev: tap0
+          proto: tcp
+          remote:
+            host: "148.135.56.215"
+            port: 21194
+          resolv_retry: infinite
+          nobind: true
+          http_proxy:
+            host: "ss"
+            port: 8080
+          cert_file: /etc/openvpn/certs/client-cert.pem
+          key_file: /etc/openvpn/certs/client-key.pem
+          peer_fingerprint: "A6:79:F7:4A:0C:A6:4A:D1:6F:85:2E:25:8F:D8:C2:2A:62:4F:61:FB:4C:5C:38:11:5E:4E:39:51:93:11:DD:DF"
+          remote_cert_tls: server
+          verb: 3
+          keepalive:
+            interval_secs: 30
+            patience_secs: 120
+          up_cmd: /up-wrapper.sh
+          script_security_level: 3
     virtual_interface:
       dummy:
         - name: dummy0
