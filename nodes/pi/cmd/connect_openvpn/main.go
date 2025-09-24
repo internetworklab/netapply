@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -571,12 +572,30 @@ func down(ctx context.Context, servicename string) error {
 
 const tagName string = "openvpn2"
 
+var (
+	command        string
+	nodeName       string
+	servicename    string
+	configFilePath string
+)
+
 func main() {
 	ctx := context.Background()
-	configFilePath := "./config.yaml"
-	command := "up"
-	nodeName := "pi"
-	servicename := "openvpn"
+
+	flag.Parse()
+
+	if command == "" {
+		panic("command --command is required")
+	}
+	if nodeName == "" {
+		panic("node name --node is required")
+	}
+	if servicename == "" {
+		panic("service name --service is required")
+	}
+	if configFilePath == "" {
+		panic("config file path --config is required")
+	}
 
 	configFile, err := os.Open(configFilePath)
 	if err != nil {
@@ -613,4 +632,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "failed to %s: %v\n", command, err)
 		os.Exit(1)
 	}
+}
+
+func init() {
+	flag.StringVar(&command, "command", "up", "command to run")
+	flag.StringVar(&nodeName, "node", "", "node name")
+	flag.StringVar(&servicename, "service", "openvpn", "service name")
+	flag.StringVar(&configFilePath, "config", "./config.yaml", "config file path")
 }
