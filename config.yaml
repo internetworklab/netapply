@@ -37,11 +37,13 @@ nodes:
           # neighbors is a map of map[group][]PeerConfig
           neighbors:
             group1:
+              asn: 65001
               capabilities:
                 - extended-nexthop
               peers:
-                - "10.3.82.66"
-                - "10.3.98.66"
+                - address: "10.3.82.66"
+                - address: "10.3.98.66"
+
     dataplane:
       openvpn:
         - name: pi
