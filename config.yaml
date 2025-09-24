@@ -11,24 +11,37 @@ nodes:
           - type: bind
             source: "./nodes/pi/frr/config/daemons"
             target: "/etc/frr/daemons"
-          # we do not need this ospf.conf, the controller will apply it to vtysh automatically.
-          # - type: bind
-          #   source: "./nodes/pi/frr/ospf.conf"
-          #   target: "/misc/ospf.conf"
         autoremove: true
     controlplane:
       container_name: frr
       ospf:
         - vrf: default
-          router_id: 10.3.64.1
+          router_id: "10.3.64.1"
           interfaces:
             - name: v5-dummy
-              area: 0.0.0.0
+              area: "0.0.0.0"
               passive: true
             - name: veth1
-              area: 0.0.0.0
+              area: "0.0.0.0"
               network: point-to-point
-      bgp: {}
+      bgp:
+        - vrf: default
+          asn: 65001
+          router_id: "10.3.64.1"
+          no_ipv4_unicast: true
+          address_families:
+            - afi: l2vpn
+              safi: evpn
+              advertise_all_vni: true
+              advertise_svi_ip: true
+          # neighbors is a map of map[group][]PeerConfig
+          neighbors:
+            group1:
+              capabilities:
+                - extended-nexthop
+              peers:
+                - "10.3.82.66"
+                - "10.3.98.66"
     dataplane:
       openvpn:
         - name: pi
@@ -129,43 +142,32 @@ nodes:
             - peer: "10.192.122.3/32"
               local: "10.192.122.3"
           mtu: 1420
-          container:
-            docker:
-              name: frr
+          container_name: frr
       vxlan:
         - vxlan_id: 42
           local_ip: "10.3.64.1"
           mtu: 1370
           name: vx42
           nolearning: true
-          container:
-            docker:
-              name: frr
+          container_name: frr
       veth:
         - name: veth1
-          container:
-            docker:
-              name: openvpn-server
+          container_name: openvpn-connector-1
           peer:
             name: veth1
-            container:
-              docker:
-                name: frr
+            container_name: frr
       bridge:
-        - name: br42
+        - name: br0
           slave_interfaces:
-            - name: vx42
-          container:
-            docker:
-              name: frr
+            - name: veth1
+          container_name: frr
         - name: br0
           slave_interfaces:
             - name: tap0
             - name: veth1
-          container:
-            docker:
-              name: openvpn-server
+          container_name: openvpn-connector-1
     virtual_interface:
       dummy:
         - name: v5-dummy
           cidr: "10.3.64.1/24"
+          container_name: frr

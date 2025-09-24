@@ -336,11 +336,51 @@ const (
 	OVTagFlagEmptyKey string = "emptykey"
 )
 
+type OSPFInterfaceConfig struct {
+	Name    string  `yaml:"name" json:"name"`
+	Area    string  `yaml:"area" json:"area"`
+	Passive *bool   `yaml:"passive" json:"passive"`
+	Network *string `yaml:"network" json:"network"`
+}
+
+type OSPFConfig struct {
+	// Currently only 'default' vrf is supported
+	VRF        string                `yaml:"vrf" json:"vrf"`
+	RouterID   string                `yaml:"router_id" json:"router_id"`
+	Interfaces []OSPFInterfaceConfig `yaml:"interfaces" json:"interfaces"`
+}
+
+type MPBGPAddressFamilyConfig struct {
+	AFI  string `yaml:"afi" json:"afi"`
+	SAFI string `yaml:"safi" json:"safi"`
+
+	// following fields are only supported in (afi=l2vpn, safi=evpn)
+	AdvertiseAllVNI *bool `yaml:"advertise_all_vni" json:"advertise_all_vni"`
+	AdvertiseSVIIP  *bool `yaml:"advertise_svi_ip" json:"advertise_svi_ip"`
+}
+
+type BGPNeighborGroupConfig struct {
+	Capabilities []string `yaml:"capabilities" json:"capabilities"`
+	Peers        []string `yaml:"peers" json:"peers"`
+}
+
+type BGPConfig struct {
+	// Currently only 'default' vrf is supported
+	VRF             string                     `yaml:"vrf" json:"vrf"`
+	ASN             int                        `yaml:"asn" json:"asn"`
+	RouterID        string                     `yaml:"router_id" json:"router_id"`
+	NoIPv4Unicast   bool                       `yaml:"no_ipv4_unicast" json:"no_ipv4_unicast"`
+	AddressFamilies []MPBGPAddressFamilyConfig `yaml:"address_families" json:"address_families"`
+
+	// key is the group name
+	Neighbors map[string]BGPNeighborGroupConfig `yaml:"neighbors" json:"neighbors"`
+}
+
 type ControlplaneConfig struct {
 	// Container name is the name of the container that hosts the FRR daemon
-	ContainerName string      `yaml:"container_name" json:"container_name"`
-	OSPF          interface{} `yaml:"ospf,omitempty" json:"ospf,omitempty"`
-	BGP           interface{} `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	ContainerName string       `yaml:"container_name" json:"container_name"`
+	OSPF          []OSPFConfig `yaml:"ospf,omitempty" json:"ospf,omitempty"`
+	BGP           []BGPConfig  `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 }
 
 type DummyConfig struct {
