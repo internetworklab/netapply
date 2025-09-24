@@ -38,9 +38,9 @@ nodes:
             ports:
               "1194/tcp":
                 - host_ip: "0.0.0.0"
-                  host_port: "21194"
+                  host_port: 21194
                 - host_ip: "::"
-                  host_port: "21194"
+                  host_port: 21194
             volumes:
               - type: bind
                 source: "./nodes/pi/openvpn/certs/client-cert.pem"

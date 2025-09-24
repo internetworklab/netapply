@@ -12,7 +12,9 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/client"
+	"github.com/docker/go-connections/nat"
 	"gopkg.in/yaml.v3"
 )
 
@@ -127,18 +129,18 @@ type DockerDeviceMapping struct {
 
 type DockerPortMapping struct {
 	HostIP   string `yaml:"host_ip" json:"host_ip"`
-	HostPort string `yaml:"host_port" json:"host_port"`
+	HostPort int    `yaml:"host_port" json:"host_port"`
 }
 
 type DockerContainerConfig struct {
-	ExecutablePath string                       `yaml:"executable_path" json:"executable_path"`
-	Image          string                       `yaml:"image" json:"image"`
-	ContainerName  string                       `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	Capabilities   []string                     `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
-	Hostname       string                       `yaml:"hostname,omitempty" json:"hostname,omitempty"`
-	Ports          map[string]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Volumes        []DockerMountConfig          `yaml:"volumes,omitempty" json:"volumes,omitempty"`
-	Devices        []DockerDeviceMapping        `yaml:"devices,omitempty" json:"devices,omitempty"`
+	ExecutablePath string                         `yaml:"executable_path" json:"executable_path"`
+	Image          string                         `yaml:"image" json:"image"`
+	ContainerName  string                         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Capabilities   []string                       `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
+	Hostname       *string                        `yaml:"hostname,omitempty" json:"hostname,omitempty"`
+	Ports          map[string][]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Volumes        []DockerMountConfig            `yaml:"volumes,omitempty" json:"volumes,omitempty"`
+	Devices        []DockerDeviceMapping          `yaml:"devices,omitempty" json:"devices,omitempty"`
 }
 
 type OpenVPN2Instance struct {
@@ -224,6 +226,57 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 	}
 	hostConfig := &container.HostConfig{
 		AutoRemove: true,
+	}
+
+	if ovpInst.DockerContainer.Capabilities != nil {
+		hostConfig.CapAdd = strslice.StrSlice(ovpInst.DockerContainer.Capabilities)
+	}
+
+	if ovpInst.DockerContainer.Hostname != nil {
+		containerConfig.Hostname = *ovpInst.DockerContainer.Hostname
+	}
+
+	if ovpInst.DockerContainer.Ports != nil {
+		portMaps := make(nat.PortMap, 0)
+		for containerPort, hostPortMappings := range ovpInst.DockerContainer.Ports {
+			portbindings := make([]nat.PortBinding, 0)
+			for _, hostPortMapping := range hostPortMappings {
+				portbindings = append(portbindings, nat.PortBinding{
+					HostIP:   hostPortMapping.HostIP,
+					HostPort: fmt.Sprintf("%d", hostPortMapping.HostPort),
+				})
+			}
+			portMaps[nat.Port(containerPort)] = portbindings
+		}
+		hostConfig.PortBindings = portMaps
+	}
+
+	if ovpInst.DockerContainer.Volumes != nil {
+		volumeMounts := make([]mount.Mount, 0)
+		for _, volumeMount := range ovpInst.DockerContainer.Volumes {
+			volumeMounts = append(volumeMounts, mount.Mount{
+				Type:   volumeMount.Type,
+				Source: volumeMount.Source,
+				Target: volumeMount.Target,
+			})
+		}
+		hostConfig.Mounts = volumeMounts
+	}
+
+	if ovpInst.DockerContainer.Devices != nil {
+		deviceMounts := make([]container.DeviceMapping, 0)
+		for _, deviceMount := range ovpInst.DockerContainer.Devices {
+			perm := "rwm"
+			if deviceMount.CgroupPermissions != nil {
+				perm = *deviceMount.CgroupPermissions
+			}
+			deviceMounts = append(deviceMounts, container.DeviceMapping{
+				PathOnHost:        deviceMount.PathOnHost,
+				PathInContainer:   deviceMount.PathInContainer,
+				CgroupPermissions: perm,
+			})
+		}
+		hostConfig.Devices = deviceMounts
 	}
 
 	containerName := ovpInst.DockerContainer.ContainerName
