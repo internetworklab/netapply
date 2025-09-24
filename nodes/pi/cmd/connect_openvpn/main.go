@@ -136,16 +136,16 @@ type DockerPortMapping struct {
 }
 
 type DockerContainerConfig struct {
-	ExecutablePath string                         `yaml:"executable_path" json:"executable_path"`
-	Image          string                         `yaml:"image" json:"image"`
-	ContainerName  string                         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	Capabilities   []string                       `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
-	Hostname       *string                        `yaml:"hostname,omitempty" json:"hostname,omitempty"`
-	Ports          map[string][]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
-	Volumes        []DockerMountConfig            `yaml:"volumes,omitempty" json:"volumes,omitempty"`
-	Devices        []DockerDeviceMapping          `yaml:"devices,omitempty" json:"devices,omitempty"`
-	AutoRemove     *bool                          `yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
-	Networks       []string                       `yaml:"networks,omitempty" json:"networks,omitempty"`
+	Image         string                         `yaml:"image" json:"image"`
+	ContainerName string                         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Capabilities  []string                       `yaml:"cap_add,omitempty" json:"cap_add,omitempty"`
+	Hostname      *string                        `yaml:"hostname,omitempty" json:"hostname,omitempty"`
+	Ports         map[string][]DockerPortMapping `yaml:"ports,omitempty" json:"ports,omitempty"`
+	Volumes       []DockerMountConfig            `yaml:"volumes,omitempty" json:"volumes,omitempty"`
+	Devices       []DockerDeviceMapping          `yaml:"devices,omitempty" json:"devices,omitempty"`
+	AutoRemove    *bool                          `yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
+	Networks      []string                       `yaml:"networks,omitempty" json:"networks,omitempty"`
+	Command       []string                       `yaml:"command,omitempty" json:"command,omitempty"`
 }
 
 type OpenVPN2Instance struct {
@@ -178,6 +178,7 @@ type OpenVPN2Instance struct {
 	ResolvRetry         *string                    `openvpn2:"resolv-retry" yaml:"resolv_retry,omitempty"`
 	LLAddr              *string                    `openvpn2:"lladdr" yaml:"lladdr,omitempty"`
 	DockerContainer     *DockerContainerConfig     `openvpn2:"-" yaml:"docker_container,omitempty"`
+	ExecutablePath      *string                    `openvpn2:"-" yaml:"executable_path,omitempty" json:"executable_path,omitempty"`
 }
 
 type CtxKey string
@@ -226,8 +227,8 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 
 	cmd := make([]string, 0)
 	exec := "openvpn"
-	if ovpInst.DockerContainer.ExecutablePath != "" {
-		exec = ovpInst.DockerContainer.ExecutablePath
+	if ovpInst.ExecutablePath != nil && *ovpInst.ExecutablePath != "" {
+		exec = *ovpInst.ExecutablePath
 	}
 	cmd = append(cmd, exec)
 	cmd = append(cmd, ovpInst.ToCLIArgs()...)
@@ -336,8 +337,10 @@ const (
 )
 
 type ControlplaneConfig struct {
-	OSPF interface{} `yaml:"ospf,omitempty" json:"ospf,omitempty"`
-	BGP  interface{} `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	// Container name is the name of the container that hosts the FRR daemon
+	ContainerName string      `yaml:"container_name" json:"container_name"`
+	OSPF          interface{} `yaml:"ospf,omitempty" json:"ospf,omitempty"`
+	BGP           interface{} `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 }
 
 type DummyConfig struct {
@@ -395,6 +398,7 @@ type NodeConfig struct {
 	Controlplane     *ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 	VirtualInterface *VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
+	DockerContainers []DockerContainerConfig `yaml:"docker_containers,omitempty" json:"docker_containers,omitempty"`
 }
 
 type GlobalConfig struct {

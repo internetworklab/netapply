@@ -1,7 +1,33 @@
 nodes:
   pi:
+    docker_containers:
+      - container_name: frr
+        image: quay.io/frrouting/frr:10.3.0
+        cap_add:
+          - net_admin
+          - sys_admin
+        hostname: pi
+        volumes:
+          - type: bind
+            source: "./nodes/pi/frr/config/daemons"
+            target: "/etc/frr/daemons"
+          # we do not need this ospf.conf, the controller will apply it to vtysh automatically.
+          # - type: bind
+          #   source: "./nodes/pi/frr/ospf.conf"
+          #   target: "/misc/ospf.conf"
+        autoremove: true
     controlplane:
-      ospf: {}
+      container_name: frr
+      ospf:
+        - vrf: default
+          router_id: 10.3.64.1
+          interfaces:
+            - name: v5-dummy
+              area: 0.0.0.0
+              passive: true
+            - name: veth1
+              area: 0.0.0.0
+              network: point-to-point
       bgp: {}
     dataplane:
       openvpn:
@@ -27,11 +53,11 @@ nodes:
             patience_secs: 120
           up_cmd: /up-wrapper.sh
           script_security_level: 3
+          executable_path: "openvpn"
           docker_container:
             networks:
               - ss
             autoremove: true
-            executable_path: "openvpn"
             image: openvpn:latest
             container_name: "openvpn-connector-1"
             cap_add:
@@ -64,6 +90,7 @@ nodes:
           cidr: "10.3.64.1/24"
   lax1:
     controlplane:
+      container_name: frr
       ospf:
         - vrf: default
           router_id: 10.3.64.1

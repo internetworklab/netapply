@@ -1,10 +1,10 @@
-volumes:
-  frrconfig:
+# volumes:
+# frrconfig:
 services:
   rr-test:
     image: quay.io/frrouting/frr:10.3.0
     volumes:
-      - frrconfig:/etc/frr
+      # - frrconfig:/etc/frr
       - ./config/daemons:/etc/frr/daemons
       - ./ospf.conf:/misc/ospf.conf
     container_name: frr
