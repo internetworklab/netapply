@@ -149,13 +149,61 @@ type ControlplaneConfig struct {
 	BGP  interface{} `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 }
 
+type DummyConfig struct {
+	Name string  `yaml:"name" json:"name"`
+	CIDR *string `yaml:"cidr,omitempty" json:"cidr,omitempty"`
+}
+
+type VirtualInterfaceConfig struct {
+	Dummy []DummyConfig `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+}
+
+type WireGuardPeerConfig struct {
+	PublicKey  string   `yaml:"publickey" json:"publickey"`
+	Endpoint   string   `yaml:"endpoint" json:"endpoint"`
+	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
+}
+
+type WireGuardAddressConfig struct {
+	Peer  *string `yaml:"peer,omitempty" json:"peer,omitempty"`
+	Local *string `yaml:"local,omitempty" json:"local,omitempty"`
+	CIDR  *string `yaml:"cidr,omitempty" json:"cidr,omitempty"`
+}
+
+type WireGuardConfig struct {
+	Name       string                   `yaml:"name" json:"name"`
+	PrivateKey string                   `yaml:"privatekey" json:"privatekey"`
+	Peers      []WireGuardPeerConfig    `yaml:"peers,omitempty" json:"peers,omitempty"`
+	Addresses  []WireGuardAddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+}
+
+type ContainerDockerConfig struct {
+	Name string `yaml:"name" json:"name"`
+}
+
+type ContainerConfig struct {
+	Docker ContainerDockerConfig `yaml:"docker,omitempty" json:"docker,omitempty"`
+}
+
+type VXLANConfig struct {
+	Name       string           `yaml:"name" json:"name"`
+	VXLANID    int              `yaml:"vxlan_id" json:"vxlan_id"`
+	LocalIP    *string          `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
+	MTU        *int             `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	Nolearning *bool            `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
+	Container  *ContainerConfig `yaml:"container,omitempty" json:"container,omitempty"`
+}
+
 type DataplaneConfig struct {
-	OpenVPN []OpenVPN2Instance `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
+	OpenVPN   []OpenVPN2Instance `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
+	WireGuard []WireGuardConfig  `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
+	VXLAN     []VXLANConfig      `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
 }
 
 type NodeConfig struct {
-	Controlplane ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
-	Dataplane    DataplaneConfig    `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+	Controlplane     ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
+	Dataplane        DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+	VirtualInterface VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
 }
 
 type GlobalConfig struct {
