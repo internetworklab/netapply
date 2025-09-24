@@ -148,6 +148,83 @@ type DockerContainerConfig struct {
 	Command       []string                       `yaml:"command,omitempty" json:"command,omitempty"`
 }
 
+func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
+	containerConfig *container.Config,
+	hostConfig *container.HostConfig,
+	networkConfig *network.NetworkingConfig,
+) {
+	if containerConfig != nil {
+		containerConfig.Image = dockerConfig.Image
+		containerConfig.Cmd = dockerConfig.Command
+
+		if dockerConfig.Hostname != nil {
+			containerConfig.Hostname = *dockerConfig.Hostname
+		}
+	}
+
+	if networkConfig != nil {
+		if dockerConfig.Networks != nil {
+			networkConfig.EndpointsConfig = make(map[string]*network.EndpointSettings)
+			for _, networkName := range dockerConfig.Networks {
+				networkConfig.EndpointsConfig[networkName] = &network.EndpointSettings{}
+			}
+		}
+	}
+
+	if hostConfig != nil {
+		if dockerConfig.AutoRemove != nil {
+			hostConfig.AutoRemove = *dockerConfig.AutoRemove
+		}
+
+		if dockerConfig.Capabilities != nil {
+			hostConfig.CapAdd = strslice.StrSlice(dockerConfig.Capabilities)
+		}
+
+		if dockerConfig.Ports != nil {
+			portMaps := make(nat.PortMap, 0)
+			for containerPort, hostPortMappings := range dockerConfig.Ports {
+				portbindings := make([]nat.PortBinding, 0)
+				for _, hostPortMapping := range hostPortMappings {
+					portbindings = append(portbindings, nat.PortBinding{
+						HostIP:   hostPortMapping.HostIP,
+						HostPort: fmt.Sprintf("%d", hostPortMapping.HostPort),
+					})
+				}
+				portMaps[nat.Port(containerPort)] = portbindings
+			}
+			hostConfig.PortBindings = portMaps
+		}
+
+		if dockerConfig.Volumes != nil {
+			volumeMounts := make([]mount.Mount, 0)
+			for _, volumeMount := range dockerConfig.Volumes {
+				volumeMounts = append(volumeMounts, mount.Mount{
+					Type:   volumeMount.Type,
+					Source: resolvePath(volumeMount.Source),
+					Target: volumeMount.Target,
+				})
+			}
+			hostConfig.Mounts = volumeMounts
+		}
+
+		if dockerConfig.Devices != nil {
+			deviceMounts := make([]container.DeviceMapping, 0)
+			for _, deviceMount := range dockerConfig.Devices {
+				perm := "rwm"
+				if deviceMount.CgroupPermissions != nil {
+					perm = *deviceMount.CgroupPermissions
+				}
+				deviceMounts = append(deviceMounts, container.DeviceMapping{
+					PathOnHost:        resolvePath(deviceMount.PathOnHost),
+					PathInContainer:   deviceMount.PathInContainer,
+					CgroupPermissions: perm,
+				})
+			}
+			hostConfig.Devices = deviceMounts
+		}
+	}
+}
+
 type OpenVPN2Instance struct {
 	Name                string                     `openvpn2:"-" yaml:"name"`
 	Client              *bool                      `openvpn2:"client" yaml:"client,omitempty"`
@@ -233,79 +310,17 @@ func (ovpInst *OpenVPN2Instance) Start(ctx context.Context, servicename string) 
 	cmd = append(cmd, exec)
 	cmd = append(cmd, ovpInst.ToCLIArgs()...)
 
-	containerConfig := &container.Config{
-		Image:     ovpInst.DockerContainer.Image,
-		Cmd:       cmd,
-		Tty:       true,
-		OpenStdin: true,
-		Labels: map[string]string{
-			labelKeyService:  servicename,
-			labelKeyInstance: ovpInst.Name,
-		},
-	}
-
+	containerConfig := &container.Config{}
 	networkConfig := &network.NetworkingConfig{}
-	if ovpInst.DockerContainer.Networks != nil {
-		networkConfig.EndpointsConfig = make(map[string]*network.EndpointSettings)
-		for _, networkName := range ovpInst.DockerContainer.Networks {
-			networkConfig.EndpointsConfig[networkName] = &network.EndpointSettings{}
-		}
-	}
-
 	hostConfig := &container.HostConfig{}
-	if ovpInst.DockerContainer.AutoRemove != nil {
-		hostConfig.AutoRemove = *ovpInst.DockerContainer.AutoRemove
-	}
 
-	if ovpInst.DockerContainer.Capabilities != nil {
-		hostConfig.CapAdd = strslice.StrSlice(ovpInst.DockerContainer.Capabilities)
-	}
-
-	if ovpInst.DockerContainer.Hostname != nil {
-		containerConfig.Hostname = *ovpInst.DockerContainer.Hostname
-	}
-
-	if ovpInst.DockerContainer.Ports != nil {
-		portMaps := make(nat.PortMap, 0)
-		for containerPort, hostPortMappings := range ovpInst.DockerContainer.Ports {
-			portbindings := make([]nat.PortBinding, 0)
-			for _, hostPortMapping := range hostPortMappings {
-				portbindings = append(portbindings, nat.PortBinding{
-					HostIP:   hostPortMapping.HostIP,
-					HostPort: fmt.Sprintf("%d", hostPortMapping.HostPort),
-				})
-			}
-			portMaps[nat.Port(containerPort)] = portbindings
-		}
-		hostConfig.PortBindings = portMaps
-	}
-
-	if ovpInst.DockerContainer.Volumes != nil {
-		volumeMounts := make([]mount.Mount, 0)
-		for _, volumeMount := range ovpInst.DockerContainer.Volumes {
-			volumeMounts = append(volumeMounts, mount.Mount{
-				Type:   volumeMount.Type,
-				Source: resolvePath(volumeMount.Source),
-				Target: volumeMount.Target,
-			})
-		}
-		hostConfig.Mounts = volumeMounts
-	}
-
-	if ovpInst.DockerContainer.Devices != nil {
-		deviceMounts := make([]container.DeviceMapping, 0)
-		for _, deviceMount := range ovpInst.DockerContainer.Devices {
-			perm := "rwm"
-			if deviceMount.CgroupPermissions != nil {
-				perm = *deviceMount.CgroupPermissions
-			}
-			deviceMounts = append(deviceMounts, container.DeviceMapping{
-				PathOnHost:        resolvePath(deviceMount.PathOnHost),
-				PathInContainer:   deviceMount.PathInContainer,
-				CgroupPermissions: perm,
-			})
-		}
-		hostConfig.Devices = deviceMounts
+	ovpInst.DockerContainer.ApplyToContainerCreateConfig(containerConfig, hostConfig, networkConfig)
+	containerConfig.Cmd = cmd
+	containerConfig.Tty = true
+	containerConfig.OpenStdin = true
+	containerConfig.Labels = map[string]string{
+		labelKeyService:  servicename,
+		labelKeyInstance: ovpInst.Name,
 	}
 
 	containerName := ovpInst.DockerContainer.ContainerName
@@ -343,11 +358,43 @@ type OSPFInterfaceConfig struct {
 	Network *string `yaml:"network" json:"network"`
 }
 
+func (interfaceConfig *OSPFInterfaceConfig) ToCLICommands(ospfConfig *OSPFConfig) []string {
+	cmds := make([]string, 0)
+
+	cmds = append(cmds, fmt.Sprintf("interface %s vrf %s", interfaceConfig.Name, ospfConfig.VRF))
+
+	cmds = append(cmds, fmt.Sprintf("ip ospf area %s", interfaceConfig.Area))
+
+	if interfaceConfig.Passive != nil && *interfaceConfig.Passive {
+		cmds = append(cmds, "ip ospf passive")
+	} else if interfaceConfig.Network != nil {
+		cmds = append(cmds, fmt.Sprintf("ip ospf network %s", *interfaceConfig.Network))
+	}
+
+	cmds = append(cmds, "exit")
+
+	return cmds
+}
+
 type OSPFConfig struct {
 	// Currently only 'default' vrf is supported
 	VRF        string                `yaml:"vrf" json:"vrf"`
 	RouterID   string                `yaml:"router_id" json:"router_id"`
 	Interfaces []OSPFInterfaceConfig `yaml:"interfaces" json:"interfaces"`
+}
+
+func (ospfConf *OSPFConfig) ToCLICommands() []string {
+	cmds := make([]string, 0)
+
+	cmds = append(cmds, fmt.Sprintf("router ospf vrf %s", ospfConf.VRF))
+	cmds = append(cmds, fmt.Sprintf("ospf router-id %s", ospfConf.RouterID))
+	cmds = append(cmds, "exit")
+
+	for _, interfaceConfig := range ospfConf.Interfaces {
+		cmds = append(cmds, interfaceConfig.ToCLICommands(ospfConf)...)
+	}
+
+	return cmds
 }
 
 type MPBGPAddressFamilyConfig struct {
@@ -428,7 +475,6 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 
 func (bgpConf *BGPConfig) ToCLICommands() []string {
 	cmds := make([]string, 0)
-	cmds = append(cmds, "configure")
 	cmds = append(cmds, fmt.Sprintf("router bgp %d vrf %s", bgpConf.ASN, bgpConf.VRF))
 	cmds = append(cmds, fmt.Sprintf("bgp router-id %s", bgpConf.RouterID))
 
@@ -454,10 +500,9 @@ func (bgpConf *BGPConfig) ToCLICommands() []string {
 }
 
 type ControlplaneConfig struct {
-	// Container name is the name of the container that hosts the FRR daemon
-	ContainerName string       `yaml:"container_name" json:"container_name"`
-	OSPF          []OSPFConfig `yaml:"ospf,omitempty" json:"ospf,omitempty"`
-	BGP           []BGPConfig  `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	OSPF      []OSPFConfig           `yaml:"ospf,omitempty" json:"ospf,omitempty"`
+	BGP       []BGPConfig            `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	Container *DockerContainerConfig `yaml:"container,omitempty" json:"container,omitempty"`
 }
 
 type DummyConfig struct {
@@ -515,7 +560,6 @@ type NodeConfig struct {
 	Controlplane     *ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 	VirtualInterface *VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
-	DockerContainers []DockerContainerConfig `yaml:"docker_containers,omitempty" json:"docker_containers,omitempty"`
 }
 
 type GlobalConfig struct {
@@ -644,6 +688,7 @@ const labelKeyService string = "service"
 const labelKeyInstance string = "instance"
 
 func up(ctx context.Context, servicename string, nodeConfig *NodeConfig) error {
+
 	if nodeConfig.Dataplane != nil {
 		for _, ovpInst := range nodeConfig.Dataplane.OpenVPN {
 			if err := ovpInst.Start(ctx, servicename); err != nil {
@@ -651,6 +696,111 @@ func up(ctx context.Context, servicename string, nodeConfig *NodeConfig) error {
 				continue
 			}
 			log.Println("Container is started for", ovpInst.Name)
+		}
+	}
+
+	if nodeConfig.Controlplane != nil {
+
+		configsToApply := make([]string, 0)
+
+		if nodeConfig.Controlplane.OSPF != nil {
+			ospfConfFile, err := os.CreateTemp("", "frr-ospf-")
+			if err != nil {
+				return fmt.Errorf("failed to create temporary file: %w", err)
+			}
+
+			// For now, we are not gonna delete the file after when it's been used,
+			// since it's not so large and for debugging purposes.
+			// defer os.Remove(ospfConfFile.Name()) // Clean up the file when done
+
+			defer ospfConfFile.Close() // Close the file
+
+			for _, ospfConf := range nodeConfig.Controlplane.OSPF {
+				cmds := ospfConf.ToCLICommands()
+				for _, cmd := range cmds {
+					ospfConfFile.WriteString(cmd + "\n")
+				}
+			}
+			configsToApply = append(configsToApply, ospfConfFile.Name())
+		}
+
+		if nodeConfig.Controlplane.BGP != nil {
+			bgpConfFile, err := os.CreateTemp("", "frr-bgp-")
+			if err != nil {
+				return fmt.Errorf("failed to create temporary file: %w", err)
+			}
+			defer os.Remove(bgpConfFile.Name()) // Clean up the file when done
+			defer bgpConfFile.Close()           // Close the file
+			for _, bgpConf := range nodeConfig.Controlplane.BGP {
+				cmds := bgpConf.ToCLICommands()
+				for _, cmd := range cmds {
+					bgpConfFile.WriteString(cmd + "\n")
+				}
+			}
+			configsToApply = append(configsToApply, bgpConfFile.Name())
+		}
+
+		containerConfig := &container.Config{}
+		hostConfig := &container.HostConfig{}
+		networkConfig := &network.NetworkingConfig{}
+		nodeConfig.Controlplane.Container.ApplyToContainerCreateConfig(containerConfig, hostConfig, networkConfig)
+
+		extraMounts := make([]mount.Mount, 0)
+		if configsToApply != nil {
+			for _, configToApply := range configsToApply {
+				extraMounts = append(extraMounts, mount.Mount{
+					Type:   mount.TypeBind,
+					Source: configToApply,
+					Target: configToApply,
+				})
+			}
+			hostConfig.Mounts = append(hostConfig.Mounts, extraMounts...)
+		}
+
+		containerName := nodeConfig.Controlplane.Container.ContainerName
+		if containerName == "" {
+			return fmt.Errorf("router container name is required")
+		}
+
+		cli, err := dockerCliFromCtx(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get docker cli from context: %w", err)
+		}
+
+		resp, err := cli.ContainerCreate(
+			ctx,
+			containerConfig,
+			hostConfig,
+			networkConfig,
+			nil,
+			containerName,
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create container: %w", err)
+		}
+		containerID := resp.ID
+		if err := cli.ContainerStart(ctx, containerID, container.StartOptions{}); err != nil {
+			return fmt.Errorf("failed to start container: %w", err)
+		}
+
+		for _, extraMount := range extraMounts {
+			execOptions := container.ExecOptions{
+				Cmd: []string{
+					"vtysh",
+					"-f",
+					extraMount.Target,
+				},
+			}
+			exec, err := cli.ContainerExecCreate(ctx, containerID, execOptions)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to create exec: %v\n", err)
+				continue
+			}
+
+			if err := cli.ContainerExecStart(ctx, exec.ID, container.ExecStartOptions{}); err != nil {
+				fmt.Fprintf(os.Stderr, "failed to start exec: %v\n", err)
+				continue
+			}
 		}
 	}
 

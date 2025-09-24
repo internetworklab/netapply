@@ -1,7 +1,8 @@
 nodes:
   pi:
-    docker_containers:
-      - container_name: frr
+    controlplane:
+      container:
+        container_name: frr
         image: quay.io/frrouting/frr:10.3.0
         cap_add:
           - net_admin
@@ -10,10 +11,8 @@ nodes:
         volumes:
           - type: bind
             source: "./nodes/pi/frr/config/daemons"
-            target: "/etc/frr/daemons"
+            target: /etc/frr/daemons
         autoremove: true
-    controlplane:
-      container_name: frr
       ospf:
         - vrf: default
           router_id: "10.3.64.1"
