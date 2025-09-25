@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -13,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 
+	"github.com/alecthomas/kong"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
@@ -1338,84 +1338,95 @@ func down(ctx context.Context) error {
 
 const tagName string = "openvpn2"
 
-var (
-	command        string
-	nodeName       string
-	servicename    string
-	configFilePath string
-)
+// CLI structure for Kong
+type CLI struct {
+	Up   UpCmd   `cmd:"" help:"Start the service with the specified configuration"`
+	Down DownCmd `cmd:"" help:"Stop all containers associated with the service"`
+}
 
-func main() {
+type UpCmd struct {
+	Config      string `required:"" help:"Path to the configuration file" type:"path"`
+	ServiceName string `required:"" help:"Name of the service" short:"s"`
+}
+
+type DownCmd struct {
+	ServiceName string `required:"" help:"Name of the service" short:"s"`
+}
+
+// Run method for UpCmd
+func (cmd *UpCmd) Run() error {
 	ctx := context.Background()
 
-	flag.Parse()
-
-	if command == "" {
-		panic("command --command is required")
-	}
-	if nodeName == "" {
-		panic("node name --node is required")
-	}
-	if servicename == "" {
-		panic("service name --service is required")
-	}
-	if configFilePath == "" {
-		panic("config file path --config is required")
-	}
-
+	// Initialize Docker client
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to create docker client: %w", err)
 	}
 	defer cli.Close()
 
-	ctx = setServiceNameInCtx(ctx, servicename)
+	// Set up context with service name and docker client
+	ctx = setServiceNameInCtx(ctx, cmd.ServiceName)
 	ctx = setDockerCliInCtx(ctx, cli)
 
-	dpConfig := new(DataplaneConfig)
+	// Read and parse the configuration file
+	configFile, err := os.Open(cmd.Config)
+	if err != nil {
+		return fmt.Errorf("failed to open config file: %w", err)
+	}
+	defer configFile.Close()
 
-	if err := yaml.NewDecoder(os.Stdin).Decode(dpConfig); err != nil {
-		panic(err)
+	globalConfig := new(GlobalConfig)
+	if err := yaml.NewDecoder(configFile).Decode(globalConfig); err != nil {
+		return fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	if err := dpConfig.Create(ctx); err != nil {
-		panic(err)
+	// For now, we'll process the first node in the config
+	// In a real implementation, you might want to specify which node to use
+	var nodeConfig NodeConfig
+	for _, config := range globalConfig.Nodes {
+		nodeConfig = config
+		break
 	}
 
-	// configFile, err := os.Open(configFilePath)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer configFile.Close()
+	// Start the service
+	if err := nodeConfig.Up(ctx); err != nil {
+		return fmt.Errorf("failed to start service: %w", err)
+	}
 
-	// globalConfig := new(GlobalConfig)
-	// if err := yaml.NewDecoder(configFile).Decode(globalConfig); err != nil {
-	// 	panic(err)
-	// }
-
-	// nodeConfig, ok := globalConfig.Nodes[nodeName]
-	// if !ok {
-	// 	panic("node config not found")
-	// }
-
-	// switch command {
-	// case "up":
-	// 	err = up(ctx, &nodeConfig)
-	// case "down":
-	// 	err = down(ctx)
-	// default:
-	// 	panic("command is unknown")
-	// }
-
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "failed to %s: %v\n", command, err)
-	// 	os.Exit(1)
-	// }
+	fmt.Printf("Service '%s' started successfully\n", cmd.ServiceName)
+	return nil
 }
 
-func init() {
-	flag.StringVar(&command, "command", "up", "command to run")
-	flag.StringVar(&nodeName, "node", "", "node name")
-	flag.StringVar(&servicename, "service", "openvpn", "service name")
-	flag.StringVar(&configFilePath, "config", "./config.yaml", "config file path")
+// Run method for DownCmd
+func (cmd *DownCmd) Run() error {
+	ctx := context.Background()
+
+	// Initialize Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create docker client: %w", err)
+	}
+	defer cli.Close()
+
+	// Set up context with service name and docker client
+	ctx = setServiceNameInCtx(ctx, cmd.ServiceName)
+	ctx = setDockerCliInCtx(ctx, cli)
+
+	// Stop all containers associated with the service
+	if err := down(ctx); err != nil {
+		return fmt.Errorf("failed to stop service: %w", err)
+	}
+
+	fmt.Printf("Service '%s' stopped successfully\n", cmd.ServiceName)
+	return nil
+}
+
+func main() {
+	var cli CLI
+	ctx := kong.Parse(&cli)
+	err := ctx.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
 }
