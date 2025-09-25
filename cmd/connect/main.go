@@ -1338,6 +1338,33 @@ func down(ctx context.Context) error {
 
 const tagName string = "openvpn2"
 
+// getGlobalConfig reads configuration from either a file or stdin
+// path: file path or "-" for stdin
+// config: pointer to GlobalConfig struct to populate
+func getGlobalConfig(path string, config *GlobalConfig) error {
+	var reader *os.File
+	var err error
+
+	if path == "-" {
+		// Read from stdin
+		reader = os.Stdin
+	} else {
+		// Read from file
+		reader, err = os.Open(path)
+		if err != nil {
+			return fmt.Errorf("failed to open config file '%s': %w", path, err)
+		}
+		defer reader.Close()
+	}
+
+	// Parse YAML configuration
+	if err := yaml.NewDecoder(reader).Decode(config); err != nil {
+		return fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	return nil
+}
+
 // CLI structure for Kong
 type CLI struct {
 	Up   UpCmd   `cmd:"" help:"Start the service with the specified configuration"`
@@ -1369,16 +1396,10 @@ func (cmd *UpCmd) Run() error {
 	ctx = setServiceNameInCtx(ctx, cmd.ServiceName)
 	ctx = setDockerCliInCtx(ctx, cli)
 
-	// Read and parse the configuration file
-	configFile, err := os.Open(cmd.Config)
-	if err != nil {
-		return fmt.Errorf("failed to open config file: %w", err)
-	}
-	defer configFile.Close()
-
+	// Read and parse the configuration
 	globalConfig := new(GlobalConfig)
-	if err := yaml.NewDecoder(configFile).Decode(globalConfig); err != nil {
-		return fmt.Errorf("failed to parse config file: %w", err)
+	if err := getGlobalConfig(cmd.Config, globalConfig); err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// Get the specified node configuration
