@@ -421,6 +421,24 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	return nil
 }
 
+func (ovpInst *OpenVPN2Instance) IsLinkExists(ctx context.Context) bool {
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	cont, err := findContainer(ctx, cli, ovpInst.DockerContainer.ContainerName)
+	if err != nil {
+		return false
+	}
+
+	if cont == nil {
+		return false
+	}
+
+	return true
+}
+
 const (
 	OVTagFlagEmptyKey string = "emptykey"
 )
@@ -811,6 +829,23 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 	})
 }
 
+func isLinkExists(ctx context.Context, containerName *string, linkName string) bool {
+	type result struct {
+		exists bool
+	}
+	res := new(result)
+	res.exists = false
+	withNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
+		lk, err := handle.LinkByName(linkName)
+		if err == nil && lk != nil {
+			res.exists = true
+		}
+		return nil
+	})
+
+	return res.exists
+}
+
 type ContainerDockerConfig struct {
 	Name string `yaml:"name" json:"name"`
 }
@@ -829,20 +864,21 @@ type VXLANConfig struct {
 }
 
 func findContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
+	filters := filters.NewArgs()
+	filters.Add("name", containerName)
+
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		All: true,
+		Filters: filters,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
 
-	for _, container := range containers {
-		if container.Names[0] == containerName {
-			return &container, nil
-		}
+	if len(containers) == 0 {
+		return nil, nil
 	}
 
-	return nil, fmt.Errorf("container %s not found", containerName)
+	return &containers[0], nil
 }
 
 func getNetNSHandle(ctx context.Context, cli *client.Client, containerName string) (netns.NsHandle, error) {
@@ -1031,7 +1067,7 @@ type DataplaneConfig struct {
 	OpenVPN   []OpenVPN2Instance `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
 	WireGuard []WireGuardConfig  `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
 	VXLAN     []VXLANConfig      `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
-	VethPair  []VethPairConfig   `yaml:"veth_pair,omitempty" json:"veth_pair,omitempty"`
+	VethPair  []VethPairConfig   `yaml:"veth,omitempty" json:"veth,omitempty"`
 	Bridge    []BridgeConfig     `yaml:"bridge,omitempty" json:"bridge,omitempty"`
 	Dummy     []DummyConfig      `yaml:"dummy,omitempty" json:"dummy,omitempty"`
 }
@@ -1041,6 +1077,11 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		log.Println("Setting up dummy interfaces ...")
 		for _, dummyInst := range dpConfig.Dummy {
 			log.Printf("Setting up dummy interface %s ...", dummyInst.Name)
+			if isLinkExists(ctx, dummyInst.ContainerName, dummyInst.Name) {
+				log.Printf("Dummy interface %s already exists", dummyInst.Name)
+				continue
+			}
+
 			if err := dummyInst.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create dummy: %w", err)
 			}
@@ -1051,6 +1092,10 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		log.Println("Setting up OpenVPN interfaces ...")
 		for _, ovpInst := range dpConfig.OpenVPN {
 			log.Printf("Setting up OpenVPN interface %s ...", ovpInst.Name)
+			if ovpInst.IsLinkExists(ctx) {
+				log.Printf("OpenVPN interface %s already exists", ovpInst.Name)
+				continue
+			}
 			if err := ovpInst.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create openvpn: %w", err)
 			}
@@ -1061,6 +1106,16 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		log.Println("Setting up WireGuard interfaces ...")
 		for _, wgInst := range dpConfig.WireGuard {
 			log.Printf("Setting up WireGuard interface %s ...", wgInst.Name)
+			if isLinkExists(ctx, wgInst.ContainerName, wgInst.Name) {
+				log.Printf("WireGuard interface %s already exists", wgInst.Name)
+				continue
+			}
+
+			if isLinkExists(ctx, nil, wgInst.Name) {
+				log.Printf("Warning: WireGuard interface %s already exists in host netns, which prevents it from being created\n", wgInst.Name)
+				continue
+			}
+
 			if err := wgInst.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create wireguard: %w", err)
 			}
@@ -1071,6 +1126,10 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		log.Println("Setting up VXLAN interfaces ...")
 		for _, vxlanInst := range dpConfig.VXLAN {
 			log.Printf("Setting up VXLAN interface %s ...", vxlanInst.Name)
+			if isLinkExists(ctx, vxlanInst.ContainerName, vxlanInst.Name) {
+				log.Printf("VXLAN interface %s already exists", vxlanInst.Name)
+				continue
+			}
 			if err := vxlanInst.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create vxlan: %w", err)
 			}
@@ -1081,6 +1140,10 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		log.Println("Setting up VethPair interfaces ...")
 		for _, vethPairInst := range dpConfig.VethPair {
 			log.Printf("Setting up VethPair interface %s ...", vethPairInst.Name)
+			if isLinkExists(ctx, vethPairInst.ContainerName, vethPairInst.Name) {
+				log.Printf("VethPair interface %s already exists", vethPairInst.Name)
+				continue
+			}
 			if err := vethPairInst.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create veth pair: %w", err)
 			}
@@ -1091,6 +1154,10 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		log.Println("Setting up Bridge interfaces ...")
 		for _, bridgeInst := range dpConfig.Bridge {
 			log.Printf("Setting up Bridge interface %s ...", bridgeInst.Name)
+			if isLinkExists(ctx, bridgeInst.ContainerName, bridgeInst.Name) {
+				log.Printf("Bridge interface %s already exists", bridgeInst.Name)
+				continue
+			}
 			if err := bridgeInst.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create bridge: %w", err)
 			}
@@ -1152,6 +1219,10 @@ func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error 
 	if err != nil {
 		return fmt.Errorf("failed to find container: %w", err)
 	}
+	if cont == nil {
+		return fmt.Errorf("container %s not found", *controlPlaneConfig.ContainerName)
+	}
+
 	if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
