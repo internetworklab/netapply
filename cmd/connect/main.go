@@ -740,6 +740,14 @@ type WireGuardConfig struct {
 	MTU           *int                  `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 }
 
+func (wgConf *WireGuardConfig) GetInterfaceName() string {
+	return wgConf.Name
+}
+
+func (wgConf *WireGuardConfig) GetContainerName() *string {
+	return wgConf.ContainerName
+}
+
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (*WireGuardChangeSet, error) {
 	// todo
 	return nil, nil
@@ -755,6 +763,14 @@ type WireGuardChangeSet struct {
 	Addresses        []AddressConfig
 	AddressesUpdated bool
 	ListenPort       *int
+}
+
+func (wgChangeSet *WireGuardChangeSet) GetContainerName() *string {
+	return wgChangeSet.ContainerName
+}
+
+func (wgChangeSet *WireGuardChangeSet) GetInterfaceName() string {
+	return wgChangeSet.InterfaceName
 }
 
 func (wgChangeSet *WireGuardChangeSet) HasUpdates() bool {
@@ -1281,13 +1297,13 @@ func getContainerKey(containerName *string) ContainerKey {
 	return ContainerKey(*containerName)
 }
 
-func getInterfaceFromContainer(ctx context.Context, containerName *string, linkType string) ([]InterfaceCanceller, error) {
+func getInterfaceFromContainer(ctx context.Context, containerName *string, linkType string) (map[string]InterfaceCanceller, error) {
 	type result struct {
-		ifaces []InterfaceCanceller
+		ifaces map[string]InterfaceCanceller
 	}
 
 	res := new(result)
-	res.ifaces = make([]InterfaceCanceller, 0)
+	res.ifaces = make(map[string]InterfaceCanceller, 0)
 
 	err := withNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
 		links, err := handle.LinkList()
@@ -1297,7 +1313,7 @@ func getInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 
 		for _, link := range links {
 			if link.Type() == linkType {
-				res.ifaces = append(res.ifaces, &StubInterfaceCanceller{ContainerName: containerName, InterfaceName: link.Attrs().Name})
+				res.ifaces[link.Attrs().Name] = &StubInterfaceCanceller{ContainerName: containerName, InterfaceName: link.Attrs().Name}
 			}
 		}
 
@@ -1311,10 +1327,11 @@ func getInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	return res.ifaces, nil
 }
 
+// Scan containers specified for any reconciliation clues.
 func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
 	wgty := new(netlink.Wireguard).Type()
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
-	currentInterfaceListMap := make(map[string][]InterfaceCanceller)
+	currentInterfaceListMap := make(map[string]map[string]InterfaceCanceller)
 	for _, name := range containers {
 		ifaces, err := getInterfaceFromContainer(ctx, &name, wgty)
 		if err != nil {
@@ -1329,23 +1346,89 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 	currentInterfaceListMap[string(ContainerKeyHost)] = hostInterfaceList
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
-	specInterfaceListMap := make(map[string][]WireGuardConfig)
+	specInterfaceListMap := make(map[string]map[string]WireGuardConfig)
 	for _, c := range wgList {
 		contName := string(getContainerKey(c.ContainerName))
 
 		if _, ok := specInterfaceListMap[contName]; !ok {
-			specInterfaceListMap[contName] = make([]WireGuardConfig, 0)
+			specInterfaceListMap[contName] = make(map[string]WireGuardConfig, 0)
 		}
-		specInterfaceListMap[contName] = append(specInterfaceListMap[contName], c)
+		specInterfaceListMap[contName][c.Name] = c
 	}
 
-	// todo:
-	// generate added set
-	// generate removed set
-	// generate updated set (hint: updated set must be generated from the intersection set)
+	combinedNsMap := make(map[string]interface{})
+	for k := range currentInterfaceListMap {
+		combinedNsMap[k] = true
+	}
+	for k := range specInterfaceListMap {
+		combinedNsMap[k] = true
+	}
 
-	// todo
-	return nil, nil
+	addedSet := make(map[string][]InterfaceProvisioner)
+	removedSet := make(map[string][]InterfaceCanceller)
+	updatedSet := make(map[string][]InterfaceChangeSet)
+
+	for nsKey := range combinedNsMap {
+		lhsSpecMap, lhsOk := specInterfaceListMap[nsKey]
+		rhsCurrentMap, rhsOk := currentInterfaceListMap[nsKey]
+
+		if !lhsOk {
+			if rhsOk {
+				removedSet[nsKey] = make([]InterfaceCanceller, 0)
+				for _, canceller := range rhsCurrentMap {
+					removedSet[nsKey] = append(removedSet[nsKey], canceller)
+				}
+			}
+			continue
+		}
+
+		if !rhsOk {
+			if lhsOk {
+				addedSet[nsKey] = make([]InterfaceProvisioner, 0)
+				for _, spec := range lhsSpecMap {
+					addedSet[nsKey] = append(addedSet[nsKey], &spec)
+				}
+			}
+			continue
+		}
+
+		updatedSet[nsKey] = make([]InterfaceChangeSet, 0)
+		addedSet[nsKey] = make([]InterfaceProvisioner, 0)
+		removedSet[nsKey] = make([]InterfaceCanceller, 0)
+		commonSet := make(map[string]WireGuardConfig)
+
+		for _, status := range rhsCurrentMap {
+			if _, ok := lhsSpecMap[status.GetInterfaceName()]; !ok {
+				removedSet[nsKey] = append(removedSet[nsKey], status)
+			}
+		}
+
+		for _, spec := range lhsSpecMap {
+			if _, ok := rhsCurrentMap[spec.GetInterfaceName()]; ok {
+				commonSet[spec.GetInterfaceName()] = spec
+			}
+
+			if _, ok := rhsCurrentMap[spec.GetInterfaceName()]; !ok {
+				addedSet[nsKey] = append(addedSet[nsKey], &spec)
+			}
+		}
+
+		for _, spec := range commonSet {
+			changes, err := spec.DetectChanges(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
+			}
+			if changes != nil && changes.HasUpdates() {
+				updatedSet[nsKey] = append(updatedSet[nsKey], changes)
+			}
+		}
+	}
+
+	result := new(DataplaneChangeSet)
+	result.AddedInterfaces = addedSet
+	result.RemovedInterfaces = removedSet
+	result.UpdatedInterfaces = updatedSet
+	return result, nil
 }
 
 type VXLANConfigurationList []VXLANConfig
