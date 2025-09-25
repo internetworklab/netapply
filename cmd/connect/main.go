@@ -1347,6 +1347,7 @@ type CLI struct {
 type UpCmd struct {
 	Config      string `required:"" help:"Path to the configuration file" type:"path"`
 	ServiceName string `required:"" help:"Name of the service" short:"s"`
+	Node        string `required:"" help:"Name of the node to start" short:"n"`
 }
 
 type DownCmd struct {
@@ -1380,12 +1381,10 @@ func (cmd *UpCmd) Run() error {
 		return fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	// For now, we'll process the first node in the config
-	// In a real implementation, you might want to specify which node to use
-	var nodeConfig NodeConfig
-	for _, config := range globalConfig.Nodes {
-		nodeConfig = config
-		break
+	// Get the specified node configuration
+	nodeConfig, ok := globalConfig.Nodes[cmd.Node]
+	if !ok {
+		return fmt.Errorf("node '%s' not found in configuration", cmd.Node)
 	}
 
 	// Start the service
@@ -1393,7 +1392,7 @@ func (cmd *UpCmd) Run() error {
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
-	fmt.Printf("Service '%s' started successfully\n", cmd.ServiceName)
+	fmt.Printf("Service '%s' on node '%s' started successfully\n", cmd.ServiceName, cmd.Node)
 	return nil
 }
 
