@@ -1363,13 +1363,13 @@ func getGlobalConfig(cmd *UpCmd, config *GlobalConfig) error {
 		}
 
 		// Read from HTTPS endpoint
-		reader, err = fetchHTTPConfig(path, tlsConfig)
+		reader, err = fetchHTTPConfig(path, tlsConfig, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
 		if err != nil {
 			return fmt.Errorf("failed to fetch HTTPS config from '%s': %w", path, err)
 		}
 	} else if strings.HasPrefix(path, "http://") {
 		// Read from HTTP endpoint
-		reader, err = fetchHTTPConfig(path, nil)
+		reader, err = fetchHTTPConfig(path, nil, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
 		if err != nil {
 			return fmt.Errorf("failed to fetch HTTP config from '%s': %w", path, err)
 		}
@@ -1392,7 +1392,7 @@ func getGlobalConfig(cmd *UpCmd, config *GlobalConfig) error {
 }
 
 // fetchHTTPConfig fetches configuration from an HTTP(S) endpoint
-func fetchHTTPConfig(url string, tlsConfig *tls.Config) (io.Reader, error) {
+func fetchHTTPConfig(url string, tlsConfig *tls.Config, username, password string) (io.Reader, error) {
 	// Create HTTP client with timeout
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -1410,6 +1410,11 @@ func fetchHTTPConfig(url string, tlsConfig *tls.Config) (io.Reader, error) {
 	}
 
 	request.Header.Set("Accept", "application/yaml")
+
+	// Add basic authentication if credentials are provided
+	if username != "" && password != "" {
+		request.SetBasicAuth(username, password)
+	}
 
 	// Make HTTP request
 	resp, err := client.Do(request)
@@ -1477,12 +1482,14 @@ type CLI struct {
 }
 
 type UpCmd struct {
-	Config           string `required:"" help:"Path to the configuration file" type:"path"`
-	ServiceName      string `required:"" help:"Name of the service" short:"s"`
-	Node             string `required:"" help:"Name of the node to start" short:"n"`
-	TLSTrustedCACert string `help:"Path to trusted CA certificate file for TLS" type:"path"`
-	TLSClientCert    string `help:"Path to client certificate file for TLS" type:"path"`
-	TLSClientKey     string `help:"Path to client private key file for TLS" type:"path"`
+	Config                string `required:"" help:"Path to the configuration file" type:"path"`
+	ServiceName           string `required:"" help:"Name of the service" short:"s"`
+	Node                  string `required:"" help:"Name of the node to start" short:"n"`
+	TLSTrustedCACert      string `help:"Path to trusted CA certificate file for TLS" type:"path"`
+	TLSClientCert         string `help:"Path to client certificate file for TLS" type:"path"`
+	TLSClientKey          string `help:"Path to client private key file for TLS" type:"path"`
+	HTTPBasicAuthUsername string `help:"Username for HTTP basic authentication"`
+	HTTPBasicAuthPassword string `help:"Password for HTTP basic authentication"`
 }
 
 type DownCmd struct {
