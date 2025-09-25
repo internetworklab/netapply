@@ -1281,19 +1281,27 @@ const labelKeyService string = "service"
 const labelKeyInstance string = "instance"
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
-	for _, dockerContainer := range nodeConfig.DockerContainers {
-		if err := dockerContainer.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create docker container %s: %w", dockerContainer.ContainerName, err)
+	if nodeConfig.DockerContainers != nil {
+		log.Println("Setting up docker containers ...")
+
+		for _, dockerContainer := range nodeConfig.DockerContainers {
+			log.Printf("Setting up docker container %s ...", dockerContainer.ContainerName)
+
+			if err := dockerContainer.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create docker container %s: %w", dockerContainer.ContainerName, err)
+			}
 		}
 	}
 
 	if nodeConfig.Dataplane != nil {
+		log.Println("Setting up dataplane ...")
 		if err := nodeConfig.Dataplane.Create(ctx); err != nil {
 			return fmt.Errorf("failed to create dataplane: %w", err)
 		}
 	}
 
 	if nodeConfig.Controlplane != nil {
+		log.Println("Setting up controlplane ...")
 		if err := nodeConfig.Controlplane.Create(ctx); err != nil {
 			return fmt.Errorf("failed to create controlplane: %w", err)
 		}
@@ -1354,9 +1362,12 @@ func getGlobalConfig(cmd *UpCmd, config *GlobalConfig) error {
 	path := cmd.Config
 
 	if path == "-" {
+		log.Println("Reading configuration from stdin ...")
 		// Read from stdin
 		reader = os.Stdin
 	} else if strings.HasPrefix(path, "https://") {
+		log.Printf("Reading configuration from HTTPS endpoint %s ...", path)
+
 		tlsConfig, err := getTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
 		if err != nil {
 			return fmt.Errorf("failed to create TLS config: %w", err)
@@ -1368,12 +1379,16 @@ func getGlobalConfig(cmd *UpCmd, config *GlobalConfig) error {
 			return fmt.Errorf("failed to fetch HTTPS config from '%s': %w", path, err)
 		}
 	} else if strings.HasPrefix(path, "http://") {
+		log.Printf("Reading configuration from HTTP endpoint %s ...", path)
+
 		// Read from HTTP endpoint
 		reader, err = fetchHTTPConfig(path, nil, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
 		if err != nil {
 			return fmt.Errorf("failed to fetch HTTP config from '%s': %w", path, err)
 		}
 	} else {
+		log.Printf("Reading configuration from file %s ...", path)
+
 		// Read from file
 		file, err := os.Open(path)
 		if err != nil {
@@ -1524,11 +1539,11 @@ func (cmd *UpCmd) Run() error {
 	}
 
 	// Start the service
+	log.Printf("Setting up service %s on node %s ...", cmd.ServiceName, cmd.Node)
 	if err := nodeConfig.Up(ctx); err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
-	fmt.Printf("Service '%s' on node '%s' started successfully\n", cmd.ServiceName, cmd.Node)
 	return nil
 }
 
