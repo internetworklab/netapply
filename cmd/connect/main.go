@@ -621,9 +621,125 @@ type DummyConfig struct {
 	Addresses     []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 }
 
+func getNetlinkAddrKey(addr *netlink.Addr) string {
+	if addr == nil {
+		return ""
+	}
+
+	if addr.Peer != nil {
+		return fmt.Sprintf("%s -> %s", addr.IP.String(), addr.Peer.String())
+	}
+
+	if addr.IPNet != nil {
+		return addr.IPNet.String()
+	}
+
+	return addr.IP.String()
+}
+
+// returns (added, removed)
+func detectAddrChanges(spec []*netlink.Addr, actual []*netlink.Addr) ([]*netlink.Addr, []*netlink.Addr) {
+	specMap := make(map[string]*netlink.Addr)
+	for _, addr := range spec {
+		specMap[getNetlinkAddrKey(addr)] = addr
+	}
+
+	actualMap := make(map[string]*netlink.Addr)
+	for _, addr := range actual {
+		actualMap[getNetlinkAddrKey(addr)] = addr
+	}
+
+	added := make([]*netlink.Addr, 0)
+	removed := make([]*netlink.Addr, 0)
+
+	for key, addr := range specMap {
+		if _, ok := actualMap[key]; !ok {
+			added = append(added, addr)
+		}
+	}
+
+	for key, addr := range actualMap {
+		if _, ok := specMap[key]; !ok {
+			removed = append(removed, addr)
+		}
+	}
+
+	return added, removed
+}
+
+type DummyInterfaceChangeSet struct {
+	ContainerName     *string
+	InterfaceName     string
+	AddressesToRemove []*netlink.Addr
+	AddressesToAdd    []*netlink.Addr
+}
+
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetContainerName() *string {
+	return dummyInterfaceChangeSet.ContainerName
+}
+
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetInterfaceName() string {
+	return dummyInterfaceChangeSet.InterfaceName
+}
+
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) HasUpdates() bool {
+	return len(dummyInterfaceChangeSet.AddressesToRemove)+len(dummyInterfaceChangeSet.AddressesToAdd) > 0
+}
+
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) Apply(ctx context.Context) error {
+	if !dummyInterfaceChangeSet.HasUpdates() {
+		return nil
+	}
+
+	return withNsHandle(ctx, dummyInterfaceChangeSet.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(dummyInterfaceChangeSet.InterfaceName)
+		if err == nil && link != nil {
+
+			for _, addr := range dummyInterfaceChangeSet.AddressesToRemove {
+				if err := handle.AddrDel(link, addr); err != nil {
+					return fmt.Errorf("failed to remove address from dummy link: %w", err)
+				}
+			}
+
+			for _, addr := range dummyInterfaceChangeSet.AddressesToAdd {
+				if err := handle.AddrAdd(link, addr); err != nil {
+					return fmt.Errorf("failed to add address to dummy link: %w", err)
+				}
+			}
+
+		}
+		return nil
+	})
+}
+
 func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	// todo
-	return nil, nil
+	changeSet := new(DummyInterfaceChangeSet)
+	for _, addr := range dummyConfig.Addresses {
+		nlAddr, err := addr.ToNetlinkAddr()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert address to netlink addr: %w", err)
+		}
+		changeSet.AddressesToAdd = append(changeSet.AddressesToAdd, nlAddr)
+	}
+
+	withNsHandle(ctx, dummyConfig.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(dummyConfig.Name)
+		if err == nil {
+			if link != nil {
+				addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
+				if err == nil {
+					for _, addr := range addrs {
+						changeSet.AddressesToRemove = append(changeSet.AddressesToRemove, &addr)
+					}
+				}
+			}
+		}
+		return nil
+	})
+
+	changeSet.AddressesToAdd, changeSet.AddressesToRemove = detectAddrChanges(changeSet.AddressesToAdd, changeSet.AddressesToRemove)
+
+	return changeSet, nil
 }
 
 func (dummyConfig *DummyConfig) GetContainerName() *string {
