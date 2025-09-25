@@ -576,11 +576,32 @@ type ControlplaneConfig struct {
 
 type DummyConfig struct {
 	Name string  `yaml:"name" json:"name"`
+	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	CIDR *string `yaml:"cidr,omitempty" json:"cidr,omitempty"`
 }
 
-type VirtualInterfaceConfig struct {
-	Dummy []DummyConfig `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
+	return withNsHandle(ctx, dummyConfig.ContainerName, func(handle *netlink.Handle) error {
+		link := &netlink.Dummy{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: dummyConfig.Name,
+			},
+		}
+
+		err := handle.LinkAdd(link)
+		if err != nil {
+			return fmt.Errorf("failed to add dummy link: %w", err)
+		}
+
+		
+
+		err = handle.LinkSetUp(link)
+		if err != nil {
+			return fmt.Errorf("failed to set up dummy link: %w", err)
+		}
+
+		return nil
+	})
 }
 
 type WireGuardPeerConfig struct {
@@ -824,13 +845,53 @@ type DataplaneConfig struct {
 	VXLAN     []VXLANConfig      `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
 	VethPair  []VethPairConfig   `yaml:"veth_pair,omitempty" json:"veth_pair,omitempty"`
 	Bridge    []BridgeConfig     `yaml:"bridge,omitempty" json:"bridge,omitempty"`
+	Dummy     []DummyConfig      `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+}
+
+func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
+	for _, dummyInst := range dpConfig.Dummy {
+		if err := dummyInst.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create dummy: %w", err)
+		}
+	}
+
+	for _, ovpInst := range dpConfig.OpenVPN {
+		if err := ovpInst.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create openvpn: %w", err)
+		}
+	}
+
+	for _, wgInst := range dpConfig.WireGuard {
+		if err := wgInst.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create wireguard: %w", err)
+		}
+	}
+
+	for _, vxlanInst := range dpConfig.VXLAN {
+		if err := vxlanInst.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create vxlan: %w", err)
+		}
+	}
+
+	for _, vethPairInst := range dpConfig.VethPair {
+		if err := vethPairInst.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create veth pair: %w", err)
+		}
+	}
+
+	for _, bridgeInst := range dpConfig.Bridge {
+		if err := bridgeInst.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create bridge: %w", err)
+		}
+	}
+
+	return nil
 }
 
 type NodeConfig struct {
 	DockerContainers []DockerContainerConfig `yaml:"docker_containers,omitempty" json:"docker_containers,omitempty"`
 	Controlplane     *ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
-	VirtualInterface *VirtualInterfaceConfig `yaml:"virtual_interface,omitempty" json:"virtual_interface,omitempty"`
 }
 
 type GlobalConfig struct {
