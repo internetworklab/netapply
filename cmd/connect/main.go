@@ -740,6 +740,36 @@ type WireGuardConfig struct {
 	MTU           *int                  `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 }
 
+func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (*WireGuardChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+type WireGuardChangeSet struct {
+	ContainerName    *string
+	InterfaceName    string
+	PrivateKey       *string
+	MTU              *int
+	Peers            []WireGuardPeerConfig
+	PeersUpdated     bool
+	Addresses        []AddressConfig
+	AddressesUpdated bool
+	ListenPort       *int
+}
+
+func (wgChangeSet *WireGuardChangeSet) HasUpdates() bool {
+	return wgChangeSet != nil && (wgChangeSet.PrivateKey != nil ||
+		wgChangeSet.MTU != nil ||
+		wgChangeSet.PeersUpdated ||
+		wgChangeSet.AddressesUpdated ||
+		wgChangeSet.ListenPort != nil)
+}
+
+func (wgChangeSet *WireGuardChangeSet) Apply(ctx context.Context) error {
+	// todo
+	return nil
+}
+
 func (wgConf *WireGuardConfig) Apply(wgtypesConf *wgtypes.Config) error {
 	if wgConf.ListenPort != nil {
 		wgtypesConf.ListenPort = wgConf.ListenPort
@@ -1201,7 +1231,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 
 	addedSet := make(map[string][]InterfaceProvisioner)
 	removedSet := make(map[string][]InterfaceCanceller)
-	updatedSet := make(map[string][]InterfaceProvisioner)
+	updatedSet := make(map[string][]InterfaceChangeSet)
 
 	specMap := make(map[string]OpenVPN2Instance)
 	for _, c := range ovpList {
@@ -1398,9 +1428,15 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	return changeSet, nil
 }
 
+type InterfaceChangeSet interface {
+	Apply(ctx context.Context) error
+	HasUpdates() bool
+	GetInterfaceName() string
+	GetContainerName() *string
+}
+
 type InterfaceProvisioner interface {
 	Create(ctx context.Context) error
-	Update(ctx context.Context) error
 	GetInterfaceName() string
 	GetContainerName() *string
 }
@@ -1472,7 +1508,7 @@ type DataplaneChangeSet struct {
 	AddedInterfaces map[string][]InterfaceProvisioner
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be updated
-	UpdatedInterfaces map[string][]InterfaceProvisioner
+	UpdatedInterfaces map[string][]InterfaceChangeSet
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be removed
 	RemovedInterfaces map[string][]InterfaceCanceller
@@ -1501,7 +1537,7 @@ func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *Datapla
 		}
 	}
 
-	mergedUpdated := make(map[string][]InterfaceProvisioner)
+	mergedUpdated := make(map[string][]InterfaceChangeSet)
 	for k, v := range dpChangeSet.UpdatedInterfaces {
 		mergedUpdated[k] = append(mergedUpdated[k], v...)
 	}
@@ -1560,10 +1596,12 @@ func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 		}
 
 		for _, updatedInterface := range dpChangeSet.UpdatedInterfaces {
-			for _, provisioner := range updatedInterface {
-				log.Printf("Updating interface %s in %s ...", provisioner.GetInterfaceName(), getContainerDisplayName(provisioner.GetContainerName()))
-				if err := provisioner.Update(ctx); err != nil {
-					return fmt.Errorf("failed to update interface: %w", err)
+			for _, changeSet := range updatedInterface {
+				if changeSet.HasUpdates() {
+					log.Printf("Updating interface %s in %s ...", changeSet.GetInterfaceName(), getContainerDisplayName(changeSet.GetContainerName()))
+					if err := changeSet.Apply(ctx); err != nil {
+						return fmt.Errorf("failed to update interface: %w", err)
+					}
 				}
 			}
 		}
