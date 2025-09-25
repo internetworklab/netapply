@@ -1278,10 +1278,8 @@ const labelKeyInstance string = "instance"
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	for _, dockerContainer := range nodeConfig.DockerContainers {
 		if err := dockerContainer.Create(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create docker container %s: %v\n", dockerContainer.ContainerName, err)
-			continue
+			return fmt.Errorf("failed to create docker container %s: %w", dockerContainer.ContainerName, err)
 		}
-		log.Println("Container is created for", dockerContainer.ContainerName)
 	}
 
 	if nodeConfig.Dataplane != nil {
