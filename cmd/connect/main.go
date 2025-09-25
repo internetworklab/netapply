@@ -1166,13 +1166,255 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 	})
 }
 
+type OpenVPN2ConfigurationList []OpenVPN2Instance
+
+func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+type WireGuardConfigurationList []WireGuardConfig
+
+func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+type VXLANConfigurationList []VXLANConfig
+
+func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+type VethPairConfigurationList []VethPairConfig
+
+func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+type BridgeConfigurationList []BridgeConfig
+
+func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+type DummyConfigurationList []DummyConfig
+
+func (dummyList DummyConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
 type DataplaneConfig struct {
-	OpenVPN   []OpenVPN2Instance `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
-	WireGuard []WireGuardConfig  `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
-	VXLAN     []VXLANConfig      `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
-	VethPair  []VethPairConfig   `yaml:"veth,omitempty" json:"veth,omitempty"`
-	Bridge    []BridgeConfig     `yaml:"bridge,omitempty" json:"bridge,omitempty"`
-	Dummy     []DummyConfig      `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+	OpenVPN   OpenVPN2ConfigurationList  `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
+	WireGuard WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
+	VXLAN     VXLANConfigurationList     `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
+	VethPair  VethPairConfigurationList  `yaml:"veth,omitempty" json:"veth,omitempty"`
+	Bridge    BridgeConfigurationList    `yaml:"bridge,omitempty" json:"bridge,omitempty"`
+	Dummy     DummyConfigurationList     `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+}
+
+func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+
+	var changeSet *DataplaneChangeSet
+
+	openVPNChangeSet, err := dpConfig.OpenVPN.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for OpenVPN: %w", err)
+	}
+	changeSet = changeSet.Merge(openVPNChangeSet)
+
+	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
+	}
+	changeSet = changeSet.Merge(wireGuardChangeSet)
+
+	vxlanChangeSet, err := dpConfig.VXLAN.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for VXLAN: %w", err)
+	}
+	changeSet = changeSet.Merge(vxlanChangeSet)
+
+	vethPairChangeSet, err := dpConfig.VethPair.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for VethPair: %w", err)
+	}
+	changeSet = changeSet.Merge(vethPairChangeSet)
+
+	bridgeChangeSet, err := dpConfig.Bridge.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for Bridge: %w", err)
+	}
+	changeSet = changeSet.Merge(bridgeChangeSet)
+
+	dummyChangeSet, err := dpConfig.Dummy.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for Dummy: %w", err)
+	}
+	changeSet = changeSet.Merge(dummyChangeSet)
+
+	return changeSet, nil
+}
+
+type InterfaceProvisioner interface {
+	Create(ctx context.Context) error
+	Update(ctx context.Context) error
+	GetInterfaceName() string
+	GetContainerName() *string
+}
+
+type InterfaceCanceller interface {
+	Cancel(ctx context.Context) error
+	GetInterfaceName() string
+	GetContainerName() *string
+}
+
+type StubInterfaceCanceller struct {
+	containerName *string
+	interfaceName string
+}
+
+func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
+	return withNsHandle(ctx, stubInterfaceCanceller.containerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(stubInterfaceCanceller.interfaceName)
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); !ok {
+				return fmt.Errorf("failed to get link: %w", err)
+			}
+			return nil
+		}
+
+		if err := handle.LinkDel(link); err != nil {
+			return fmt.Errorf("failed to delete link: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (stubInterfaceCanceller *StubInterfaceCanceller) GetInterfaceName() string {
+	return stubInterfaceCanceller.interfaceName
+}
+
+func (stubInterfaceCanceller *StubInterfaceCanceller) GetContainerName() *string {
+	return stubInterfaceCanceller.containerName
+}
+
+type DataplaneChangeSet struct {
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be added
+	AddedInterfaces map[string][]InterfaceProvisioner
+
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be updated
+	UpdatedInterfaces map[string][]InterfaceProvisioner
+
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be removed
+	RemovedInterfaces map[string][]InterfaceCanceller
+}
+
+func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *DataplaneChangeSet {
+	if dpChangeSet == nil {
+		return other
+	}
+
+	if other == nil {
+		return dpChangeSet
+	}
+
+	result := new(DataplaneChangeSet)
+
+	mergedAdded := make(map[string][]InterfaceProvisioner)
+	for k, v := range dpChangeSet.AddedInterfaces {
+		mergedAdded[k] = append(mergedAdded[k], v...)
+	}
+	for k, v := range other.AddedInterfaces {
+		if curr, ok := mergedAdded[k]; ok {
+			mergedAdded[k] = append(curr, v...)
+		} else {
+			mergedAdded[k] = v
+		}
+	}
+
+	mergedUpdated := make(map[string][]InterfaceProvisioner)
+	for k, v := range dpChangeSet.UpdatedInterfaces {
+		mergedUpdated[k] = append(mergedUpdated[k], v...)
+	}
+	for k, v := range other.UpdatedInterfaces {
+		if curr, ok := mergedUpdated[k]; ok {
+			mergedUpdated[k] = append(curr, v...)
+		} else {
+			mergedUpdated[k] = v
+		}
+	}
+
+	mergedRemoved := make(map[string][]InterfaceCanceller)
+	for k, v := range dpChangeSet.RemovedInterfaces {
+		mergedRemoved[k] = append(mergedRemoved[k], v...)
+	}
+	for k, v := range other.RemovedInterfaces {
+		if curr, ok := mergedRemoved[k]; ok {
+			mergedRemoved[k] = append(curr, v...)
+		} else {
+			mergedRemoved[k] = v
+		}
+	}
+
+	result.AddedInterfaces = mergedAdded
+	result.UpdatedInterfaces = mergedUpdated
+	result.RemovedInterfaces = mergedRemoved
+
+	return result
+}
+
+func (dpChangeSet *DataplaneChangeSet) HasChanges() bool {
+	if dpChangeSet != nil {
+		return len(dpChangeSet.AddedInterfaces)+len(dpChangeSet.UpdatedInterfaces)+len(dpChangeSet.RemovedInterfaces) > 0
+	}
+
+	return false
+}
+
+func getContainerDisplayName(containerName *string) string {
+	if containerName != nil {
+		return fmt.Sprintf("container %s", *containerName)
+	}
+
+	return "host"
+}
+
+func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
+	if dpChangeSet.HasChanges() {
+		for _, removedInterface := range dpChangeSet.RemovedInterfaces {
+			for _, canceller := range removedInterface {
+				log.Printf("Removing interface %s in %s ...", canceller.GetInterfaceName(), getContainerDisplayName(canceller.GetContainerName()))
+				if err := canceller.Cancel(ctx); err != nil {
+					return fmt.Errorf("failed to cancel interface: %w", err)
+				}
+			}
+		}
+
+		for _, updatedInterface := range dpChangeSet.UpdatedInterfaces {
+			for _, provisioner := range updatedInterface {
+				log.Printf("Updating interface %s in %s ...", provisioner.GetInterfaceName(), getContainerDisplayName(provisioner.GetContainerName()))
+				if err := provisioner.Update(ctx); err != nil {
+					return fmt.Errorf("failed to update interface: %w", err)
+				}
+			}
+		}
+
+		for _, addedInterface := range dpChangeSet.AddedInterfaces {
+			for _, provisioner := range addedInterface {
+				log.Printf("Creating interface %s in %s ...", provisioner.GetInterfaceName(), getContainerDisplayName(provisioner.GetContainerName()))
+				if err := provisioner.Create(ctx); err != nil {
+					return fmt.Errorf("failed to create interface: %w", err)
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
@@ -1287,6 +1529,7 @@ type NodeConfig struct {
 	DockerContainers []DockerContainerConfig `yaml:"docker_containers,omitempty" json:"docker_containers,omitempty"`
 	Controlplane     *ControlplaneConfig     `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+	Containers       []string                `yaml:"containers,omitempty" json:"containers,omitempty"`
 }
 
 func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error {

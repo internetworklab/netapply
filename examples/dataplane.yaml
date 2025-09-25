@@ -1,4 +1,7 @@
 nodes:
+  containers:
+    - frr
+    - openvpn-server
   lax1:
     dataplane:
       wireguard:
@@ -22,6 +25,18 @@ nodes:
           vxlan_id: 42
           nolearning: true
           container_name: frr
+        - name: vx43
+          local_ip: "10.3.64.1"
+          mtu: 1370
+          vxlan_id: 43
+          nolearning: true
+          container_name: frr
+        - name: vx44
+          local_ip: "10.3.64.1"
+          mtu: 1370
+          vxlan_id: 44
+          nolearning: true
+          container_name: frr
       veth:
         - name: veth1
           container_name: openvpn-server
@@ -33,6 +48,8 @@ nodes:
           slave_interfaces:
             - veth1
             - vx42
+            - vx43
+            - vx44
           container_name: frr
         - name: br0
           slave_interfaces:
