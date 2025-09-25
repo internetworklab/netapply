@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/docker/docker/api/types/container"
@@ -1338,23 +1342,37 @@ func down(ctx context.Context) error {
 
 const tagName string = "openvpn2"
 
-// getGlobalConfig reads configuration from either a file or stdin
-// path: file path or "-" for stdin
+// getGlobalConfig reads configuration from either a file, stdin, or HTTP(S) endpoint
+// path: file path, "-" for stdin, or HTTP(S) URL
 // config: pointer to GlobalConfig struct to populate
-func getGlobalConfig(path string, config *GlobalConfig) error {
-	var reader *os.File
+// tlsConfig: TLS configuration for HTTPS requests (can be nil for default)
+func getGlobalConfig(path string, config *GlobalConfig, tlsConfig *tls.Config) error {
+	var reader io.Reader
 	var err error
 
 	if path == "-" {
 		// Read from stdin
 		reader = os.Stdin
+	} else if strings.HasPrefix(path, "https://") {
+		// Read from HTTPS endpoint
+		reader, err = fetchHTTPConfig(path, tlsConfig)
+		if err != nil {
+			return fmt.Errorf("failed to fetch HTTPS config from '%s': %w", path, err)
+		}
+	} else if strings.HasPrefix(path, "http://") {
+		// Read from HTTP endpoint
+		reader, err = fetchHTTPConfig(path, nil)
+		if err != nil {
+			return fmt.Errorf("failed to fetch HTTP config from '%s': %w", path, err)
+		}
 	} else {
 		// Read from file
-		reader, err = os.Open(path)
+		file, err := os.Open(path)
 		if err != nil {
 			return fmt.Errorf("failed to open config file '%s': %w", path, err)
 		}
-		defer reader.Close()
+		defer file.Close()
+		reader = file
 	}
 
 	// Parse YAML configuration
@@ -1363,6 +1381,47 @@ func getGlobalConfig(path string, config *GlobalConfig) error {
 	}
 
 	return nil
+}
+
+// fetchHTTPConfig fetches configuration from an HTTP(S) endpoint
+func fetchHTTPConfig(url string, tlsConfig *tls.Config) (io.Reader, error) {
+	// Create HTTP client with timeout
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	if tlsConfig != nil {
+		client.Transport = &http.Transport{
+			TLSClientConfig: tlsConfig,
+		}
+	}
+
+	request, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	request.Header.Set("Accept", "application/yaml")
+
+	// Make HTTP request
+	resp, err := client.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("HTTP request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check HTTP status code
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
+	}
+
+	// Read response body into memory
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return strings.NewReader(string(body)), nil
 }
 
 // CLI structure for Kong
@@ -1398,7 +1457,8 @@ func (cmd *UpCmd) Run() error {
 
 	// Read and parse the configuration
 	globalConfig := new(GlobalConfig)
-	if err := getGlobalConfig(cmd.Config, globalConfig); err != nil {
+	var tlsConfig *tls.Config
+	if err := getGlobalConfig(cmd.Config, globalConfig, tlsConfig); err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
