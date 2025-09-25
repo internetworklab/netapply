@@ -22,6 +22,8 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+	"golang.zx2c4.com/wireguard/wgctrl"
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"gopkg.in/yaml.v3"
 )
 
@@ -615,8 +617,46 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 
 type WireGuardPeerConfig struct {
 	PublicKey  string   `yaml:"publickey" json:"publickey"`
-	Endpoint   string   `yaml:"endpoint" json:"endpoint"`
+	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
 	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
+}
+
+func (wgPeerConfig *WireGuardPeerConfig) Apply(wgtypesConf *wgtypes.Config) error {
+	if wgtypesConf.Peers == nil {
+		wgtypesConf.Peers = make([]wgtypes.PeerConfig, 0)
+	}
+
+	wgtypesPeerConfig := new(wgtypes.PeerConfig)
+	pk, err := wgtypes.ParseKey(wgPeerConfig.PublicKey)
+	if err != nil {
+		return fmt.Errorf("failed to parse public key: %w", err)
+	}
+	wgtypesPeerConfig.PublicKey = pk
+
+	if wgPeerConfig.Endpoint != nil {
+		udpAddr, err := net.ResolveUDPAddr("udp", *wgPeerConfig.Endpoint)
+		if err != nil {
+			return fmt.Errorf("failed to resolve udp address: %w", err)
+		}
+		wgtypesPeerConfig.Endpoint = udpAddr
+	}
+
+	if wgPeerConfig.AllowedIPs != nil {
+		if wgtypesPeerConfig.AllowedIPs == nil {
+			wgtypesPeerConfig.AllowedIPs = make([]net.IPNet, 0)
+		}
+
+		for _, allowedIP := range wgPeerConfig.AllowedIPs {
+			_, ipNet, err := net.ParseCIDR(allowedIP)
+			if err != nil {
+				return fmt.Errorf("failed to parse allowed ip: %w", err)
+			}
+			wgtypesPeerConfig.AllowedIPs = append(wgtypesPeerConfig.AllowedIPs, *ipNet)
+		}
+	}
+
+	wgtypesConf.Peers = append(wgtypesConf.Peers, *wgtypesPeerConfig)
+	return nil
 }
 
 type AddressConfig struct {
@@ -656,15 +696,114 @@ func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 }
 
 type WireGuardConfig struct {
-	Name       string                `yaml:"name" json:"name"`
-	PrivateKey string                `yaml:"privatekey" json:"privatekey"`
-	Peers      []WireGuardPeerConfig `yaml:"peers,omitempty" json:"peers,omitempty"`
-	Addresses  []AddressConfig       `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	Name          string                `yaml:"name" json:"name"`
+	PrivateKey    string                `yaml:"privatekey" json:"privatekey"`
+	Peers         []WireGuardPeerConfig `yaml:"peers,omitempty" json:"peers,omitempty"`
+	Addresses     []AddressConfig       `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	ContainerName *string               `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	ListenPort    *int                  `yaml:"listen_port,omitempty" json:"listen_port,omitempty"`
+	MTU           *int                  `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+}
+
+func (wgConf *WireGuardConfig) Apply(wgtypesConf *wgtypes.Config) error {
+	if wgConf.ListenPort != nil {
+		wgtypesConf.ListenPort = wgConf.ListenPort
+	}
+
+	if wgConf.PrivateKey != "" {
+		pk, err := wgtypes.ParseKey(wgConf.PrivateKey)
+		if err != nil {
+			return fmt.Errorf("failed to parse private key: %w", err)
+		}
+		wgtypesConf.PrivateKey = &pk
+	}
+
+	for _, peer := range wgConf.Peers {
+		if err := peer.Apply(wgtypesConf); err != nil {
+			return fmt.Errorf("failed to apply peer: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
-	// todo
-	return nil
+	return withNsHandle(ctx, nil, func(handle *netlink.Handle) error {
+		link := &netlink.Wireguard{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: wgConf.Name,
+			},
+		}
+
+		if wgConf.MTU != nil {
+			link.MTU = *wgConf.MTU
+		}
+
+		if err := handle.LinkAdd(link); err != nil {
+			return fmt.Errorf("failed to add wireguard link: %w", err)
+		}
+
+		wgCtrl, err := wgctrl.New()
+		if err != nil {
+			return fmt.Errorf("failed to create wireguard controller: %w", err)
+		}
+		defer wgCtrl.Close()
+
+		wgtypesConf := new(wgtypes.Config)
+		if err := wgConf.Apply(wgtypesConf); err != nil {
+			return fmt.Errorf("failed to apply wireguard config: %w", err)
+		}
+
+		if err := wgCtrl.ConfigureDevice(wgConf.Name, *wgtypesConf); err != nil {
+			return fmt.Errorf("failed to configure wireguard device: %w", err)
+		}
+
+		if err := handle.LinkSetUp(link); err != nil {
+			return fmt.Errorf("failed to set wireguard link up: %w", err)
+		}
+
+		if wgConf.ContainerName != nil {
+			cli, err := dockerCliFromCtx(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get docker cli from context: %w", err)
+			}
+
+			nsHandle, err := getNetNSHandle(ctx, cli, *wgConf.ContainerName)
+			if err != nil {
+				return fmt.Errorf("failed to get netns from docker: %w", err)
+			}
+			defer nsHandle.Close()
+
+			err = netlink.LinkSetNsPid(link, int(nsHandle))
+			if err != nil {
+				return fmt.Errorf("failed to set wireguard link ns pid: %w", err)
+			}
+		}
+
+		return withNsHandle(ctx, wgConf.ContainerName, func(handle *netlink.Handle) error {
+			link, err := handle.LinkByName(wgConf.Name)
+			if err != nil {
+				return fmt.Errorf("failed to get wireguard link: %w", err)
+			}
+
+			if err := handle.LinkSetUp(link); err != nil {
+				return fmt.Errorf("failed to set wireguard link up: %w", err)
+			}
+
+			for _, peer := range wgConf.Addresses {
+				nlAddr, err := peer.ToNetlinkAddr()
+				if err != nil {
+					return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+				}
+				err = handle.AddrAdd(link, nlAddr)
+				if err != nil {
+					return fmt.Errorf("failed to add address to wireguard link: %w", err)
+				}
+			}
+
+			return nil
+		})
+	})
 }
 
 type ContainerDockerConfig struct {
@@ -938,6 +1077,79 @@ type NodeConfig struct {
 	Dataplane        *DataplaneConfig        `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 }
 
+func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error {
+
+	configsToApply := make([]string, 0)
+
+	if controlPlaneConfig.OSPF != nil {
+		ospfPatchPath := path.Join(controlPlaneConfig.HostPatchDir, "ospf.conf")
+		ospfPatchFile, err := os.OpenFile(ospfPatchPath, os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to open ospf patch file: %w", err)
+		}
+		defer ospfPatchFile.Close()
+
+		for _, ospfConf := range controlPlaneConfig.OSPF {
+			cmds := ospfConf.ToCLICommands()
+			for _, cmd := range cmds {
+				ospfPatchFile.WriteString(cmd + "\n")
+			}
+		}
+		configsToApply = append(configsToApply, path.Join(controlPlaneConfig.ContainerPatchDir, path.Base(ospfPatchPath)))
+	}
+
+	if controlPlaneConfig.BGP != nil {
+		bgpPatchPath := path.Join(controlPlaneConfig.HostPatchDir, "bgp.conf")
+		bgpPatchFile, err := os.OpenFile(bgpPatchPath, os.O_RDWR|os.O_CREATE, 0644)
+		if err != nil {
+			return fmt.Errorf("failed to create temporary file: %w", err)
+		}
+		defer bgpPatchFile.Close()
+
+		for _, bgpConf := range controlPlaneConfig.BGP {
+			cmds := bgpConf.ToCLICommands()
+			for _, cmd := range cmds {
+				bgpPatchFile.WriteString(cmd + "\n")
+			}
+		}
+		configsToApply = append(configsToApply, path.Join(controlPlaneConfig.ContainerPatchDir, path.Base(bgpPatchPath)))
+	}
+
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+	cont, err := findContainer(ctx, cli, *controlPlaneConfig.ContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to find container: %w", err)
+	}
+	if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+
+	for _, configToApply := range configsToApply {
+		execOptions := container.ExecOptions{
+			Cmd: []string{
+				"vtysh",
+				"-f",
+				configToApply,
+			},
+		}
+		exec, err := cli.ContainerExecCreate(ctx, cont.ID, execOptions)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to create exec: %v\n", err)
+			continue
+		}
+
+		if err := cli.ContainerExecStart(ctx, exec.ID, container.ExecStartOptions{}); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to start exec: %v\n", err)
+			continue
+		}
+	}
+
+	return nil
+}
+
 type GlobalConfig struct {
 	Nodes map[string]NodeConfig `yaml:"nodes" json:"nodes"`
 }
@@ -1063,7 +1275,7 @@ type Instance struct {
 const labelKeyService string = "service"
 const labelKeyInstance string = "instance"
 
-func up(ctx context.Context, nodeConfig *NodeConfig) error {
+func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	for _, dockerContainer := range nodeConfig.DockerContainers {
 		if err := dockerContainer.Create(ctx); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to create docker container %s: %v\n", dockerContainer.ContainerName, err)
@@ -1073,83 +1285,14 @@ func up(ctx context.Context, nodeConfig *NodeConfig) error {
 	}
 
 	if nodeConfig.Dataplane != nil {
-		for _, ovpInst := range nodeConfig.Dataplane.OpenVPN {
-			if err := ovpInst.Create(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to start openvpn for %s: %v\n", ovpInst.Name, err)
-				continue
-			}
-			log.Println("Container is started for", ovpInst.Name)
+		if err := nodeConfig.Dataplane.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create dataplane: %w", err)
 		}
 	}
 
 	if nodeConfig.Controlplane != nil {
-
-		configsToApply := make([]string, 0)
-
-		if nodeConfig.Controlplane.OSPF != nil {
-			ospfPatchPath := path.Join(nodeConfig.Controlplane.HostPatchDir, "ospf.conf")
-			ospfPatchFile, err := os.OpenFile(ospfPatchPath, os.O_RDWR|os.O_CREATE, 0644)
-			if err != nil {
-				return fmt.Errorf("failed to open ospf patch file: %w", err)
-			}
-			defer ospfPatchFile.Close()
-
-			for _, ospfConf := range nodeConfig.Controlplane.OSPF {
-				cmds := ospfConf.ToCLICommands()
-				for _, cmd := range cmds {
-					ospfPatchFile.WriteString(cmd + "\n")
-				}
-			}
-			configsToApply = append(configsToApply, path.Join(nodeConfig.Controlplane.ContainerPatchDir, path.Base(ospfPatchPath)))
-		}
-
-		if nodeConfig.Controlplane.BGP != nil {
-			bgpPatchPath := path.Join(nodeConfig.Controlplane.HostPatchDir, "bgp.conf")
-			bgpPatchFile, err := os.OpenFile(bgpPatchPath, os.O_RDWR|os.O_CREATE, 0644)
-			if err != nil {
-				return fmt.Errorf("failed to create temporary file: %w", err)
-			}
-			defer bgpPatchFile.Close()
-
-			for _, bgpConf := range nodeConfig.Controlplane.BGP {
-				cmds := bgpConf.ToCLICommands()
-				for _, cmd := range cmds {
-					bgpPatchFile.WriteString(cmd + "\n")
-				}
-			}
-			configsToApply = append(configsToApply, path.Join(nodeConfig.Controlplane.ContainerPatchDir, path.Base(bgpPatchPath)))
-		}
-
-		cli, err := dockerCliFromCtx(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get docker cli from context: %w", err)
-		}
-		cont, err := findContainer(ctx, cli, *nodeConfig.Controlplane.ContainerName)
-		if err != nil {
-			return fmt.Errorf("failed to find container: %w", err)
-		}
-		if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
-			return fmt.Errorf("failed to start container: %w", err)
-		}
-
-		for _, configToApply := range configsToApply {
-			execOptions := container.ExecOptions{
-				Cmd: []string{
-					"vtysh",
-					"-f",
-					configToApply,
-				},
-			}
-			exec, err := cli.ContainerExecCreate(ctx, cont.ID, execOptions)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to create exec: %v\n", err)
-				continue
-			}
-
-			if err := cli.ContainerExecStart(ctx, exec.ID, container.ExecStartOptions{}); err != nil {
-				fmt.Fprintf(os.Stderr, "failed to start exec: %v\n", err)
-				continue
-			}
+		if err := nodeConfig.Controlplane.Create(ctx); err != nil {
+			return fmt.Errorf("failed to create controlplane: %w", err)
 		}
 	}
 
