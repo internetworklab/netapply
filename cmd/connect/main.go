@@ -621,6 +621,19 @@ type DummyConfig struct {
 	Addresses     []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 }
 
+func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+func (dummyConfig *DummyConfig) GetContainerName() *string {
+	return dummyConfig.ContainerName
+}
+
+func (dummyConfig *DummyConfig) GetInterfaceName() string {
+	return dummyConfig.Name
+}
+
 func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 	return withNsHandle(ctx, dummyConfig.ContainerName, func(handle *netlink.Handle) error {
 		link := &netlink.Dummy{
@@ -924,6 +937,19 @@ type VXLANConfig struct {
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 }
 
+func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+func (vxlanConfig *VXLANConfig) GetContainerName() *string {
+	return vxlanConfig.ContainerName
+}
+
+func (vxlanConfig *VXLANConfig) GetInterfaceName() string {
+	return vxlanConfig.Name
+}
+
 func findContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
 	filters := filters.NewArgs()
 	filters.Add("name", containerName)
@@ -1049,6 +1075,19 @@ type VethPairConfig struct {
 	Peer          *VethPairConfig `yaml:"peer,omitempty" json:"peer,omitempty"`
 }
 
+func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+func (vethPairConfig *VethPairConfig) GetContainerName() *string {
+	return vethPairConfig.ContainerName
+}
+
+func (vethPairConfig *VethPairConfig) GetInterfaceName() string {
+	return vethPairConfig.Name
+}
+
 func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 	return withNsHandle(ctx, nil, func(handle *netlink.Handle) error {
 		cli, err := dockerCliFromCtx(ctx)
@@ -1114,6 +1153,19 @@ type BridgeConfig struct {
 	Name            string   `yaml:"name" json:"name"`
 	SlaveInterfaces []string `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
 	ContainerName   *string  `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+}
+
+func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
+	// todo
+	return nil, nil
+}
+
+func (bridgeConfig *BridgeConfig) GetContainerName() *string {
+	return bridgeConfig.ContainerName
+}
+
+func (bridgeConfig *BridgeConfig) GetInterfaceName() string {
+	return bridgeConfig.Name
 }
 
 // returns: (added, removed)
@@ -1331,17 +1383,17 @@ func getInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	return res.ifaces, nil
 }
 
-func detectChangesFromProvisionerList(ctx context.Context, wgList []InterfaceProvisioner, wgty string, containers []string) (*DataplaneChangeSet, error) {
+func detectChangesFromProvisionerList(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
 	currentInterfaceListMap := make(map[string]map[string]InterfaceCanceller)
 	for _, name := range containers {
-		ifaces, err := getInterfaceFromContainer(ctx, &name, wgty)
+		ifaces, err := getInterfaceFromContainer(ctx, &name, netlinkIfType)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get interface from container: %w", err)
 		}
 		currentInterfaceListMap[name] = ifaces
 	}
-	hostInterfaceList, err := getInterfaceFromContainer(ctx, nil, wgty)
+	hostInterfaceList, err := getInterfaceFromContainer(ctx, nil, netlinkIfType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get interface from host: %w", err)
 	}
@@ -1349,7 +1401,7 @@ func detectChangesFromProvisionerList(ctx context.Context, wgList []InterfacePro
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
 	specInterfaceListMap := make(map[string]map[string]InterfaceProvisioner)
-	for _, c := range wgList {
+	for _, c := range provisionerList {
 		contName := string(getContainerKey(c.GetContainerName()))
 
 		if _, ok := specInterfaceListMap[contName]; !ok {
@@ -1446,29 +1498,45 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 type VXLANConfigurationList []VXLANConfig
 
 func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	// todo
-	return nil, nil
+	vxlanty := new(netlink.Vxlan).Type()
+	provisionerList := make([]InterfaceProvisioner, 0)
+	for _, vxlan := range vxlanList {
+		provisionerList = append(provisionerList, &vxlan)
+	}
+	return detectChangesFromProvisionerList(ctx, provisionerList, vxlanty, containers)
 }
 
 type VethPairConfigurationList []VethPairConfig
 
 func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	// todo
-	return nil, nil
+	vethPairTy := new(netlink.Veth).Type()
+	provisionerList := make([]InterfaceProvisioner, 0)
+	for _, vethPair := range vethPairList {
+		provisionerList = append(provisionerList, &vethPair)
+	}
+	return detectChangesFromProvisionerList(ctx, provisionerList, vethPairTy, containers)
 }
 
 type BridgeConfigurationList []BridgeConfig
 
 func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	// todo
-	return nil, nil
+	bridgeTy := new(netlink.Bridge).Type()
+	provisionerList := make([]InterfaceProvisioner, 0)
+	for _, bridge := range bridgeList {
+		provisionerList = append(provisionerList, &bridge)
+	}
+	return detectChangesFromProvisionerList(ctx, provisionerList, bridgeTy, containers)
 }
 
 type DummyConfigurationList []DummyConfig
 
 func (dummyList DummyConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	// todo
-	return nil, nil
+	dummyTy := new(netlink.Dummy).Type()
+	provisionerList := make([]InterfaceProvisioner, 0)
+	for _, dummy := range dummyList {
+		provisionerList = append(provisionerList, &dummy)
+	}
+	return detectChangesFromProvisionerList(ctx, provisionerList, dummyTy, containers)
 }
 
 type DataplaneConfig struct {
