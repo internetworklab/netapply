@@ -314,6 +314,10 @@ type OpenVPN2Instance struct {
 	ExecutablePath      *string                    `openvpn2:"-" yaml:"executable_path,omitempty" json:"executable_path,omitempty"`
 }
 
+func (ovpInst *OpenVPN2Instance) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
+	return nil, nil
+}
+
 func (ovpInst *OpenVPN2Instance) GetContainerName() *string {
 	return &ovpInst.DockerContainer.ContainerName
 }
@@ -748,7 +752,7 @@ func (wgConf *WireGuardConfig) GetContainerName() *string {
 	return wgConf.ContainerName
 }
 
-func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (*WireGuardChangeSet, error) {
+func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
 	// todo
 	return nil, nil
 }
@@ -1327,9 +1331,7 @@ func getInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	return res.ifaces, nil
 }
 
-// Scan containers specified for any reconciliation clues.
-func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	wgty := new(netlink.Wireguard).Type()
+func detectChangesFromProvisionerList(ctx context.Context, wgList []InterfaceProvisioner, wgty string, containers []string) (*DataplaneChangeSet, error) {
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
 	currentInterfaceListMap := make(map[string]map[string]InterfaceCanceller)
 	for _, name := range containers {
@@ -1346,14 +1348,14 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 	currentInterfaceListMap[string(ContainerKeyHost)] = hostInterfaceList
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
-	specInterfaceListMap := make(map[string]map[string]WireGuardConfig)
+	specInterfaceListMap := make(map[string]map[string]InterfaceProvisioner)
 	for _, c := range wgList {
-		contName := string(getContainerKey(c.ContainerName))
+		contName := string(getContainerKey(c.GetContainerName()))
 
 		if _, ok := specInterfaceListMap[contName]; !ok {
-			specInterfaceListMap[contName] = make(map[string]WireGuardConfig, 0)
+			specInterfaceListMap[contName] = make(map[string]InterfaceProvisioner, 0)
 		}
-		specInterfaceListMap[contName][c.Name] = c
+		specInterfaceListMap[contName][c.GetInterfaceName()] = c
 	}
 
 	combinedNsMap := make(map[string]interface{})
@@ -1386,7 +1388,7 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 			if lhsOk {
 				addedSet[nsKey] = make([]InterfaceProvisioner, 0)
 				for _, spec := range lhsSpecMap {
-					addedSet[nsKey] = append(addedSet[nsKey], &spec)
+					addedSet[nsKey] = append(addedSet[nsKey], spec)
 				}
 			}
 			continue
@@ -1395,7 +1397,7 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 		updatedSet[nsKey] = make([]InterfaceChangeSet, 0)
 		addedSet[nsKey] = make([]InterfaceProvisioner, 0)
 		removedSet[nsKey] = make([]InterfaceCanceller, 0)
-		commonSet := make(map[string]WireGuardConfig)
+		commonSet := make(map[string]InterfaceProvisioner)
 
 		for _, status := range rhsCurrentMap {
 			if _, ok := lhsSpecMap[status.GetInterfaceName()]; !ok {
@@ -1409,7 +1411,7 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 			}
 
 			if _, ok := rhsCurrentMap[spec.GetInterfaceName()]; !ok {
-				addedSet[nsKey] = append(addedSet[nsKey], &spec)
+				addedSet[nsKey] = append(addedSet[nsKey], spec)
 			}
 		}
 
@@ -1429,6 +1431,16 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 	result.RemovedInterfaces = removedSet
 	result.UpdatedInterfaces = updatedSet
 	return result, nil
+}
+
+// Scan containers specified for any reconciliation clues.
+func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	wgty := new(netlink.Wireguard).Type()
+	provisionerList := make([]InterfaceProvisioner, 0)
+	for _, wg := range wgList {
+		provisionerList = append(provisionerList, &wg)
+	}
+	return detectChangesFromProvisionerList(ctx, provisionerList, wgty, containers)
 }
 
 type VXLANConfigurationList []VXLANConfig
@@ -1519,8 +1531,17 @@ type InterfaceChangeSet interface {
 }
 
 type InterfaceProvisioner interface {
+	// In case the interface is not created yet, one can call `Create` to create the interface.
 	Create(ctx context.Context) error
+
+	// In case the interface is already created, one can call `DetectChanges` to detect any changes.
+	// Also, a `*InterfaceChangeSet` might be nil regardless of there is error or not.
+	DetectChanges(ctx context.Context) (InterfaceChangeSet, error)
+
+	// Get the interface name for indexing and logging purposes.
 	GetInterfaceName() string
+
+	// Get the container name for indexing and logging purposes.
 	GetContainerName() *string
 }
 
