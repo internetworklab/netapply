@@ -575,9 +575,9 @@ type ControlplaneConfig struct {
 }
 
 type DummyConfig struct {
-	Name string  `yaml:"name" json:"name"`
-	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	CIDR *string `yaml:"cidr,omitempty" json:"cidr,omitempty"`
+	Name          string          `yaml:"name" json:"name"`
+	ContainerName *string         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Addresses     []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 }
 
 func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
@@ -593,11 +593,20 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to add dummy link: %w", err)
 		}
 
-		
-
 		err = handle.LinkSetUp(link)
 		if err != nil {
 			return fmt.Errorf("failed to set up dummy link: %w", err)
+		}
+
+		for _, addr := range dummyConfig.Addresses {
+			nlAddr, err := addr.ToNetlinkAddr()
+			if err != nil {
+				return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+			}
+			err = handle.AddrAdd(link, nlAddr)
+			if err != nil {
+				return fmt.Errorf("failed to add address to dummy link: %w", err)
+			}
 		}
 
 		return nil
@@ -610,17 +619,52 @@ type WireGuardPeerConfig struct {
 	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
 }
 
-type WireGuardAddressConfig struct {
+type AddressConfig struct {
 	Peer  *string `yaml:"peer,omitempty" json:"peer,omitempty"`
 	Local *string `yaml:"local,omitempty" json:"local,omitempty"`
 	CIDR  *string `yaml:"cidr,omitempty" json:"cidr,omitempty"`
 }
 
+func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
+	if addrConfig.Peer != nil && addrConfig.Local != nil {
+		_, peerIPNet, err := net.ParseCIDR(*addrConfig.Peer)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse peer ip: %w", err)
+		}
+
+		localIp := net.ParseIP(*addrConfig.Local)
+		if localIp == nil {
+			return nil, fmt.Errorf("failed to parse local ip: %w", err)
+		}
+
+		nlAddr := new(netlink.Addr)
+		nlAddr.Peer = peerIPNet
+		nlAddr.IPNet = new(net.IPNet)
+		nlAddr.IP = localIp
+
+		return nlAddr, nil
+	}
+
+	_, ipNet, err := net.ParseCIDR(*addrConfig.CIDR)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse cidr: %w", err)
+	}
+
+	nlAddr := new(netlink.Addr)
+	nlAddr.IPNet = ipNet
+	return nlAddr, nil
+}
+
 type WireGuardConfig struct {
-	Name       string                   `yaml:"name" json:"name"`
-	PrivateKey string                   `yaml:"privatekey" json:"privatekey"`
-	Peers      []WireGuardPeerConfig    `yaml:"peers,omitempty" json:"peers,omitempty"`
-	Addresses  []WireGuardAddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	Name       string                `yaml:"name" json:"name"`
+	PrivateKey string                `yaml:"privatekey" json:"privatekey"`
+	Peers      []WireGuardPeerConfig `yaml:"peers,omitempty" json:"peers,omitempty"`
+	Addresses  []AddressConfig       `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+}
+
+func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
+	// todo
+	return nil
 }
 
 type ContainerDockerConfig struct {
@@ -1178,22 +1222,6 @@ func main() {
 		panic("config file path --config is required")
 	}
 
-	configFile, err := os.Open(configFilePath)
-	if err != nil {
-		panic(err)
-	}
-	defer configFile.Close()
-
-	globalConfig := new(GlobalConfig)
-	if err := yaml.NewDecoder(configFile).Decode(globalConfig); err != nil {
-		panic(err)
-	}
-
-	nodeConfig, ok := globalConfig.Nodes[nodeName]
-	if !ok {
-		panic("node config not found")
-	}
-
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		panic(err)
@@ -1203,19 +1231,45 @@ func main() {
 	ctx = setServiceNameInCtx(ctx, servicename)
 	ctx = setDockerCliInCtx(ctx, cli)
 
-	switch command {
-	case "up":
-		err = up(ctx, &nodeConfig)
-	case "down":
-		err = down(ctx)
-	default:
-		panic("command is unknown")
+	dpConfig := new(DataplaneConfig)
+
+	if err := yaml.NewDecoder(os.Stdin).Decode(dpConfig); err != nil {
+		panic(err)
 	}
 
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to %s: %v\n", command, err)
-		os.Exit(1)
+	if err := dpConfig.Create(ctx); err != nil {
+		panic(err)
 	}
+
+	// configFile, err := os.Open(configFilePath)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer configFile.Close()
+
+	// globalConfig := new(GlobalConfig)
+	// if err := yaml.NewDecoder(configFile).Decode(globalConfig); err != nil {
+	// 	panic(err)
+	// }
+
+	// nodeConfig, ok := globalConfig.Nodes[nodeName]
+	// if !ok {
+	// 	panic("node config not found")
+	// }
+
+	// switch command {
+	// case "up":
+	// 	err = up(ctx, &nodeConfig)
+	// case "down":
+	// 	err = down(ctx)
+	// default:
+	// 	panic("command is unknown")
+	// }
+
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "failed to %s: %v\n", command, err)
+	// 	os.Exit(1)
+	// }
 }
 
 func init() {
