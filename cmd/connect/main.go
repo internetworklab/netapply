@@ -1037,39 +1037,63 @@ type DataplaneConfig struct {
 }
 
 func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
-	for _, dummyInst := range dpConfig.Dummy {
-		if err := dummyInst.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create dummy: %w", err)
+	if dpConfig.Dummy != nil {
+		log.Println("Setting up dummy interfaces ...")
+		for _, dummyInst := range dpConfig.Dummy {
+			log.Printf("Setting up dummy interface %s ...", dummyInst.Name)
+			if err := dummyInst.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create dummy: %w", err)
+			}
 		}
 	}
 
-	for _, ovpInst := range dpConfig.OpenVPN {
-		if err := ovpInst.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create openvpn: %w", err)
+	if dpConfig.OpenVPN != nil {
+		log.Println("Setting up OpenVPN interfaces ...")
+		for _, ovpInst := range dpConfig.OpenVPN {
+			log.Printf("Setting up OpenVPN interface %s ...", ovpInst.Name)
+			if err := ovpInst.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create openvpn: %w", err)
+			}
 		}
 	}
 
-	for _, wgInst := range dpConfig.WireGuard {
-		if err := wgInst.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create wireguard: %w", err)
+	if dpConfig.WireGuard != nil {
+		log.Println("Setting up WireGuard interfaces ...")
+		for _, wgInst := range dpConfig.WireGuard {
+			log.Printf("Setting up WireGuard interface %s ...", wgInst.Name)
+			if err := wgInst.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create wireguard: %w", err)
+			}
 		}
 	}
 
-	for _, vxlanInst := range dpConfig.VXLAN {
-		if err := vxlanInst.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create vxlan: %w", err)
+	if dpConfig.VXLAN != nil {
+		log.Println("Setting up VXLAN interfaces ...")
+		for _, vxlanInst := range dpConfig.VXLAN {
+			log.Printf("Setting up VXLAN interface %s ...", vxlanInst.Name)
+			if err := vxlanInst.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create vxlan: %w", err)
+			}
 		}
 	}
 
-	for _, vethPairInst := range dpConfig.VethPair {
-		if err := vethPairInst.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create veth pair: %w", err)
+	if dpConfig.VethPair != nil {
+		log.Println("Setting up VethPair interfaces ...")
+		for _, vethPairInst := range dpConfig.VethPair {
+			log.Printf("Setting up VethPair interface %s ...", vethPairInst.Name)
+			if err := vethPairInst.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create veth pair: %w", err)
+			}
 		}
 	}
 
-	for _, bridgeInst := range dpConfig.Bridge {
-		if err := bridgeInst.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create bridge: %w", err)
+	if dpConfig.Bridge != nil {
+		log.Println("Setting up Bridge interfaces ...")
+		for _, bridgeInst := range dpConfig.Bridge {
+			log.Printf("Setting up Bridge interface %s ...", bridgeInst.Name)
+			if err := bridgeInst.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create bridge: %w", err)
+			}
 		}
 	}
 
