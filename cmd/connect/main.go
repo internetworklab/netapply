@@ -314,6 +314,18 @@ type OpenVPN2Instance struct {
 	ExecutablePath      *string                    `openvpn2:"-" yaml:"executable_path,omitempty" json:"executable_path,omitempty"`
 }
 
+func (ovpInst *OpenVPN2Instance) GetContainerName() *string {
+	return &ovpInst.DockerContainer.ContainerName
+}
+
+func (ovpInst *OpenVPN2Instance) GetInterfaceName() string {
+	return ovpInst.Dev
+}
+
+func (ovpInst *OpenVPN2Instance) Update(ctx context.Context) error {
+	return nil
+}
+
 type CtxKey string
 
 const ctxKeyDockerCli CtxKey = "docker_cli"
@@ -1169,13 +1181,139 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 type OpenVPN2ConfigurationList []OpenVPN2Instance
 
 func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	// todo
-	return nil, nil
+	// Reconciliaton of container-based OpenVPN instances is quite simple, rules:
+	// 1. If the container is present on the system but not in the list, remove it.
+	// 2. If the container is not present on the system but in the list, create it.
+	// 3. If the container is present both on the system and the list, by optimistic assumption, it doesn't need to be updated.
+	// 4. The key is the container name, forget about the interface name.
+
+	changeSet := new(DataplaneChangeSet)
+
+	serviceName, err := serviceNameFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service name: %w", err)
+	}
+
+	containerList, err := NewContainerListFromServiceName(ctx, serviceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container list from service name: %w", err)
+	}
+
+	addedSet := make(map[string][]InterfaceProvisioner)
+	removedSet := make(map[string][]InterfaceCanceller)
+	updatedSet := make(map[string][]InterfaceProvisioner)
+
+	specMap := make(map[string]OpenVPN2Instance)
+	for _, c := range ovpList {
+		specMap[c.DockerContainer.ContainerName] = c
+	}
+
+	containersMap := make(map[string]interface{})
+	for _, container := range containerList.GetContainers() {
+		containersMap[container.Names[0]] = container
+		if _, ok := specMap[container.Names[0]]; !ok {
+			removedSet[container.Names[0]] = make([]InterfaceCanceller, 0)
+			removedSet[container.Names[0]] = append(removedSet[container.Names[0]], &OpenVPN2InterfaceCanceller{ContainerName: container.Names[0]})
+		}
+	}
+
+	for _, c := range specMap {
+		if _, ok := containersMap[c.DockerContainer.ContainerName]; !ok {
+			addedSet[c.DockerContainer.ContainerName] = make([]InterfaceProvisioner, 0)
+			addedSet[c.DockerContainer.ContainerName] = append(addedSet[c.DockerContainer.ContainerName], &c)
+		}
+	}
+
+	changeSet.AddedInterfaces = addedSet
+	changeSet.RemovedInterfaces = removedSet
+	changeSet.UpdatedInterfaces = updatedSet
+
+	return changeSet, nil
 }
 
 type WireGuardConfigurationList []WireGuardConfig
 
+type ContainerKey string
+
+const (
+	ContainerKeyHost ContainerKey = "-"
+)
+
+func getContainerKey(containerName *string) ContainerKey {
+	if containerName == nil {
+		return ContainerKeyHost
+	}
+
+	if *containerName == "" || *containerName == "-" {
+		return ContainerKeyHost
+	}
+
+	return ContainerKey(*containerName)
+}
+
+func getInterfaceFromContainer(ctx context.Context, containerName *string, linkType string) ([]InterfaceCanceller, error) {
+	type result struct {
+		ifaces []InterfaceCanceller
+	}
+
+	res := new(result)
+	res.ifaces = make([]InterfaceCanceller, 0)
+
+	err := withNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
+		links, err := handle.LinkList()
+		if err != nil {
+			return fmt.Errorf("failed to list links: %w", err)
+		}
+
+		for _, link := range links {
+			if link.Type() == linkType {
+				res.ifaces = append(res.ifaces, &StubInterfaceCanceller{ContainerName: containerName, InterfaceName: link.Attrs().Name})
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interface from container: %w", err)
+	}
+
+	return res.ifaces, nil
+}
+
 func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
+	wgty := new(netlink.Wireguard).Type()
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
+	currentInterfaceListMap := make(map[string][]InterfaceCanceller)
+	for _, name := range containers {
+		ifaces, err := getInterfaceFromContainer(ctx, &name, wgty)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get interface from container: %w", err)
+		}
+		currentInterfaceListMap[name] = ifaces
+	}
+	hostInterfaceList, err := getInterfaceFromContainer(ctx, nil, wgty)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interface from host: %w", err)
+	}
+	currentInterfaceListMap[string(ContainerKeyHost)] = hostInterfaceList
+
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
+	specInterfaceListMap := make(map[string][]WireGuardConfig)
+	for _, c := range wgList {
+		contName := string(getContainerKey(c.ContainerName))
+
+		if _, ok := specInterfaceListMap[contName]; !ok {
+			specInterfaceListMap[contName] = make([]WireGuardConfig, 0)
+		}
+		specInterfaceListMap[contName] = append(specInterfaceListMap[contName], c)
+	}
+
+	// todo:
+	// generate added set
+	// generate removed set
+	// generate updated set (hint: updated set must be generated from the intersection set)
+
 	// todo
 	return nil, nil
 }
@@ -1273,14 +1411,39 @@ type InterfaceCanceller interface {
 	GetContainerName() *string
 }
 
+type OpenVPN2InterfaceCanceller struct {
+	ContainerName string
+}
+
+func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) Cancel(ctx context.Context) error {
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker client: %w", err)
+	}
+
+	if err := cli.ContainerStop(ctx, ovpInterfaceCanceller.ContainerName, container.StopOptions{}); err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+
+	return nil
+}
+
+func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetContainerName() *string {
+	return &ovpInterfaceCanceller.ContainerName
+}
+
+func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetInterfaceName() string {
+	return "-"
+}
+
 type StubInterfaceCanceller struct {
-	containerName *string
-	interfaceName string
+	ContainerName *string
+	InterfaceName string
 }
 
 func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
-	return withNsHandle(ctx, stubInterfaceCanceller.containerName, func(handle *netlink.Handle) error {
-		link, err := handle.LinkByName(stubInterfaceCanceller.interfaceName)
+	return withNsHandle(ctx, stubInterfaceCanceller.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(stubInterfaceCanceller.InterfaceName)
 		if err != nil {
 			if _, ok := err.(netlink.LinkNotFoundError); !ok {
 				return fmt.Errorf("failed to get link: %w", err)
@@ -1297,11 +1460,11 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context
 }
 
 func (stubInterfaceCanceller *StubInterfaceCanceller) GetInterfaceName() string {
-	return stubInterfaceCanceller.interfaceName
+	return stubInterfaceCanceller.InterfaceName
 }
 
 func (stubInterfaceCanceller *StubInterfaceCanceller) GetContainerName() *string {
-	return stubInterfaceCanceller.containerName
+	return stubInterfaceCanceller.ContainerName
 }
 
 type DataplaneChangeSet struct {
@@ -1764,10 +1927,41 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	return nil
 }
 
+type ContainerList struct {
+	containers []container.Summary
+}
+
+func (containerList *ContainerList) GetContainers() []container.Summary {
+	return containerList.containers
+}
+
+func NewContainerListFromServiceName(ctx context.Context, serviceName string) (*ContainerList, error) {
+	cli, err := dockerCliFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	dockerArgs := filters.NewArgs()
+	dockerArgs.Add("label", fmt.Sprintf("%s=%s", labelKeyService, serviceName))
+	containers, err := cli.ContainerList(ctx, container.ListOptions{
+		Filters: dockerArgs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	return &ContainerList{containers: containers}, nil
+}
+
 func down(ctx context.Context) error {
-	servicename, err := serviceNameFromCtx(ctx)
+	serviceName, err := serviceNameFromCtx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get service name from context: %w", err)
+	}
+
+	containerList, err := NewContainerListFromServiceName(ctx, serviceName)
+	if err != nil {
+		return fmt.Errorf("failed to get container list from service name: %w", err)
 	}
 
 	cli, err := dockerCliFromCtx(ctx)
@@ -1775,17 +1969,8 @@ func down(ctx context.Context) error {
 		return fmt.Errorf("failed to get docker cli from context: %w", err)
 	}
 
-	dockerArgs := filters.NewArgs()
-	dockerArgs.Add("label", fmt.Sprintf("%s=%s", labelKeyService, servicename))
-	containers, err := cli.ContainerList(ctx, container.ListOptions{
-		Filters: dockerArgs,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to list containers: %w", err)
-	}
-
-	for _, cont := range containers {
-		if err := cli.ContainerStop(context.Background(), cont.ID, container.StopOptions{}); err != nil {
+	for _, cont := range containerList.GetContainers() {
+		if err := cli.ContainerStop(ctx, cont.ID, container.StopOptions{}); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to stop container %s: %v\n", cont.Names[0], err)
 			continue
 		}
