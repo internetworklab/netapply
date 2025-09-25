@@ -1552,39 +1552,63 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 
 	var changeSet *DataplaneChangeSet
 
+	log.Println("Detecting changes for OpenVPN ...")
 	openVPNChangeSet, err := dpConfig.OpenVPN.DetectChanges(ctx, containers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for OpenVPN: %w", err)
 	}
+	if openVPNChangeSet != nil && openVPNChangeSet.HasChanges() {
+		log.Println("Found changes for OpenVPN dataplane config")
+	}
 	changeSet = changeSet.Merge(openVPNChangeSet)
 
+	log.Println("Detecting changes for WireGuard ...")
 	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx, containers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
 	}
+	if wireGuardChangeSet != nil && wireGuardChangeSet.HasChanges() {
+		log.Println("Found changes for WireGuard dataplane config")
+	}
 	changeSet = changeSet.Merge(wireGuardChangeSet)
 
+	log.Println("Detecting changes for VXLAN ...")
 	vxlanChangeSet, err := dpConfig.VXLAN.DetectChanges(ctx, containers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for VXLAN: %w", err)
 	}
+	if vxlanChangeSet != nil && vxlanChangeSet.HasChanges() {
+		log.Println("Found changes for VXLAN dataplane config")
+	}
 	changeSet = changeSet.Merge(vxlanChangeSet)
 
+	log.Println("Detecting changes for VethPair ...")
 	vethPairChangeSet, err := dpConfig.VethPair.DetectChanges(ctx, containers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for VethPair: %w", err)
 	}
+	if vethPairChangeSet != nil && vethPairChangeSet.HasChanges() {
+		log.Println("Found changes for VethPair dataplane config")
+	}
 	changeSet = changeSet.Merge(vethPairChangeSet)
 
+	log.Println("Detecting changes for Bridge ...")
 	bridgeChangeSet, err := dpConfig.Bridge.DetectChanges(ctx, containers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for Bridge: %w", err)
 	}
+	if bridgeChangeSet != nil && bridgeChangeSet.HasChanges() {
+		log.Println("Found changes for Bridge dataplane config")
+	}
 	changeSet = changeSet.Merge(bridgeChangeSet)
 
+	log.Println("Detecting changes for Dummy ...")
 	dummyChangeSet, err := dpConfig.Dummy.DetectChanges(ctx, containers)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for Dummy: %w", err)
+	}
+	if dummyChangeSet != nil && dummyChangeSet.HasChanges() {
+		log.Println("Found changes for Dummy dataplane config")
 	}
 	changeSet = changeSet.Merge(dummyChangeSet)
 
@@ -1790,108 +1814,16 @@ func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 	return nil
 }
 
-func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
-	if dpConfig.Dummy != nil {
-		log.Println("Setting up dummy interfaces ...")
-		for _, dummyInst := range dpConfig.Dummy {
-			log.Printf("Setting up dummy interface %s ...", dummyInst.Name)
-			if isLinkExists(ctx, dummyInst.ContainerName, dummyInst.Name) {
-				log.Printf("Dummy interface %s already exists", dummyInst.Name)
-				continue
-			}
-
-			if err := dummyInst.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create dummy: %w", err)
-			}
-		}
+func (dpConfig *DataplaneConfig) Apply(ctx context.Context, containers []string) error {
+	log.Println("Detecting changes for dataplane config ...")
+	changeSet, err := dpConfig.DetectChanges(ctx, containers)
+	if err != nil {
+		return fmt.Errorf("failed to detect changes: %w", err)
 	}
-
-	if dpConfig.OpenVPN != nil {
-		log.Println("Setting up OpenVPN interfaces ...")
-		for _, ovpInst := range dpConfig.OpenVPN {
-			log.Printf("Setting up OpenVPN interface %s ...", ovpInst.Name)
-			if ovpInst.IsLinkExists(ctx) {
-				log.Printf("OpenVPN interface %s already exists", ovpInst.Name)
-				continue
-			}
-			if err := ovpInst.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create openvpn: %w", err)
-			}
-		}
-	}
-
-	if dpConfig.WireGuard != nil {
-		log.Println("Setting up WireGuard interfaces ...")
-		for _, wgInst := range dpConfig.WireGuard {
-			log.Printf("Setting up WireGuard interface %s ...", wgInst.Name)
-			if isLinkExists(ctx, wgInst.ContainerName, wgInst.Name) {
-				log.Printf("WireGuard interface %s already exists", wgInst.Name)
-				continue
-			}
-
-			if isLinkExists(ctx, nil, wgInst.Name) {
-				log.Printf("Warning: WireGuard interface %s already exists in host netns, which prevents it from being created\n", wgInst.Name)
-				continue
-			}
-
-			if err := wgInst.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create wireguard: %w", err)
-			}
-		}
-	}
-
-	if dpConfig.VXLAN != nil {
-		log.Println("Setting up VXLAN interfaces ...")
-		for _, vxlanInst := range dpConfig.VXLAN {
-			log.Printf("Setting up VXLAN interface %s ...", vxlanInst.Name)
-			if isLinkExists(ctx, vxlanInst.ContainerName, vxlanInst.Name) {
-				log.Printf("VXLAN interface %s already exists", vxlanInst.Name)
-				continue
-			}
-			if err := vxlanInst.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create vxlan: %w", err)
-			}
-		}
-	}
-
-	if dpConfig.VethPair != nil {
-		log.Println("Setting up VethPair interfaces ...")
-		for _, vethPairInst := range dpConfig.VethPair {
-			log.Printf("Setting up VethPair interface %s ...", vethPairInst.Name)
-			if isLinkExists(ctx, vethPairInst.ContainerName, vethPairInst.Name) {
-				log.Printf("VethPair interface %s already exists", vethPairInst.Name)
-				continue
-			}
-			if err := vethPairInst.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create veth pair: %w", err)
-			}
-		}
-	}
-
-	if dpConfig.Bridge != nil {
-		log.Println("Setting up Bridge interfaces ...")
-		for _, bridgeInst := range dpConfig.Bridge {
-			log.Printf("Setting up Bridge interface %s ...", bridgeInst.Name)
-			if isLinkExists(ctx, bridgeInst.ContainerName, bridgeInst.Name) {
-				log.Printf("Bridge interface %s already exists, reconciling slave interfaces ...", bridgeInst.Name)
-				added, removed, err := bridgeInst.ReconcileEnclaves(ctx)
-				if err != nil {
-					return fmt.Errorf("failed to reconcile bridge slave interfaces: %w", err)
-				}
-
-				for removedSlaveIfName := range removed {
-					log.Printf("Removed slave interface %s from bridge %s", removedSlaveIfName, bridgeInst.Name)
-				}
-
-				for addedSlaveIfName := range added {
-					log.Printf("Added slave interface %s to bridge %s", addedSlaveIfName, bridgeInst.Name)
-				}
-
-				continue
-			}
-			if err := bridgeInst.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create bridge: %w", err)
-			}
+	if changeSet.HasChanges() {
+		log.Println("Applying changes for dataplane config ...")
+		if err := changeSet.Apply(ctx); err != nil {
+			return fmt.Errorf("failed to apply changes: %w", err)
 		}
 	}
 
@@ -2122,7 +2054,7 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 
 	if nodeConfig.Dataplane != nil {
 		log.Println("Setting up dataplane ...")
-		if err := nodeConfig.Dataplane.Create(ctx); err != nil {
+		if err := nodeConfig.Dataplane.Apply(ctx, nodeConfig.Containers); err != nil {
 			return fmt.Errorf("failed to create dataplane: %w", err)
 		}
 	}
