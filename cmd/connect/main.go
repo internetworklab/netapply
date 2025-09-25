@@ -1174,6 +1174,56 @@ type VethPairConfig struct {
 	Name          string          `yaml:"name" json:"name"`
 	ContainerName *string         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Peer          *VethPairConfig `yaml:"peer,omitempty" json:"peer,omitempty"`
+	Addresses     []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	MTU           *int            `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+}
+
+type VethPairChangeSet struct {
+	Local *VethPairPeerChangeSet
+	Peer  *VethPairPeerChangeSet
+}
+
+func (vethPair *VethPairChangeSet) GetContainerName() *string {
+	return vethPair.Local.ContainerName
+}
+
+func (vethPair *VethPairChangeSet) GetInterfaceName() string {
+	return vethPair.Local.InterfaceName
+}
+
+func (vethPair *VethPairChangeSet) HasUpdates() bool {
+	return vethPair != nil && (vethPair.Local.HasUpdates() || vethPair.Peer.HasUpdates())
+}
+
+func (vethPair *VethPairChangeSet) Apply(ctx context.Context) error {
+	if vethPair != nil {
+		if err := vethPair.Local.Apply(ctx); err != nil {
+			return fmt.Errorf("failed to apply local veth pair: %w", err)
+		}
+		if err := vethPair.Peer.Apply(ctx); err != nil {
+			return fmt.Errorf("failed to apply peer veth pair: %w", err)
+		}
+		return nil
+	}
+
+	return nil
+}
+
+type VethPairPeerChangeSet struct {
+	ContainerName  *string
+	InterfaceName  string
+	AddressesToAdd []*netlink.Addr
+	AddressesToDel []*netlink.Addr
+	MTUToSet       *int
+}
+
+func (vethPeer *VethPairPeerChangeSet) HasUpdates() bool {
+	return vethPeer != nil && (len(vethPeer.AddressesToAdd) > 0 || len(vethPeer.AddressesToDel) > 0 || vethPeer.MTUToSet != nil)
+}
+
+func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
+	// todo
+	return nil
 }
 
 func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
@@ -2530,7 +2580,7 @@ func (cmd *DownCmd) Run() error {
 		return fmt.Errorf("failed to stop service: %w", err)
 	}
 
-	fmt.Printf("Service '%s' stopped successfully\n", cmd.ServiceName)
+	log.Printf("Service '%s' stopped successfully\n", cmd.ServiceName)
 	return nil
 }
 
