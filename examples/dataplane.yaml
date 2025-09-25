@@ -2,8 +2,8 @@ nodes:
   lax1:
     dataplane:
       wireguard:
-        - name: wg-lax1-mnz1
-          privatekey: yAnz5TF+lXXJte14tji3zlMNq+hd2rYUIgJBgB3fBmk=
+        - name: wg-mnz1
+          privatekey: 0MklEaEBCoaK6oKUFUb0yM5Ti9f8dmMhnU+I1NpqtUc=
           peers:
             - publickey: xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg=
               endpoint: 148.135.56.215:12121
@@ -11,8 +11,8 @@ nodes:
                 - "0.0.0.0/0"
                 - "::/0"
           addresses:
-            - peer: "1.2.3.4"
-              local: "2.3.4.5/32"
+            - peer: "1.2.3.4/32"
+              local: "2.3.4.5"
           mtu: 1420
           container_name: frr
       vxlan:

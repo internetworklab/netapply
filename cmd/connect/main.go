@@ -791,15 +791,14 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 				return fmt.Errorf("failed to get docker cli from context: %w", err)
 			}
 
-			nsHandle, err := getNetNSHandle(ctx, cli, *wgConf.ContainerName)
+			pidPtr, err := getContainerNSPid(ctx, cli, *wgConf.ContainerName)
 			if err != nil {
-				return fmt.Errorf("failed to get netns from docker: %w", err)
+				return fmt.Errorf("failed to get container ns pid: %w", err)
 			}
-			defer nsHandle.Close()
-
-			err = netlink.LinkSetNsPid(link, int(nsHandle))
-			if err != nil {
-				return fmt.Errorf("failed to set wireguard link ns pid: %w", err)
+			if pidPtr != nil {
+				if err := netlink.LinkSetNsPid(link, int(*pidPtr)); err != nil {
+					return fmt.Errorf("failed to set wireguard link ns pid: %w", err)
+				}
 			}
 		}
 
