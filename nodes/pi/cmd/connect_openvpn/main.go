@@ -802,6 +802,18 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to set bridge link up: %w", err)
 		}
 
+		for _, slaveInterface := range bridgeConfig.SlaveInterfaces {
+			slaveLink, err := handle.LinkByName(slaveInterface)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to get slave link %s when setting up bridge %s: %v\n", slaveInterface, bridgeConfig.Name, err)
+				continue
+			}
+			err = handle.LinkSetMaster(slaveLink, link)
+			if err != nil {
+				return fmt.Errorf("failed to set slave link master: %w", err)
+			}
+		}
+
 		return nil
 	})
 }
