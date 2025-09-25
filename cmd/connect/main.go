@@ -737,6 +737,8 @@ func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (InterfaceCha
 		return nil
 	})
 
+	changeSet.ContainerName = dummyConfig.ContainerName
+	changeSet.InterfaceName = dummyConfig.Name
 	changeSet.AddressesToAdd, changeSet.AddressesToRemove = detectAddrChanges(changeSet.AddressesToAdd, changeSet.AddressesToRemove)
 
 	return changeSet, nil
@@ -1019,23 +1021,6 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 	})
 }
 
-func isLinkExists(ctx context.Context, containerName *string, linkName string) bool {
-	type result struct {
-		exists bool
-	}
-	res := new(result)
-	res.exists = false
-	withNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
-		lk, err := handle.LinkByName(linkName)
-		if err == nil && lk != nil {
-			res.exists = true
-		}
-		return nil
-	})
-
-	return res.exists
-}
-
 type ContainerDockerConfig struct {
 	Name string `yaml:"name" json:"name"`
 }
@@ -1271,9 +1256,90 @@ type BridgeConfig struct {
 	ContainerName   *string  `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 }
 
+type BridgeChangeSet struct {
+	InterfaceToEnslave map[string]interface{}
+	InterfaceToUnslave map[string]interface{}
+	ContainerName      *string
+	InterfaceName      string
+}
+
+func (bridgeChangeSet *BridgeChangeSet) Apply(ctx context.Context) error {
+	return withNsHandle(ctx, bridgeChangeSet.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(bridgeChangeSet.InterfaceName)
+		if err != nil {
+			return fmt.Errorf("failed to get bridge link: %w", err)
+		}
+
+		for slaveInterface := range bridgeChangeSet.InterfaceToUnslave {
+			lk, err := handle.LinkByName(slaveInterface)
+			if err == nil && lk != nil {
+				if err := handle.LinkSetNoMaster(lk); err != nil {
+					return fmt.Errorf("failed to set slave link no master: %w", err)
+				}
+			}
+		}
+
+		for slaveInterface := range bridgeChangeSet.InterfaceToEnslave {
+			lk, err := handle.LinkByName(slaveInterface)
+			if err == nil && lk != nil {
+				if err := handle.LinkSetMaster(lk, link); err != nil {
+					return fmt.Errorf("failed to set slave link master: %w", err)
+				}
+			}
+		}
+
+		return nil
+	})
+}
+
+func (bridgeChangeSet *BridgeChangeSet) GetContainerName() *string {
+	return bridgeChangeSet.ContainerName
+}
+
+func (bridgeChangeSet *BridgeChangeSet) GetInterfaceName() string {
+	return bridgeChangeSet.InterfaceName
+}
+
+func (bridgeChangeSet *BridgeChangeSet) HasUpdates() bool {
+	return bridgeChangeSet != nil && (len(bridgeChangeSet.InterfaceToEnslave)+len(bridgeChangeSet.InterfaceToUnslave) > 0)
+}
+
 func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	// todo
-	return nil, nil
+	changeSet := new(BridgeChangeSet)
+	changeSet.ContainerName = bridgeConfig.ContainerName
+	changeSet.InterfaceName = bridgeConfig.Name
+	changeSet.InterfaceToEnslave = make(map[string]interface{})
+	changeSet.InterfaceToUnslave = make(map[string]interface{})
+
+	err := withNsHandle(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(bridgeConfig.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get bridge link: %w", err)
+		}
+
+		enslavedLinks, err := getEnslavedLinks(handle, link)
+		if err != nil {
+			return fmt.Errorf("failed to get enslaved links: %w", err)
+		}
+
+		specSlaveIfs := make(map[string]interface{})
+		for _, slaveInterface := range bridgeConfig.SlaveInterfaces {
+			specSlaveIfs[slaveInterface] = true
+			if _, ok := enslavedLinks[slaveInterface]; ok {
+				changeSet.InterfaceToEnslave[slaveInterface] = true
+			}
+		}
+
+		for _, slif := range enslavedLinks {
+			if _, ok := specSlaveIfs[slif.Attrs().Name]; !ok {
+				changeSet.InterfaceToUnslave[slif.Attrs().Name] = true
+			}
+		}
+
+		return nil
+	})
+
+	return changeSet, err
 }
 
 func (bridgeConfig *BridgeConfig) GetContainerName() *string {
