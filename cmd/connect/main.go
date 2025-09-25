@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1346,14 +1347,21 @@ const tagName string = "openvpn2"
 // path: file path, "-" for stdin, or HTTP(S) URL
 // config: pointer to GlobalConfig struct to populate
 // tlsConfig: TLS configuration for HTTPS requests (can be nil for default)
-func getGlobalConfig(path string, config *GlobalConfig, tlsConfig *tls.Config) error {
+func getGlobalConfig(cmd *UpCmd, config *GlobalConfig) error {
 	var reader io.Reader
 	var err error
+
+	path := cmd.Config
 
 	if path == "-" {
 		// Read from stdin
 		reader = os.Stdin
 	} else if strings.HasPrefix(path, "https://") {
+		tlsConfig, err := getTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
+		if err != nil {
+			return fmt.Errorf("failed to create TLS config: %w", err)
+		}
+
 		// Read from HTTPS endpoint
 		reader, err = fetchHTTPConfig(path, tlsConfig)
 		if err != nil {
@@ -1424,6 +1432,44 @@ func fetchHTTPConfig(url string, tlsConfig *tls.Config) (io.Reader, error) {
 	return strings.NewReader(string(body)), nil
 }
 
+// getTLSConfig creates a TLS configuration from the provided certificate files
+func getTLSConfig(caCertPath, clientCertPath, clientKeyPath string) (*tls.Config, error) {
+	// If no TLS parameters are provided, return nil (use default TLS config)
+	if caCertPath == "" && clientCertPath == "" && clientKeyPath == "" {
+		return nil, nil
+	}
+
+	config := &tls.Config{}
+
+	// Load CA certificate if provided
+	if caCertPath != "" {
+		caCert, err := os.ReadFile(caCertPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read CA certificate from '%s': %w", caCertPath, err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(caCert) {
+			return nil, fmt.Errorf("failed to parse CA certificate from '%s'", caCertPath)
+		}
+		config.RootCAs = caCertPool
+	}
+
+	// Load client certificate and key if both are provided
+	if clientCertPath != "" && clientKeyPath != "" {
+		cert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load client certificate pair (cert: '%s', key: '%s'): %w", clientCertPath, clientKeyPath, err)
+		}
+		config.Certificates = []tls.Certificate{cert}
+	} else if clientCertPath != "" || clientKeyPath != "" {
+		// If only one of client cert or key is provided, that's an error
+		return nil, fmt.Errorf("both client certificate and key must be provided together")
+	}
+
+	return config, nil
+}
+
 // CLI structure for Kong
 type CLI struct {
 	Up   UpCmd   `cmd:"" help:"Start the service with the specified configuration"`
@@ -1431,9 +1477,12 @@ type CLI struct {
 }
 
 type UpCmd struct {
-	Config      string `required:"" help:"Path to the configuration file" type:"path"`
-	ServiceName string `required:"" help:"Name of the service" short:"s"`
-	Node        string `required:"" help:"Name of the node to start" short:"n"`
+	Config           string `required:"" help:"Path to the configuration file" type:"path"`
+	ServiceName      string `required:"" help:"Name of the service" short:"s"`
+	Node             string `required:"" help:"Name of the node to start" short:"n"`
+	TLSTrustedCACert string `help:"Path to trusted CA certificate file for TLS" type:"path"`
+	TLSClientCert    string `help:"Path to client certificate file for TLS" type:"path"`
+	TLSClientKey     string `help:"Path to client private key file for TLS" type:"path"`
 }
 
 type DownCmd struct {
@@ -1457,8 +1506,7 @@ func (cmd *UpCmd) Run() error {
 
 	// Read and parse the configuration
 	globalConfig := new(GlobalConfig)
-	var tlsConfig *tls.Config
-	if err := getGlobalConfig(cmd.Config, globalConfig, tlsConfig); err != nil {
+	if err := getGlobalConfig(cmd, globalConfig); err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
