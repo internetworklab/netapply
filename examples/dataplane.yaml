@@ -32,6 +32,7 @@ nodes:
         - name: br0
           slave_interfaces:
             - veth1
+            - vx42
           container_name: frr
         - name: br0
           slave_interfaces:

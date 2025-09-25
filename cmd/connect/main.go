@@ -894,6 +894,24 @@ func getNetNSHandle(ctx context.Context, cli *client.Client, containerName strin
 	return netns.GetFromDocker(container.ID)
 }
 
+func getContainerNSPid(ctx context.Context, cli *client.Client, containerName string) (*int, error) {
+	container, err := findContainer(ctx, cli, containerName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find container: %w", err)
+	}
+
+	if container == nil {
+		return nil, fmt.Errorf("container %s not found", containerName)
+	}
+
+	resp, err := cli.ContainerInspect(ctx, container.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to inspect container: %w", err)
+	}
+
+	return &resp.State.Pid, nil
+}
+
 func withNsHandle(ctx context.Context, containerName *string, f func(h *netlink.Handle) error) error {
 	if containerName == nil {
 		handle, err := netlink.NewHandle()
@@ -981,42 +999,50 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("peer is not set")
 		}
 
-		var primaryNsHandle *netns.NsHandle
-		var secondaryNsHandle *netns.NsHandle
+		link := &netlink.Veth{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: vethPairConfig.Name,
+			},
+			PeerName: vethPairConfig.Peer.Name,
+		}
 
 		if vethPairConfig.ContainerName != nil {
-			nsHd, err := getNetNSHandle(ctx, cli, *vethPairConfig.ContainerName)
+			pidPtr, err := getContainerNSPid(ctx, cli, *vethPairConfig.ContainerName)
 			if err != nil {
-				return fmt.Errorf("failed to get netns from docker: %w", err)
+				return fmt.Errorf("failed to get container ns pid: %w", err)
 			}
-			defer nsHd.Close()
-			primaryNsHandle = &nsHd
+			if pidPtr != nil {
+				link.Namespace = netlink.NsPid(*pidPtr)
+			}
 		}
 
 		if vethPairConfig.Peer.ContainerName != nil {
-			nsHd, err := getNetNSHandle(ctx, cli, *vethPairConfig.Peer.ContainerName)
+			pidPtr, err := getContainerNSPid(ctx, cli, *vethPairConfig.Peer.ContainerName)
 			if err != nil {
-				return fmt.Errorf("failed to get netns from docker: %w", err)
+				return fmt.Errorf("failed to get container ns pid: %w", err)
 			}
-			defer nsHd.Close()
-			secondaryNsHandle = &nsHd
-		}
-
-		link := &netlink.Veth{}
-		link.Name = vethPairConfig.Name
-		if primaryNsHandle != nil {
-			link.Namespace = *primaryNsHandle
-		}
-
-		link.PeerName = vethPairConfig.Peer.Name
-
-		if secondaryNsHandle != nil {
-			link.PeerNamespace = *secondaryNsHandle
+			if pidPtr != nil {
+				link.PeerNamespace = netlink.NsPid(*pidPtr)
+			}
 		}
 
 		err = handle.LinkAdd(link)
 		if err != nil {
 			return fmt.Errorf("failed to add veth link: %w", err)
+		}
+
+		err = withNsHandle(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
+			return handle.LinkSetUp(link)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set veth link up: %w", err)
+		}
+
+		err = withNsHandle(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
+			return handle.LinkSetUp(link)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to set veth link up: %w", err)
 		}
 
 		return nil
@@ -1027,6 +1053,95 @@ type BridgeConfig struct {
 	Name            string   `yaml:"name" json:"name"`
 	SlaveInterfaces []string `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
 	ContainerName   *string  `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+}
+
+// returns: (added, removed)
+// added is those in lhs but not rhs, removed is those in rhs but not lhs
+func diffSets(lhs, rhs map[string]interface{}) (map[string]interface{}, map[string]interface{}) {
+	added := make(map[string]interface{})
+	for k, v := range lhs {
+		if _, ok := rhs[k]; !ok {
+			added[k] = v
+		}
+	}
+
+	removed := make(map[string]interface{})
+	for k, v := range rhs {
+		if _, ok := lhs[k]; !ok {
+			removed[k] = v
+		}
+	}
+
+	return added, removed
+}
+
+func getEnslavedLinks(handle *netlink.Handle, master netlink.Link) (map[string]netlink.Link, error) {
+	allNLLinks, err := handle.LinkList()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get all netlink links: %s", err.Error())
+	}
+
+	enslavedNLLinks := make(map[string]netlink.Link)
+	for _, lk := range allNLLinks {
+		if lk.Attrs().MasterIndex == master.Attrs().Index {
+			enslavedNLLinks[lk.Attrs().Name] = lk
+		}
+	}
+
+	return enslavedNLLinks, nil
+}
+
+func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[string]interface{}, map[string]interface{}, error) {
+	var added map[string]interface{}
+	var removed map[string]interface{}
+	actuallyAdded := make(map[string]interface{})
+	actuallyRemoved := make(map[string]interface{})
+
+	err := withNsHandle(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(bridgeConfig.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get bridge link: %w", err)
+		}
+
+		specSlaveIfs := make(map[string]interface{})
+		for _, slaveInterface := range bridgeConfig.SlaveInterfaces {
+			specSlaveIfs[slaveInterface] = slaveInterface
+		}
+
+		slaveLinks, err := getEnslavedLinks(handle, link)
+		if err != nil {
+			return fmt.Errorf("failed to get enslaved links: %w", err)
+		}
+		slaveLinksMap := make(map[string]interface{})
+		for _, slaveLink := range slaveLinks {
+			slaveLinksMap[slaveLink.Attrs().Name] = slaveLink
+		}
+
+		added, removed = diffSets(specSlaveIfs, slaveLinksMap)
+		for removeSlaveIfName := range removed {
+			l, err := handle.LinkByName(removeSlaveIfName)
+			if err == nil && l != nil {
+				if err := netlink.LinkSetNoMaster(l); err != nil {
+					return fmt.Errorf("failed to set slave link no master: %w", err)
+				}
+				actuallyRemoved[removeSlaveIfName] = removeSlaveIfName
+			}
+		}
+
+		for addedSlaveIfName := range added {
+			lk, err := handle.LinkByName(addedSlaveIfName)
+			if err == nil && lk != nil {
+				if err := handle.LinkSetMaster(lk, link); err != nil {
+					return fmt.Errorf("failed to set slave link master: %w", err)
+				}
+				actuallyAdded[addedSlaveIfName] = addedSlaveIfName
+			}
+		}
+
+		return nil
+	})
+
+	return actuallyAdded, actuallyRemoved, err
 }
 
 func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
@@ -1047,19 +1162,8 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to set bridge link up: %w", err)
 		}
 
-		for _, slaveInterface := range bridgeConfig.SlaveInterfaces {
-			slaveLink, err := handle.LinkByName(slaveInterface)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to get slave link %s when setting up bridge %s: %v\n", slaveInterface, bridgeConfig.Name, err)
-				continue
-			}
-			err = handle.LinkSetMaster(slaveLink, link)
-			if err != nil {
-				return fmt.Errorf("failed to set slave link master: %w", err)
-			}
-		}
-
-		return nil
+		_, _, err = bridgeConfig.ReconcileEnclaves(ctx)
+		return err
 	})
 }
 
@@ -1155,7 +1259,20 @@ func (dpConfig *DataplaneConfig) Create(ctx context.Context) error {
 		for _, bridgeInst := range dpConfig.Bridge {
 			log.Printf("Setting up Bridge interface %s ...", bridgeInst.Name)
 			if isLinkExists(ctx, bridgeInst.ContainerName, bridgeInst.Name) {
-				log.Printf("Bridge interface %s already exists", bridgeInst.Name)
+				log.Printf("Bridge interface %s already exists, reconciling slave interfaces ...", bridgeInst.Name)
+				added, removed, err := bridgeInst.ReconcileEnclaves(ctx)
+				if err != nil {
+					return fmt.Errorf("failed to reconcile bridge slave interfaces: %w", err)
+				}
+
+				for removedSlaveIfName := range removed {
+					log.Printf("Removed slave interface %s from bridge %s", removedSlaveIfName, bridgeInst.Name)
+				}
+
+				for addedSlaveIfName := range added {
+					log.Printf("Added slave interface %s to bridge %s", addedSlaveIfName, bridgeInst.Name)
+				}
+
 				continue
 			}
 			if err := bridgeInst.Create(ctx); err != nil {
