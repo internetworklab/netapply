@@ -875,6 +875,121 @@ type WireGuardConfig struct {
 	MTU           *int                  `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 }
 
+type WireGuardInterfaceChangeSet struct {
+	ContainerName *string
+	InterfaceName string
+
+	PrivateKeyToSet *wgtypes.Key
+	MTUToSet        *int
+	ListenPortToSet *int
+
+	Peers        []wgtypes.PeerConfig
+	PeersUpdated bool
+
+	AddressesToAdd    []*netlink.Addr
+	AddressesToRemove []*netlink.Addr
+}
+
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetContainerName() *string {
+	return wgInterfaceChangeSet.ContainerName
+}
+
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetInterfaceName() string {
+	return wgInterfaceChangeSet.InterfaceName
+}
+
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
+	return wgInterfaceChangeSet != nil && (wgInterfaceChangeSet.PrivateKeyToSet != nil ||
+		wgInterfaceChangeSet.MTUToSet != nil ||
+		wgInterfaceChangeSet.ListenPortToSet != nil ||
+		wgInterfaceChangeSet.PeersUpdated ||
+		wgInterfaceChangeSet.AddressesToAdd != nil ||
+		wgInterfaceChangeSet.AddressesToRemove != nil)
+}
+
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Context) error {
+	if wgInterfaceChangeSet == nil {
+		return nil
+	}
+
+	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersUpdated {
+		wgCtrl, err := wgctrl.New()
+		if err != nil {
+			return fmt.Errorf("failed to create wireguard controller: %w", err)
+		}
+		defer wgCtrl.Close()
+
+		currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.InterfaceName)
+		if err != nil {
+			return fmt.Errorf("failed to get wireguard device: %w", err)
+		}
+
+		if currentConfig == nil {
+			return fmt.Errorf("failed to get wireguard device: %s in %s", wgInterfaceChangeSet.InterfaceName, getContainerDisplayName(wgInterfaceChangeSet.ContainerName))
+		}
+
+		if wgInterfaceChangeSet.PrivateKeyToSet != nil {
+			patchConfig := new(wgtypes.Config)
+			patchConfig.PrivateKey = wgInterfaceChangeSet.PrivateKeyToSet
+			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				return fmt.Errorf("failed to patch wireguard config: %w", err)
+			}
+		}
+
+		if wgInterfaceChangeSet.ListenPortToSet != nil {
+			patchConfig := new(wgtypes.Config)
+			patchConfig.ListenPort = wgInterfaceChangeSet.ListenPortToSet
+			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				return fmt.Errorf("failed to patch wireguard config: %w", err)
+			}
+		}
+
+		if wgInterfaceChangeSet.PeersUpdated {
+			patchConfig := new(wgtypes.Config)
+			patchConfig.ReplacePeers = true
+			patchConfig.Peers = wgInterfaceChangeSet.Peers
+			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				return fmt.Errorf("failed to patch wireguard config: %w", err)
+			}
+		}
+	}
+
+	if wgInterfaceChangeSet.MTUToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil {
+		err := withNsHandle(ctx, wgInterfaceChangeSet.ContainerName, func(handle *netlink.Handle) error {
+			link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
+			if err != nil {
+				return fmt.Errorf("failed to get wireguard link: %w", err)
+			}
+
+			if wgInterfaceChangeSet.MTUToSet != nil {
+				if err := handle.LinkSetMTU(link, *wgInterfaceChangeSet.MTUToSet); err != nil {
+					return fmt.Errorf("failed to set wireguard link mtu: %w", err)
+				}
+			}
+
+			for _, addr := range wgInterfaceChangeSet.AddressesToRemove {
+				if err := handle.AddrDel(link, addr); err != nil {
+					return fmt.Errorf("failed to remove wireguard link address: %w", err)
+				}
+			}
+
+			for _, addr := range wgInterfaceChangeSet.AddressesToAdd {
+				if err := handle.AddrAdd(link, addr); err != nil {
+					return fmt.Errorf("failed to add wireguard link address: %w", err)
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return fmt.Errorf("failed to apply wireguard netlink config: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (wgConf *WireGuardConfig) GetInterfaceName() string {
 	return wgConf.Name
 }
@@ -884,41 +999,11 @@ func (wgConf *WireGuardConfig) GetContainerName() *string {
 }
 
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	// todo
-	return nil, nil
-}
+	changeSet := new(WireGuardInterfaceChangeSet)
+	changeSet.ContainerName = wgConf.ContainerName
+	changeSet.InterfaceName = wgConf.Name
 
-type WireGuardChangeSet struct {
-	ContainerName    *string
-	InterfaceName    string
-	PrivateKey       *string
-	MTU              *int
-	Peers            []WireGuardPeerConfig
-	PeersUpdated     bool
-	Addresses        []AddressConfig
-	AddressesUpdated bool
-	ListenPort       *int
-}
-
-func (wgChangeSet *WireGuardChangeSet) GetContainerName() *string {
-	return wgChangeSet.ContainerName
-}
-
-func (wgChangeSet *WireGuardChangeSet) GetInterfaceName() string {
-	return wgChangeSet.InterfaceName
-}
-
-func (wgChangeSet *WireGuardChangeSet) HasUpdates() bool {
-	return wgChangeSet != nil && (wgChangeSet.PrivateKey != nil ||
-		wgChangeSet.MTU != nil ||
-		wgChangeSet.PeersUpdated ||
-		wgChangeSet.AddressesUpdated ||
-		wgChangeSet.ListenPort != nil)
-}
-
-func (wgChangeSet *WireGuardChangeSet) Apply(ctx context.Context) error {
-	// todo
-	return nil
+	return changeSet, nil
 }
 
 func (wgConf *WireGuardConfig) Apply(wgtypesConf *wgtypes.Config) error {
