@@ -2044,8 +2044,10 @@ func getInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	return res.ifaces, nil
 }
 
-func detectChangesFromProvisionerList(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
+// netns -> iface name -> iface canceller
+type CurrentIfaceIndex = map[string]map[string]InterfaceCanceller
+
+func indexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType string, includeHostNetns bool) (CurrentIfaceIndex, error) {
 	currentInterfaceListMap := make(map[string]map[string]InterfaceCanceller)
 	for _, name := range containers {
 		ifaces, err := getInterfaceFromContainer(ctx, &name, netlinkIfType)
@@ -2054,13 +2056,21 @@ func detectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 		}
 		currentInterfaceListMap[name] = ifaces
 	}
-	hostInterfaceList, err := getInterfaceFromContainer(ctx, nil, netlinkIfType)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get interface from host: %w", err)
-	}
-	currentInterfaceListMap[string(ContainerKeyHost)] = hostInterfaceList
 
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
+	if includeHostNetns {
+		hostInterfaceList, err := getInterfaceFromContainer(ctx, nil, netlinkIfType)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get interface from host: %w", err)
+		}
+		currentInterfaceListMap[string(ContainerKeyHost)] = hostInterfaceList
+	}
+
+	return currentInterfaceListMap, nil
+}
+
+type SpecIfaceIndex = map[string]map[string]InterfaceProvisioner
+
+func indexSpecIfaces(provisionerList []InterfaceProvisioner) (SpecIfaceIndex, error) {
 	specInterfaceListMap := make(map[string]map[string]InterfaceProvisioner)
 	for _, c := range provisionerList {
 		contName := string(getContainerKey(c.GetContainerName()))
@@ -2071,6 +2081,73 @@ func detectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 		specInterfaceListMap[contName][c.GetInterfaceName()] = c
 	}
 
+	return specInterfaceListMap, nil
+}
+
+func detectChangesInContainer(
+	ctx context.Context,
+	provisionerList map[string]InterfaceProvisioner,
+	currentInterfacesInContainer map[string]InterfaceCanceller,
+	container string,
+) (*DataplaneChangeSet, error) {
+
+	addedSet := make(map[string]InterfaceProvisioner)
+	removedSet := make(map[string]InterfaceCanceller)
+	commonSet := make(map[string]InterfaceProvisioner)
+	updatedSet := make(map[string]InterfaceChangeSet)
+
+	for _, provisioner := range provisionerList {
+		if _, ok := currentInterfacesInContainer[provisioner.GetInterfaceName()]; !ok {
+			addedSet[container] = provisioner
+		}
+	}
+
+	for _, currentInterface := range currentInterfacesInContainer {
+		if p, ok := provisionerList[currentInterface.GetInterfaceName()]; ok {
+			commonSet[container] = p
+		} else {
+			removedSet[container] = currentInterface
+		}
+	}
+
+	for ifaceName, provisioner := range commonSet {
+		changes, err := provisioner.DetectChanges(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect changes in container: %w", err)
+		}
+		if changes != nil && changes.HasUpdates() {
+			updatedSet[ifaceName] = changes
+		}
+	}
+
+	changeSet := new(DataplaneChangeSet)
+	for _, provisioner := range addedSet {
+		changeSet.AddedInterfaces[container] = append(changeSet.AddedInterfaces[container], provisioner)
+	}
+	for _, currentInterface := range removedSet {
+		changeSet.RemovedInterfaces[container] = append(changeSet.RemovedInterfaces[container], currentInterface)
+	}
+	for _, changeset := range updatedSet {
+		changeSet.UpdatedInterfaces[container] = append(changeSet.UpdatedInterfaces[container], changeset)
+	}
+	return changeSet, nil
+}
+
+func detectChangesFromProvisionerList(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
+
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
+	// for now, skip the host netns, so includeHostNetns is set to false
+	currentInterfaceListMap, err := indexCurrentIfaces(ctx, containers, netlinkIfType, false)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index current interface: %w", err)
+	}
+
+	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
+	specInterfaceListMap, err := indexSpecIfaces(provisionerList)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index spec interface: %w", err)
+	}
+
 	combinedNsMap := make(map[string]interface{})
 	for k := range currentInterfaceListMap {
 		combinedNsMap[k] = true
@@ -2079,71 +2156,28 @@ func detectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 		combinedNsMap[k] = true
 	}
 
-	addedSet := make(map[string][]InterfaceProvisioner)
-	removedSet := make(map[string][]InterfaceCanceller)
-	updatedSet := make(map[string][]InterfaceChangeSet)
+	var totalChanges *DataplaneChangeSet
 
 	for nsKey := range combinedNsMap {
-		lhsSpecMap, lhsOk := specInterfaceListMap[nsKey]
-		rhsCurrentMap, rhsOk := currentInterfaceListMap[nsKey]
-
-		if !lhsOk {
-			if rhsOk {
-				removedSet[nsKey] = make([]InterfaceCanceller, 0)
-				for _, canceller := range rhsCurrentMap {
-					removedSet[nsKey] = append(removedSet[nsKey], canceller)
-				}
-			}
-			continue
+		var provisionersInContainer map[string]InterfaceProvisioner
+		if v, ok := specInterfaceListMap[nsKey]; ok {
+			provisionersInContainer = v
 		}
 
-		if !rhsOk {
-			if lhsOk {
-				addedSet[nsKey] = make([]InterfaceProvisioner, 0)
-				for _, spec := range lhsSpecMap {
-					addedSet[nsKey] = append(addedSet[nsKey], spec)
-				}
-			}
-			continue
+		var currentInterfacesInContainer map[string]InterfaceCanceller
+		if v, ok := currentInterfaceListMap[nsKey]; ok {
+			currentInterfacesInContainer = v
 		}
 
-		updatedSet[nsKey] = make([]InterfaceChangeSet, 0)
-		addedSet[nsKey] = make([]InterfaceProvisioner, 0)
-		removedSet[nsKey] = make([]InterfaceCanceller, 0)
-		commonSet := make(map[string]InterfaceProvisioner)
-
-		for _, status := range rhsCurrentMap {
-			if _, ok := lhsSpecMap[status.GetInterfaceName()]; !ok {
-				removedSet[nsKey] = append(removedSet[nsKey], status)
-			}
+		changes, err := detectChangesInContainer(ctx, provisionersInContainer, currentInterfacesInContainer, nsKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect changes in container: %w", err)
 		}
 
-		for _, spec := range lhsSpecMap {
-			if _, ok := rhsCurrentMap[spec.GetInterfaceName()]; ok {
-				commonSet[spec.GetInterfaceName()] = spec
-			}
-
-			if _, ok := rhsCurrentMap[spec.GetInterfaceName()]; !ok {
-				addedSet[nsKey] = append(addedSet[nsKey], spec)
-			}
-		}
-
-		for _, spec := range commonSet {
-			changes, err := spec.DetectChanges(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
-			}
-			if changes != nil && changes.HasUpdates() {
-				updatedSet[nsKey] = append(updatedSet[nsKey], changes)
-			}
-		}
+		totalChanges = totalChanges.Merge(changes)
 	}
 
-	result := new(DataplaneChangeSet)
-	result.AddedInterfaces = addedSet
-	result.RemovedInterfaces = removedSet
-	result.UpdatedInterfaces = updatedSet
-	return result, nil
+	return totalChanges, nil
 }
 
 // Scan containers specified for any reconciliation clues.

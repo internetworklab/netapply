@@ -1,8 +1,8 @@
 nodes:
-  containers:
-    - frr
-    - openvpn-server
   lax1:
+    containers:
+      - frr
+      - openvpn-server
     dataplane:
       wireguard:
         - name: wg-mnz1
