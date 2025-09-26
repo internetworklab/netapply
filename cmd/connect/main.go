@@ -1030,17 +1030,111 @@ type ContainerConfig struct {
 }
 
 type VXLANConfig struct {
-	Name          string  `yaml:"name" json:"name"`
-	VXLANID       int     `yaml:"vxlan_id" json:"vxlan_id"`
-	LocalIP       *string `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
-	MTU           *int    `yaml:"mtu,omitempty" json:"mtu,omitempty"`
-	Nolearning    *bool   `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
-	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Name          string          `yaml:"name" json:"name"`
+	VXLANID       int             `yaml:"vxlan_id" json:"vxlan_id"`
+	LocalIP       *string         `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
+	MTU           *int            `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	Nolearning    *bool           `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
+	ContainerName *string         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Addresses     []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+}
+
+type VXLANInterfaceChangeSet struct {
+	AddressesToAdd    []*netlink.Addr
+	AddressedToRemove []*netlink.Addr
+	MTUToSet          *int
+	ContainerName     *string
+	InterfaceName     string
+}
+
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetContainerName() *string {
+	return vxlanInterfaceChangeSet.ContainerName
+}
+
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetInterfaceName() string {
+	return vxlanInterfaceChangeSet.InterfaceName
+}
+
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) HasUpdates() bool {
+	return vxlanInterfaceChangeSet != nil && (len(vxlanInterfaceChangeSet.AddressesToAdd) > 0 ||
+		len(vxlanInterfaceChangeSet.AddressedToRemove) > 0 ||
+		vxlanInterfaceChangeSet.MTUToSet != nil)
+}
+
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) Apply(ctx context.Context) error {
+	if vxlanInterfaceChangeSet == nil {
+		return nil
+	}
+
+	return withNsHandle(ctx, vxlanInterfaceChangeSet.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(vxlanInterfaceChangeSet.InterfaceName)
+		if err != nil {
+			return fmt.Errorf("failed to get vxlan link: %w", err)
+		}
+
+		for _, addr := range vxlanInterfaceChangeSet.AddressedToRemove {
+			if err := handle.AddrDel(link, addr); err != nil {
+				return fmt.Errorf("failed to remove address from vxlan link: %w", err)
+			}
+		}
+
+		for _, addr := range vxlanInterfaceChangeSet.AddressesToAdd {
+			if err := handle.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address to vxlan link: %w", err)
+			}
+		}
+
+		if vxlanInterfaceChangeSet.MTUToSet != nil {
+			if err := handle.LinkSetMTU(link, *vxlanInterfaceChangeSet.MTUToSet); err != nil {
+				return fmt.Errorf("failed to set vxlan link mtu: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
 func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	// todo
-	return nil, nil
+	changeSet := new(VXLANInterfaceChangeSet)
+	changeSet.ContainerName = vxlanConfig.ContainerName
+	changeSet.InterfaceName = vxlanConfig.Name
+
+	err := withNsHandle(ctx, vxlanConfig.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(vxlanConfig.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get vxlan link: %w", err)
+		}
+
+		if vxlanConfig.MTU != nil {
+			if *vxlanConfig.MTU != link.Attrs().MTU {
+				changeSet.MTUToSet = vxlanConfig.MTU
+			}
+		}
+
+		specAddrs := make([]*netlink.Addr, 0)
+		for _, addr := range vxlanConfig.Addresses {
+			nlAddr, err := addr.ToNetlinkAddr()
+			if err != nil {
+				return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+			}
+			specAddrs = append(specAddrs, nlAddr)
+		}
+
+		actualAddrPtrs := make([]*netlink.Addr, 0)
+		actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return fmt.Errorf("failed to list vxlan link addresses: %w", err)
+		}
+		for _, addr := range actualAddrs {
+			actualAddrPtrs = append(actualAddrPtrs, &addr)
+		}
+
+		changeSet.AddressesToAdd, changeSet.AddressedToRemove = detectAddrChanges(specAddrs, actualAddrPtrs)
+
+		return nil
+	})
+
+	return changeSet, err
 }
 
 func (vxlanConfig *VXLANConfig) GetContainerName() *string {
@@ -1222,13 +1316,106 @@ func (vethPeer *VethPairPeerChangeSet) HasUpdates() bool {
 }
 
 func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
-	// todo
-	return nil
+	if vethPeer == nil {
+		return nil
+	}
+
+	return withNsHandle(ctx, vethPeer.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(vethPeer.InterfaceName)
+		if err != nil {
+			return fmt.Errorf("failed to get veth link: %w", err)
+		}
+
+		for _, addr := range vethPeer.AddressesToDel {
+			if err := handle.AddrDel(link, addr); err != nil {
+				return fmt.Errorf("failed to remove address from veth link: %w", err)
+			}
+		}
+
+		for _, addr := range vethPeer.AddressesToAdd {
+			if err := handle.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address to veth link: %w", err)
+			}
+		}
+
+		if vethPeer.MTUToSet != nil {
+			if err := handle.LinkSetMTU(link, *vethPeer.MTUToSet); err != nil {
+				return fmt.Errorf("failed to set veth link mtu: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec *VethPairConfig, handle *netlink.Handle) (*VethPairPeerChangeSet, error) {
+
+	changeSet := new(VethPairPeerChangeSet)
+	changeSet.ContainerName = containerName
+	changeSet.InterfaceName = interfaceName
+
+	link, err := handle.LinkByName(interfaceName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get veth link: %w", err)
+	}
+
+	if spec.MTU != nil {
+		if *spec.MTU != link.Attrs().MTU {
+			changeSet.MTUToSet = spec.MTU
+		}
+	}
+
+	specAddrs := make([]*netlink.Addr, 0)
+	for _, addr := range spec.Addresses {
+		nlAddr, err := addr.ToNetlinkAddr()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert address to netlink addr: %w", err)
+		}
+		specAddrs = append(specAddrs, nlAddr)
+	}
+	actualAddrPtrs := make([]*netlink.Addr, 0)
+	actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list veth link addresses: %w", err)
+	}
+	for _, addr := range actualAddrs {
+		actualAddrPtrs = append(actualAddrPtrs, &addr)
+	}
+	changeSet.AddressesToAdd, changeSet.AddressesToDel = detectAddrChanges(specAddrs, actualAddrPtrs)
+
+	return changeSet, nil
 }
 
 func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	// todo
-	return nil, nil
+	changeSet := new(VethPairChangeSet)
+
+	// Detecting local changeset
+	err := withNsHandle(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
+		localChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.ContainerName, vethPairConfig.Name, vethPairConfig, handle)
+		if err != nil {
+			return fmt.Errorf("failed to detect local changeset: %w", err)
+		}
+		changeSet.Local = localChangeSet
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changeset: %w", err)
+	}
+
+	// Detecting peer changeset
+	err = withNsHandle(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
+		peerChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.Peer.ContainerName, vethPairConfig.Peer.Name, vethPairConfig.Peer, handle)
+		if err != nil {
+			return fmt.Errorf("failed to detect peer changeset: %w", err)
+		}
+		changeSet.Peer = peerChangeSet
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changeset: %w", err)
+	}
+
+	return changeSet, err
 }
 
 func (vethPairConfig *VethPairConfig) GetContainerName() *string {
