@@ -2373,8 +2373,25 @@ type VethPairPlacementStatus struct {
 }
 
 func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*VethPairPlacementStatus, error) {
-	// todo
-	return nil, nil
+	res := new(VethPairPlacementStatus)
+
+	withNsHandle(ctx, vethPairConfig.GetContainerName(), func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(vethPairConfig.GetInterfaceName())
+		if err == nil && link != nil {
+			res.FoundInPrimaryNetns = true
+		}
+		return nil
+	})
+
+	withNsHandle(ctx, vethPairConfig.Peer.GetContainerName(), func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(vethPairConfig.Peer.GetInterfaceName())
+		if err == nil && link != nil {
+			res.FoundInSecondaryNetns = true
+		}
+		return nil
+	})
+
+	return res, nil
 }
 
 func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
@@ -2631,6 +2648,11 @@ type StubInterfaceCanceller struct {
 }
 
 func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
+	if stubInterfaceCanceller.InterfaceName == "lo" {
+		// skip special interfaces such as "lo"
+		return nil
+	}
+
 	return withNsHandle(ctx, stubInterfaceCanceller.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(stubInterfaceCanceller.InterfaceName)
 		if err == nil && link != nil {
