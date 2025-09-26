@@ -1102,6 +1102,8 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 }
 
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
+	log.Printf("**** detecting changes for wireguard config: %v *****", wgConf)
+
 	changeSet := new(WireGuardInterfaceChangeSet)
 	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
@@ -1112,6 +1114,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChan
 	}
 	defer wgCtrl.Close()
 
+	// todo: enter netns of the container to get the wgCtrl handle
 	currentConfig, err := wgCtrl.Device(wgConf.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get wireguard device: %w", err)
@@ -2098,22 +2101,22 @@ func detectChangesInContainer(
 
 	for _, provisioner := range provisionerList {
 		if _, ok := currentInterfacesInContainer[provisioner.GetInterfaceName()]; !ok {
-			addedSet[container] = provisioner
+			addedSet[provisioner.GetInterfaceName()] = provisioner
 		}
 	}
 
 	for _, currentInterface := range currentInterfacesInContainer {
 		if p, ok := provisionerList[currentInterface.GetInterfaceName()]; ok {
-			commonSet[container] = p
+			commonSet[currentInterface.GetInterfaceName()] = p
 		} else {
-			removedSet[container] = currentInterface
+			removedSet[currentInterface.GetInterfaceName()] = currentInterface
 		}
 	}
 
 	for ifaceName, provisioner := range commonSet {
 		changes, err := provisioner.DetectChanges(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to detect changes in container: %w", err)
+			return nil, fmt.Errorf("failed to detect changes in container %s for interface %s: %w", container, ifaceName, err)
 		}
 		if changes != nil && changes.HasUpdates() {
 			updatedSet[ifaceName] = changes
@@ -2171,7 +2174,7 @@ func detectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 
 		changes, err := detectChangesInContainer(ctx, provisionersInContainer, currentInterfacesInContainer, nsKey)
 		if err != nil {
-			return nil, fmt.Errorf("failed to detect changes in container: %w", err)
+			return nil, fmt.Errorf("failed to detect changes in container %s: %w", nsKey, err)
 		}
 
 		totalChanges = totalChanges.Merge(changes)
