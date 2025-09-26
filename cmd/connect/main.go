@@ -705,6 +705,12 @@ type DummyInterfaceChangeSet struct {
 	AddressesToAdd    []*netlink.Addr
 }
 
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetChangedItems() map[string]bool {
+	changedItems := make(map[string]bool)
+	changedItems["Addresses"] = len(dummyInterfaceChangeSet.AddressesToAdd)+len(dummyInterfaceChangeSet.AddressesToRemove) > 0
+	return changedItems
+}
+
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetContainerName() *string {
 	return dummyInterfaceChangeSet.ContainerName
 }
@@ -910,6 +916,16 @@ type WireGuardInterfaceChangeSet struct {
 
 	AddressesToAdd    []*netlink.Addr
 	AddressesToRemove []*netlink.Addr
+}
+
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetChangedItems() map[string]bool {
+	changedItems := make(map[string]bool)
+	changedItems["PrivateKey"] = wgInterfaceChangeSet.PrivateKeyToSet != nil
+	changedItems["ListenPort"] = wgInterfaceChangeSet.ListenPortToSet != nil
+	changedItems["Peers"] = wgInterfaceChangeSet.PeersToRemove != nil || wgInterfaceChangeSet.PeersToAdd != nil
+	changedItems["Addresses"] = wgInterfaceChangeSet.AddressesToAdd != nil || wgInterfaceChangeSet.AddressesToRemove != nil
+	changedItems["MTU"] = wgInterfaceChangeSet.MTUToSet != nil
+	return changedItems
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetContainerName() *string {
@@ -1442,6 +1458,13 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) Apply(ctx context.Contex
 	})
 }
 
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetChangedItems() map[string]bool {
+	changedItems := make(map[string]bool)
+	changedItems["Addresses"] = len(vxlanInterfaceChangeSet.AddressesToAdd)+len(vxlanInterfaceChangeSet.AddressedToRemove) > 0
+	changedItems["MTU"] = vxlanInterfaceChangeSet.MTUToSet != nil
+	return changedItems
+}
+
 func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
 	changeSet := new(VXLANInterfaceChangeSet)
 	changeSet.ContainerName = vxlanConfig.ContainerName
@@ -1612,6 +1635,17 @@ type VethPairChangeSet struct {
 	Peer  *VethPairPeerChangeSet
 }
 
+func (vethPair *VethPairChangeSet) GetChangedItems() map[string]bool {
+	changedItems := make(map[string]bool)
+	for k, v := range vethPair.Local.GetChangedItems() {
+		changedItems["local."+k] = v
+	}
+	for k, v := range vethPair.Peer.GetChangedItems() {
+		changedItems["peer."+k] = v
+	}
+	return changedItems
+}
+
 func (vethPair *VethPairChangeSet) GetContainerName() *string {
 	return vethPair.Local.ContainerName
 }
@@ -1644,6 +1678,13 @@ type VethPairPeerChangeSet struct {
 	AddressesToAdd []*netlink.Addr
 	AddressesToDel []*netlink.Addr
 	MTUToSet       *int
+}
+
+func (vethPeer *VethPairPeerChangeSet) GetChangedItems() map[string]bool {
+	changedItems := make(map[string]bool)
+	changedItems["Addresses"] = len(vethPeer.AddressesToAdd)+len(vethPeer.AddressesToDel) > 0
+	changedItems["MTU"] = vethPeer.MTUToSet != nil
+	return changedItems
 }
 
 func (vethPeer *VethPairPeerChangeSet) HasUpdates() bool {
@@ -1751,6 +1792,7 @@ func (vethPairConfig *VethPairConfig) GetInterfaceName() string {
 }
 
 func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
+
 	return withNsHandle(ctx, nil, func(handle *netlink.Handle) error {
 		cli, err := dockerCliFromCtx(ctx)
 		if err != nil {
@@ -1794,17 +1836,25 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 		}
 
 		err = withNsHandle(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
+			link, err := handle.LinkByName(vethPairConfig.Name)
+			if err != nil {
+				return fmt.Errorf("failed to get veth link: %w", err)
+			}
 			return handle.LinkSetUp(link)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to set veth link up: %w", err)
+			return fmt.Errorf("failed to set veth link up (lhs): %w", err)
 		}
 
 		err = withNsHandle(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
+			link, err := handle.LinkByName(vethPairConfig.Peer.Name)
+			if err != nil {
+				return fmt.Errorf("failed to get veth link: %w", err)
+			}
 			return handle.LinkSetUp(link)
 		})
 		if err != nil {
-			return fmt.Errorf("failed to set veth link up: %w", err)
+			return fmt.Errorf("failed to set veth link up (rhs): %w", err)
 		}
 
 		return nil
@@ -1818,7 +1868,7 @@ type BridgeConfig struct {
 	Addresses       []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 }
 
-type BridgeChangeSet struct {
+type BridgeInterfaceChangeSet struct {
 	InterfaceToEnslave map[string]interface{}
 	InterfaceToUnslave map[string]interface{}
 	ContainerName      *string
@@ -1827,7 +1877,14 @@ type BridgeChangeSet struct {
 	AddressesToRemove  []*netlink.Addr
 }
 
-func (bridgeChangeSet *BridgeChangeSet) Apply(ctx context.Context) error {
+func (bridgeChangeSet *BridgeInterfaceChangeSet) GetChangedItems() map[string]bool {
+	changedItems := make(map[string]bool)
+	changedItems["SlaveInterfaces"] = len(bridgeChangeSet.InterfaceToEnslave)+len(bridgeChangeSet.InterfaceToUnslave) > 0
+	changedItems["Addresses"] = len(bridgeChangeSet.AddressesToAdd)+len(bridgeChangeSet.AddressesToRemove) > 0
+	return changedItems
+}
+
+func (bridgeChangeSet *BridgeInterfaceChangeSet) Apply(ctx context.Context) error {
 	return withNsHandle(ctx, bridgeChangeSet.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeChangeSet.InterfaceName)
 		if err != nil {
@@ -1856,20 +1913,20 @@ func (bridgeChangeSet *BridgeChangeSet) Apply(ctx context.Context) error {
 	})
 }
 
-func (bridgeChangeSet *BridgeChangeSet) GetContainerName() *string {
+func (bridgeChangeSet *BridgeInterfaceChangeSet) GetContainerName() *string {
 	return bridgeChangeSet.ContainerName
 }
 
-func (bridgeChangeSet *BridgeChangeSet) GetInterfaceName() string {
+func (bridgeChangeSet *BridgeInterfaceChangeSet) GetInterfaceName() string {
 	return bridgeChangeSet.InterfaceName
 }
 
-func (bridgeChangeSet *BridgeChangeSet) HasUpdates() bool {
+func (bridgeChangeSet *BridgeInterfaceChangeSet) HasUpdates() bool {
 	return bridgeChangeSet != nil && (len(bridgeChangeSet.InterfaceToEnslave)+len(bridgeChangeSet.InterfaceToUnslave) > 0)
 }
 
 func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	changeSet := new(BridgeChangeSet)
+	changeSet := new(BridgeInterfaceChangeSet)
 	changeSet.ContainerName = bridgeConfig.ContainerName
 	changeSet.InterfaceName = bridgeConfig.Name
 	changeSet.InterfaceToEnslave = make(map[string]interface{})
@@ -2208,6 +2265,7 @@ func detectChangesInContainer(
 			return nil, fmt.Errorf("failed to detect changes in container %s for interface %s: %w", container, ifaceName, err)
 		}
 		if changes != nil && changes.HasUpdates() {
+			log.Printf("Found updates for interface %s in container %s: %v", ifaceName, container, changes.GetChangedItems())
 			updatedSet[ifaceName] = changes
 		}
 	}
@@ -2359,9 +2417,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		return nil, fmt.Errorf("failed to detect changes for OpenVPN: %w", err)
 	}
 	if openVPNChangeSet != nil && openVPNChangeSet.HasChanges() {
-		log.Println("Found changes for OpenVPN dataplane config")
+		log.Println("Found changes for OpenVPN dataplane config", *openVPNChangeSet)
+		changeSet = changeSet.Merge(openVPNChangeSet)
 	}
-	changeSet = changeSet.Merge(openVPNChangeSet)
 
 	log.Println("Detecting changes for WireGuard ...")
 	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx, containers)
@@ -2369,9 +2427,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
 	}
 	if wireGuardChangeSet != nil && wireGuardChangeSet.HasChanges() {
-		log.Println("Found changes for WireGuard dataplane config")
+		log.Println("Found changes for WireGuard dataplane config", *wireGuardChangeSet)
+		changeSet = changeSet.Merge(wireGuardChangeSet)
 	}
-	changeSet = changeSet.Merge(wireGuardChangeSet)
 
 	log.Println("Detecting changes for VXLAN ...")
 	vxlanChangeSet, err := dpConfig.VXLAN.DetectChanges(ctx, containers)
@@ -2379,9 +2437,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		return nil, fmt.Errorf("failed to detect changes for VXLAN: %w", err)
 	}
 	if vxlanChangeSet != nil && vxlanChangeSet.HasChanges() {
-		log.Println("Found changes for VXLAN dataplane config")
+		log.Printf("Found changes for VXLAN dataplane config: %v\n", *vxlanChangeSet)
+		changeSet = changeSet.Merge(vxlanChangeSet)
 	}
-	changeSet = changeSet.Merge(vxlanChangeSet)
 
 	log.Println("Detecting changes for VethPair ...")
 	vethPairChangeSet, err := dpConfig.VethPair.DetectChanges(ctx, containers)
@@ -2389,9 +2447,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		return nil, fmt.Errorf("failed to detect changes for VethPair: %w", err)
 	}
 	if vethPairChangeSet != nil && vethPairChangeSet.HasChanges() {
-		log.Println("Found changes for VethPair dataplane config")
+		log.Println("Found changes for VethPair dataplane config", *vethPairChangeSet)
+		changeSet = changeSet.Merge(vethPairChangeSet)
 	}
-	changeSet = changeSet.Merge(vethPairChangeSet)
 
 	log.Println("Detecting changes for Bridge ...")
 	bridgeChangeSet, err := dpConfig.Bridge.DetectChanges(ctx, containers)
@@ -2399,9 +2457,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		return nil, fmt.Errorf("failed to detect changes for Bridge: %w", err)
 	}
 	if bridgeChangeSet != nil && bridgeChangeSet.HasChanges() {
-		log.Println("Found changes for Bridge dataplane config")
+		log.Println("Found changes for Bridge dataplane config", *bridgeChangeSet)
+		changeSet = changeSet.Merge(bridgeChangeSet)
 	}
-	changeSet = changeSet.Merge(bridgeChangeSet)
 
 	log.Println("Detecting changes for Dummy ...")
 	dummyChangeSet, err := dpConfig.Dummy.DetectChanges(ctx, containers)
@@ -2409,9 +2467,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		return nil, fmt.Errorf("failed to detect changes for Dummy: %w", err)
 	}
 	if dummyChangeSet != nil && dummyChangeSet.HasChanges() {
-		log.Println("Found changes for Dummy dataplane config")
+		log.Println("Found changes for Dummy dataplane config", *dummyChangeSet)
+		changeSet = changeSet.Merge(dummyChangeSet)
 	}
-	changeSet = changeSet.Merge(dummyChangeSet)
 
 	return changeSet, nil
 }
@@ -2421,6 +2479,7 @@ type InterfaceChangeSet interface {
 	HasUpdates() bool
 	GetInterfaceName() string
 	GetContainerName() *string
+	GetChangedItems() map[string]bool
 }
 
 type InterfaceProvisioner interface {
@@ -2567,7 +2626,21 @@ func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *Datapla
 
 func (dpChangeSet *DataplaneChangeSet) HasChanges() bool {
 	if dpChangeSet != nil {
-		return len(dpChangeSet.AddedInterfaces)+len(dpChangeSet.UpdatedInterfaces)+len(dpChangeSet.RemovedInterfaces) > 0
+		for _, addedInterface := range dpChangeSet.AddedInterfaces {
+			if len(addedInterface) > 0 {
+				return true
+			}
+		}
+		for _, updatedInterface := range dpChangeSet.UpdatedInterfaces {
+			if len(updatedInterface) > 0 {
+				return true
+			}
+		}
+		for _, removedInterface := range dpChangeSet.RemovedInterfaces {
+			if len(removedInterface) > 0 {
+				return true
+			}
+		}
 	}
 
 	return false
