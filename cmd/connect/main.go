@@ -14,6 +14,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -791,42 +792,32 @@ type WireGuardPeerConfig struct {
 	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
 }
 
-func (wgPeerConfig *WireGuardPeerConfig) Apply(wgtypesConf *wgtypes.Config) error {
-	if wgtypesConf.Peers == nil {
-		wgtypesConf.Peers = make([]wgtypes.PeerConfig, 0)
-	}
+func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer() (*wgtypes.PeerConfig, error) {
+	peercfg := new(wgtypes.PeerConfig)
 
-	wgtypesPeerConfig := new(wgtypes.PeerConfig)
 	pk, err := wgtypes.ParseKey(wgPeerConfig.PublicKey)
 	if err != nil {
-		return fmt.Errorf("failed to parse public key: %w", err)
+		return nil, fmt.Errorf("failed to parse public key: %w", err)
 	}
-	wgtypesPeerConfig.PublicKey = pk
+	peercfg.PublicKey = pk
 
 	if wgPeerConfig.Endpoint != nil {
 		udpAddr, err := net.ResolveUDPAddr("udp", *wgPeerConfig.Endpoint)
 		if err != nil {
-			return fmt.Errorf("failed to resolve udp address: %w", err)
+			return nil, fmt.Errorf("failed to resolve udp address: %w", err)
 		}
-		wgtypesPeerConfig.Endpoint = udpAddr
+		peercfg.Endpoint = udpAddr
 	}
 
-	if wgPeerConfig.AllowedIPs != nil {
-		if wgtypesPeerConfig.AllowedIPs == nil {
-			wgtypesPeerConfig.AllowedIPs = make([]net.IPNet, 0)
+	for _, allowedipstr := range wgPeerConfig.AllowedIPs {
+		_, ipnet, err := net.ParseCIDR(allowedipstr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse allowed ip: %w", err)
 		}
-
-		for _, allowedIP := range wgPeerConfig.AllowedIPs {
-			_, ipNet, err := net.ParseCIDR(allowedIP)
-			if err != nil {
-				return fmt.Errorf("failed to parse allowed ip: %w", err)
-			}
-			wgtypesPeerConfig.AllowedIPs = append(wgtypesPeerConfig.AllowedIPs, *ipNet)
-		}
+		peercfg.AllowedIPs = append(peercfg.AllowedIPs, *ipnet)
 	}
 
-	wgtypesConf.Peers = append(wgtypesConf.Peers, *wgtypesPeerConfig)
-	return nil
+	return peercfg, nil
 }
 
 type AddressConfig struct {
@@ -883,8 +874,8 @@ type WireGuardInterfaceChangeSet struct {
 	MTUToSet        *int
 	ListenPortToSet *int
 
-	Peers        []wgtypes.PeerConfig
-	PeersUpdated bool
+	PeersToRemove map[string]*wgtypes.Peer
+	PeersToAdd    map[string]wgtypes.PeerConfig
 
 	AddressesToAdd    []*netlink.Addr
 	AddressesToRemove []*netlink.Addr
@@ -902,7 +893,8 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
 	return wgInterfaceChangeSet != nil && (wgInterfaceChangeSet.PrivateKeyToSet != nil ||
 		wgInterfaceChangeSet.MTUToSet != nil ||
 		wgInterfaceChangeSet.ListenPortToSet != nil ||
-		wgInterfaceChangeSet.PeersUpdated ||
+		wgInterfaceChangeSet.PeersToRemove != nil ||
+		wgInterfaceChangeSet.PeersToAdd != nil ||
 		wgInterfaceChangeSet.AddressesToAdd != nil ||
 		wgInterfaceChangeSet.AddressesToRemove != nil)
 }
@@ -912,7 +904,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		return nil
 	}
 
-	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersUpdated {
+	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersToRemove != nil || wgInterfaceChangeSet.PeersToAdd != nil {
 		wgCtrl, err := wgctrl.New()
 		if err != nil {
 			return fmt.Errorf("failed to create wireguard controller: %w", err)
@@ -944,10 +936,24 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 			}
 		}
 
-		if wgInterfaceChangeSet.PeersUpdated {
+		for _, p := range wgInterfaceChangeSet.PeersToRemove {
 			patchConfig := new(wgtypes.Config)
-			patchConfig.ReplacePeers = true
-			patchConfig.Peers = wgInterfaceChangeSet.Peers
+			patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
+			patchConfig.ReplacePeers = false
+			patchConfig.Peers = append(patchConfig.Peers, wgtypes.PeerConfig{
+				PublicKey: p.PublicKey,
+				Remove:    true,
+			})
+			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				return fmt.Errorf("failed to patch wireguard config: %w", err)
+			}
+		}
+
+		for _, p := range wgInterfaceChangeSet.PeersToAdd {
+			patchConfig := new(wgtypes.Config)
+			patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
+			patchConfig.ReplacePeers = false
+			patchConfig.Peers = append(patchConfig.Peers, p)
 			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
 				return fmt.Errorf("failed to patch wireguard config: %w", err)
 			}
@@ -998,15 +1004,164 @@ func (wgConf *WireGuardConfig) GetContainerName() *string {
 	return wgConf.ContainerName
 }
 
+func isUDPAddrNotEqu(spec, curr *net.UDPAddr) bool {
+	if spec == nil {
+		// when spec is nil, always consider them as equal
+		return false
+	}
+
+	if curr == nil {
+		return true
+	}
+
+	return spec.String() != curr.String()
+}
+
+func isIPNetListNotEqu(lhs, rhs []net.IPNet) bool {
+	lhsStrs := make([]string, 0)
+	for _, allowedIP := range lhs {
+		lhsStrs = append(lhsStrs, allowedIP.String())
+	}
+
+	rhsStrs := make([]string, 0)
+	for _, allowedIP := range rhs {
+		rhsStrs = append(rhsStrs, allowedIP.String())
+	}
+
+	sort.Strings(lhsStrs)
+	sort.Strings(rhsStrs)
+
+	if len(lhsStrs) != len(rhsStrs) {
+		return true
+	}
+
+	for i := range lhsStrs {
+		if lhsStrs[i] != rhsStrs[i] {
+			return true
+		}
+	}
+
+	return false
+}
+
+// returns: (added, removed)
+func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgtypes.Peer) (map[string]wgtypes.PeerConfig, map[string]*wgtypes.Peer) {
+
+	commonPeers := make(map[string]wgtypes.PeerConfig)
+	specPeersMap := make(map[string]wgtypes.PeerConfig)
+	currentPeersMap := make(map[string]*wgtypes.Peer)
+	peersToRemove := make(map[string]*wgtypes.Peer)
+	peersToAdd := make(map[string]wgtypes.PeerConfig)
+
+	for _, peer := range specPeers {
+		specPeersMap[peer.PublicKey.String()] = peer
+	}
+
+	for _, peer := range currentPeers {
+		k := peer.PublicKey.String()
+		currentPeersMap[k] = peer
+		if _, ok := specPeersMap[k]; ok {
+			commonPeers[k] = specPeersMap[k]
+		} else {
+			peersToRemove[k] = peer
+		}
+	}
+
+	for _, peer := range specPeers {
+		if _, ok := currentPeersMap[peer.PublicKey.String()]; !ok {
+			peersToAdd[peer.PublicKey.String()] = peer
+		}
+	}
+
+	for k, spec := range commonPeers {
+		peer := currentPeersMap[k]
+		if spec.PresharedKey != nil && *spec.PresharedKey != peer.PresharedKey {
+			peersToRemove[k] = peer
+			peersToAdd[k] = spec
+		}
+
+		if isUDPAddrNotEqu(spec.Endpoint, peer.Endpoint) {
+			peersToRemove[k] = peer
+			peersToAdd[k] = spec
+		}
+
+		if spec.PersistentKeepaliveInterval != nil {
+			if *spec.PersistentKeepaliveInterval != peer.PersistentKeepaliveInterval {
+				peersToRemove[k] = peer
+				peersToAdd[k] = spec
+			}
+		}
+
+		if isIPNetListNotEqu(spec.AllowedIPs, peer.AllowedIPs) {
+			peersToRemove[k] = peer
+			peersToAdd[k] = spec
+		}
+	}
+
+	return peersToAdd, peersToRemove
+}
+
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
 	changeSet := new(WireGuardInterfaceChangeSet)
 	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
 
+	wgCtrl, err := wgctrl.New()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create wireguard controller: %w", err)
+	}
+	defer wgCtrl.Close()
+
+	currentConfig, err := wgCtrl.Device(wgConf.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get wireguard device: %w", err)
+	}
+
+	if currentConfig == nil {
+		return nil, fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, getContainerDisplayName(wgConf.ContainerName))
+	}
+
+	specPeerConfigs := make([]wgtypes.PeerConfig, 0)
+	for _, peer := range wgConf.Peers {
+		peercfg, err := peer.ToWGTypesPeer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
+		}
+		specPeerConfigs = append(specPeerConfigs, *peercfg)
+	}
+
+	currPeers := make([]*wgtypes.Peer, 0)
+	for _, peer := range currentConfig.Peers {
+		currPeers = append(currPeers, &peer)
+	}
+
+	addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers)
+	changeSet.PeersToAdd = addedPeers
+	changeSet.PeersToRemove = removedPeers
+
+	wgtypesConf, err := wgConf.ToWGTypesConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
+	}
+
+	if wgtypesConf.PrivateKey != nil {
+		if *wgtypesConf.PrivateKey != currentConfig.PrivateKey {
+			changeSet.PrivateKeyToSet = wgtypesConf.PrivateKey
+		}
+	}
+
+	if wgtypesConf.ListenPort != nil {
+		if *wgtypesConf.ListenPort != currentConfig.ListenPort {
+			changeSet.ListenPortToSet = wgtypesConf.ListenPort
+		}
+	}
+
 	return changeSet, nil
 }
 
-func (wgConf *WireGuardConfig) Apply(wgtypesConf *wgtypes.Config) error {
+func (wgConf *WireGuardConfig) ToWGTypesConfig() (*wgtypes.Config, error) {
+	wgtypesConf := new(wgtypes.Config)
+
 	if wgConf.ListenPort != nil {
 		wgtypesConf.ListenPort = wgConf.ListenPort
 	}
@@ -1014,18 +1169,20 @@ func (wgConf *WireGuardConfig) Apply(wgtypesConf *wgtypes.Config) error {
 	if wgConf.PrivateKey != "" {
 		pk, err := wgtypes.ParseKey(wgConf.PrivateKey)
 		if err != nil {
-			return fmt.Errorf("failed to parse private key: %w", err)
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
 		wgtypesConf.PrivateKey = &pk
 	}
 
 	for _, peer := range wgConf.Peers {
-		if err := peer.Apply(wgtypesConf); err != nil {
-			return fmt.Errorf("failed to apply peer: %w", err)
+		peercfg, err := peer.ToWGTypesPeer()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
 		}
+		wgtypesConf.Peers = append(wgtypesConf.Peers, *peercfg)
 	}
 
-	return nil
+	return wgtypesConf, nil
 }
 
 func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
@@ -1050,9 +1207,9 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 		}
 		defer wgCtrl.Close()
 
-		wgtypesConf := new(wgtypes.Config)
-		if err := wgConf.Apply(wgtypesConf); err != nil {
-			return fmt.Errorf("failed to apply wireguard config: %w", err)
+		wgtypesConf, err := wgConf.ToWGTypesConfig()
+		if err != nil {
+			return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 		}
 
 		if err := wgCtrl.ConfigureDevice(wgConf.Name, *wgtypesConf); err != nil {
