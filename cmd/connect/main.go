@@ -1175,7 +1175,6 @@ func withNetnsWGCli(ctx context.Context, containerName *string, hook func(wgCtrl
 }
 
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
-	log.Printf("**** detecting changes for wireguard config: %v *****", wgConf)
 
 	changeSet := new(WireGuardInterfaceChangeSet)
 	changeSet.ContainerName = wgConf.ContainerName
@@ -2209,16 +2208,30 @@ func detectChangesInContainer(
 		}
 	}
 
-	changeSet := new(DataplaneChangeSet)
+	addedList := make([]InterfaceProvisioner, 0)
+	removedList := make([]InterfaceCanceller, 0)
+	updatedList := make([]InterfaceChangeSet, 0)
+
 	for _, provisioner := range addedSet {
-		changeSet.AddedInterfaces[container] = append(changeSet.AddedInterfaces[container], provisioner)
+		addedList = append(addedList, provisioner)
 	}
 	for _, currentInterface := range removedSet {
-		changeSet.RemovedInterfaces[container] = append(changeSet.RemovedInterfaces[container], currentInterface)
+		removedList = append(removedList, currentInterface)
 	}
 	for _, changeset := range updatedSet {
-		changeSet.UpdatedInterfaces[container] = append(changeSet.UpdatedInterfaces[container], changeset)
+		updatedList = append(updatedList, changeset)
 	}
+
+	changeSet := new(DataplaneChangeSet)
+	changeSet.AddedInterfaces = make(map[string][]InterfaceProvisioner)
+	changeSet.AddedInterfaces[container] = addedList
+
+	changeSet.RemovedInterfaces = make(map[string][]InterfaceCanceller)
+	changeSet.RemovedInterfaces[container] = removedList
+
+	changeSet.UpdatedInterfaces = make(map[string][]InterfaceChangeSet)
+	changeSet.UpdatedInterfaces[container] = updatedList
+
 	return changeSet, nil
 }
 
