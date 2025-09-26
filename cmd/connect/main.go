@@ -2444,6 +2444,7 @@ func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context,
 		}
 	}
 
+	vethTy := new(netlink.Veth).Type()
 	for _, cont := range containers {
 		err := withNsHandle(ctx, &cont, func(handle *netlink.Handle) error {
 			links, err := handle.LinkList()
@@ -2452,6 +2453,10 @@ func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context,
 			}
 
 			for _, link := range links {
+				if link.Type() != vethTy {
+					continue
+				}
+
 				if ifmap, ok := vethSpecMap[cont]; ok {
 					if _, ok := ifmap[link.Attrs().Name]; ok {
 						continue
