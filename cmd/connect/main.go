@@ -668,6 +668,36 @@ func detectAddrChanges(spec []*netlink.Addr, actual []*netlink.Addr) ([]*netlink
 	return added, removed
 }
 
+type AddrsChangeSet struct {
+	AddressesToAdd    []*netlink.Addr
+	AddressesToRemove []*netlink.Addr
+}
+
+func compareSpecAddrsAgainstActualAddrs(specAddrConfigs []AddressConfig, link netlink.Link, handle *netlink.Handle) (*AddrsChangeSet, error) {
+	specAddrs := make([]*netlink.Addr, 0)
+	for _, addr := range specAddrConfigs {
+		nlAddr, err := addr.ToNetlinkAddr()
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert address to netlink addr: %w", err)
+		}
+		specAddrs = append(specAddrs, nlAddr)
+	}
+
+	actualAddrPtrs := make([]*netlink.Addr, 0)
+	actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list wireguard link addresses: %w", err)
+	}
+	for _, addr := range actualAddrs {
+		actualAddrPtrs = append(actualAddrPtrs, &addr)
+	}
+
+	return &AddrsChangeSet{
+		AddressesToAdd:    specAddrs,
+		AddressesToRemove: actualAddrPtrs,
+	}, nil
+}
+
 type DummyInterfaceChangeSet struct {
 	ContainerName     *string
 	InterfaceName     string
@@ -725,16 +755,17 @@ func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (InterfaceCha
 
 	withNsHandle(ctx, dummyConfig.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(dummyConfig.Name)
-		if err == nil {
-			if link != nil {
-				addrs, err := netlink.AddrList(link, netlink.FAMILY_ALL)
-				if err == nil {
-					for _, addr := range addrs {
-						changeSet.AddressesToRemove = append(changeSet.AddressesToRemove, &addr)
-					}
-				}
-			}
+		if err != nil {
+			return fmt.Errorf("failed to get dummy link: %w", err)
 		}
+
+		addrsChangeSet, err := compareSpecAddrsAgainstActualAddrs(dummyConfig.Addresses, link, handle)
+		if err != nil {
+			return fmt.Errorf("failed to compare spec addrs against actual addrs: %w", err)
+		}
+		changeSet.AddressesToAdd = addrsChangeSet.AddressesToAdd
+		changeSet.AddressesToRemove = addrsChangeSet.AddressesToRemove
+
 		return nil
 	})
 
@@ -1101,6 +1132,48 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 	return peersToAdd, peersToRemove
 }
 
+func withNetnsWGCli(ctx context.Context, containerName *string, hook func(wgCtrlCli *wgctrl.Client) error) error {
+	var wgCtrlCli *wgctrl.Client
+	var err error
+
+	if containerName != nil {
+		cli, err := dockerCliFromCtx(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get docker client: %s", err.Error())
+		}
+
+		nsHandle, err := getNetNSHandle(ctx, cli, *containerName)
+		if err != nil {
+			return fmt.Errorf("failed to get netns: %s", err.Error())
+		}
+		defer nsHandle.Close()
+
+		hostPid := os.Getpid()
+		hostNsHandle, err := netns.GetFromPid(hostPid)
+		if err != nil {
+			return fmt.Errorf("failed to get host netns: %s", err.Error())
+		}
+		defer hostNsHandle.Close()
+
+		netns.Set(nsHandle)
+		defer netns.Set(hostNsHandle)
+
+		wgCtrlCli, err = wgctrl.New()
+		if err != nil {
+			return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
+		}
+		defer wgCtrlCli.Close()
+	} else {
+		wgCtrlCli, err = wgctrl.New()
+		if err != nil {
+			return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
+		}
+		defer wgCtrlCli.Close()
+	}
+
+	return hook(wgCtrlCli)
+}
+
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChangeSet, error) {
 	log.Printf("**** detecting changes for wireguard config: %v *****", wgConf)
 
@@ -1108,55 +1181,82 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (InterfaceChan
 	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
 
-	wgCtrl, err := wgctrl.New()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create wireguard controller: %w", err)
-	}
-	defer wgCtrl.Close()
-
-	// todo: enter netns of the container to get the wgCtrl handle
-	currentConfig, err := wgCtrl.Device(wgConf.Name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get wireguard device: %w", err)
-	}
-
-	if currentConfig == nil {
-		return nil, fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, getContainerDisplayName(wgConf.ContainerName))
-	}
-
-	specPeerConfigs := make([]wgtypes.PeerConfig, 0)
-	for _, peer := range wgConf.Peers {
-		peercfg, err := peer.ToWGTypesPeer()
+	err := withNetnsWGCli(ctx, wgConf.ContainerName, func(wgCtrl *wgctrl.Client) error {
+		currentConfig, err := wgCtrl.Device(wgConf.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
+			return fmt.Errorf("failed to get wireguard device: %w", err)
 		}
-		specPeerConfigs = append(specPeerConfigs, *peercfg)
-	}
 
-	currPeers := make([]*wgtypes.Peer, 0)
-	for _, peer := range currentConfig.Peers {
-		currPeers = append(currPeers, &peer)
-	}
+		if currentConfig == nil {
+			return fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, getContainerDisplayName(wgConf.ContainerName))
+		}
 
-	addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers)
-	changeSet.PeersToAdd = addedPeers
-	changeSet.PeersToRemove = removedPeers
+		specPeerConfigs := make([]wgtypes.PeerConfig, 0)
+		for _, peer := range wgConf.Peers {
+			peercfg, err := peer.ToWGTypesPeer()
+			if err != nil {
+				return fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
+			}
+			specPeerConfigs = append(specPeerConfigs, *peercfg)
+		}
 
-	wgtypesConf, err := wgConf.ToWGTypesConfig()
+		currPeers := make([]*wgtypes.Peer, 0)
+		for _, peer := range currentConfig.Peers {
+			currPeers = append(currPeers, &peer)
+		}
+
+		addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers)
+		changeSet.PeersToAdd = addedPeers
+		changeSet.PeersToRemove = removedPeers
+
+		wgtypesConf, err := wgConf.ToWGTypesConfig()
+		if err != nil {
+			return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
+		}
+
+		if wgtypesConf.PrivateKey != nil {
+			if *wgtypesConf.PrivateKey != currentConfig.PrivateKey {
+				changeSet.PrivateKeyToSet = wgtypesConf.PrivateKey
+			}
+		}
+
+		if wgtypesConf.ListenPort != nil {
+			if *wgtypesConf.ListenPort != currentConfig.ListenPort {
+				changeSet.ListenPortToSet = wgtypesConf.ListenPort
+			}
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
+		return nil, fmt.Errorf("failed to detect changes for wireguard config: %w", err)
 	}
 
-	if wgtypesConf.PrivateKey != nil {
-		if *wgtypesConf.PrivateKey != currentConfig.PrivateKey {
-			changeSet.PrivateKeyToSet = wgtypesConf.PrivateKey
+	err = withNsHandle(ctx, wgConf.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(wgConf.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get wireguard link: %w", err)
 		}
-	}
 
-	if wgtypesConf.ListenPort != nil {
-		if *wgtypesConf.ListenPort != currentConfig.ListenPort {
-			changeSet.ListenPortToSet = wgtypesConf.ListenPort
+		if wgConf.MTU != nil {
+			if *wgConf.MTU != link.Attrs().MTU {
+				changeSet.MTUToSet = wgConf.MTU
+			}
 		}
+
+		addrsChangeSet, err := compareSpecAddrsAgainstActualAddrs(wgConf.Addresses, link, handle)
+		if err != nil {
+			return fmt.Errorf("failed to compare spec addrs against actual addrs: %w", err)
+		}
+		changeSet.AddressesToAdd = addrsChangeSet.AddressesToAdd
+		changeSet.AddressesToRemove = addrsChangeSet.AddressesToRemove
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect netlink changes for wireguard interface: %w", err)
 	}
 
 	return changeSet, nil
@@ -1356,25 +1456,12 @@ func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (InterfaceCha
 			}
 		}
 
-		specAddrs := make([]*netlink.Addr, 0)
-		for _, addr := range vxlanConfig.Addresses {
-			nlAddr, err := addr.ToNetlinkAddr()
-			if err != nil {
-				return fmt.Errorf("failed to convert address to netlink addr: %w", err)
-			}
-			specAddrs = append(specAddrs, nlAddr)
-		}
-
-		actualAddrPtrs := make([]*netlink.Addr, 0)
-		actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
+		addrsChangeSet, err := compareSpecAddrsAgainstActualAddrs(vxlanConfig.Addresses, link, handle)
 		if err != nil {
-			return fmt.Errorf("failed to list vxlan link addresses: %w", err)
+			return fmt.Errorf("failed to compare spec addrs against actual addrs: %w", err)
 		}
-		for _, addr := range actualAddrs {
-			actualAddrPtrs = append(actualAddrPtrs, &addr)
-		}
-
-		changeSet.AddressesToAdd, changeSet.AddressedToRemove = detectAddrChanges(specAddrs, actualAddrPtrs)
+		changeSet.AddressesToAdd = addrsChangeSet.AddressesToAdd
+		changeSet.AddressedToRemove = addrsChangeSet.AddressesToRemove
 
 		return nil
 	})
@@ -1610,23 +1697,12 @@ func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec 
 		}
 	}
 
-	specAddrs := make([]*netlink.Addr, 0)
-	for _, addr := range spec.Addresses {
-		nlAddr, err := addr.ToNetlinkAddr()
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert address to netlink addr: %w", err)
-		}
-		specAddrs = append(specAddrs, nlAddr)
-	}
-	actualAddrPtrs := make([]*netlink.Addr, 0)
-	actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
+	addrsChangeSet, err := compareSpecAddrsAgainstActualAddrs(spec.Addresses, link, handle)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list veth link addresses: %w", err)
+		return nil, fmt.Errorf("failed to compare spec addrs against actual addrs: %w", err)
 	}
-	for _, addr := range actualAddrs {
-		actualAddrPtrs = append(actualAddrPtrs, &addr)
-	}
-	changeSet.AddressesToAdd, changeSet.AddressesToDel = detectAddrChanges(specAddrs, actualAddrPtrs)
+	changeSet.AddressesToAdd = addrsChangeSet.AddressesToAdd
+	changeSet.AddressesToDel = addrsChangeSet.AddressesToRemove
 
 	return changeSet, nil
 }
@@ -1733,9 +1809,10 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 }
 
 type BridgeConfig struct {
-	Name            string   `yaml:"name" json:"name"`
-	SlaveInterfaces []string `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
-	ContainerName   *string  `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Name            string          `yaml:"name" json:"name"`
+	SlaveInterfaces []string        `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
+	ContainerName   *string         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Addresses       []AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 }
 
 type BridgeChangeSet struct {
@@ -1743,6 +1820,8 @@ type BridgeChangeSet struct {
 	InterfaceToUnslave map[string]interface{}
 	ContainerName      *string
 	InterfaceName      string
+	AddressesToAdd     []*netlink.Addr
+	AddressesToRemove  []*netlink.Addr
 }
 
 func (bridgeChangeSet *BridgeChangeSet) Apply(ctx context.Context) error {
@@ -1817,6 +1896,13 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (InterfaceC
 				changeSet.InterfaceToUnslave[slif.Attrs().Name] = true
 			}
 		}
+
+		addrsChangeSet, err := compareSpecAddrsAgainstActualAddrs(bridgeConfig.Addresses, link, handle)
+		if err != nil {
+			return fmt.Errorf("failed to compare spec addrs against actual addrs: %w", err)
+		}
+		changeSet.AddressesToAdd = addrsChangeSet.AddressesToAdd
+		changeSet.AddressesToRemove = addrsChangeSet.AddressesToRemove
 
 		return nil
 	})
