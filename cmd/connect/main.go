@@ -2367,13 +2367,110 @@ func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, conta
 
 type VethPairConfigurationList []VethPairConfig
 
+type VethPairPlacementStatus struct {
+	FoundInPrimaryNetns   bool
+	FoundInSecondaryNetns bool
+}
+
+func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*VethPairPlacementStatus, error) {
+	// todo
+	return nil, nil
+}
+
 func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*DataplaneChangeSet, error) {
-	vethPairTy := new(netlink.Veth).Type()
-	provisionerList := make([]InterfaceProvisioner, 0)
-	for _, vethPair := range vethPairList {
-		provisionerList = append(provisionerList, &vethPair)
+	vethPairsToCreate := make([]VethPairConfig, 0)
+	vethPairsToDelete := make([]InterfaceCanceller, 0)
+	vethPairsToCheckUpdates := make([]VethPairConfig, 0)
+	vethPairsUpdated := make([]InterfaceChangeSet, 0)
+
+	vethSpecMap := make(map[string]map[string]interface{})
+
+	for _, vethPairSpec := range vethPairList {
+		nsKey := string(getContainerKey(vethPairSpec.GetContainerName()))
+		if _, ok := vethSpecMap[nsKey]; !ok {
+			vethSpecMap[nsKey] = make(map[string]interface{})
+		}
+		vethSpecMap[nsKey][vethPairSpec.GetInterfaceName()] = true
+		secondaryNsKey := string(getContainerKey(vethPairSpec.Peer.GetContainerName()))
+		if _, ok := vethSpecMap[secondaryNsKey]; !ok {
+			vethSpecMap[secondaryNsKey] = make(map[string]interface{})
+		}
+		vethSpecMap[secondaryNsKey][vethPairSpec.Peer.GetInterfaceName()] = true
+
+		placementStatus, err := vethPairSpec.GetPlacementStatus(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get placement status for veth pair %s: %w", vethPairSpec.Name, err)
+		}
+
+		if placementStatus.FoundInPrimaryNetns && placementStatus.FoundInSecondaryNetns {
+			vethPairsToCheckUpdates = append(vethPairsToCheckUpdates, vethPairSpec)
+		} else if !placementStatus.FoundInPrimaryNetns && !placementStatus.FoundInSecondaryNetns {
+			vethPairsToCreate = append(vethPairsToCreate, vethPairSpec)
+		} else if placementStatus.FoundInPrimaryNetns && !placementStatus.FoundInSecondaryNetns {
+			vethPairsToDelete = append(vethPairsToDelete, &StubInterfaceCanceller{ContainerName: vethPairSpec.ContainerName, InterfaceName: vethPairSpec.Name})
+			vethPairsToCreate = append(vethPairsToCreate, vethPairSpec)
+		} else if !placementStatus.FoundInPrimaryNetns && placementStatus.FoundInSecondaryNetns {
+			vethPairsToDelete = append(vethPairsToDelete, &StubInterfaceCanceller{ContainerName: vethPairSpec.Peer.ContainerName, InterfaceName: vethPairSpec.Peer.Name})
+			vethPairsToCreate = append(vethPairsToCreate, vethPairSpec)
+		} else {
+			continue
+		}
 	}
-	return detectChangesFromProvisionerList(ctx, provisionerList, vethPairTy, containers)
+
+	for _, vethPairSpec := range vethPairsToCheckUpdates {
+		changes, err := vethPairSpec.DetectChanges(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect changes for veth pair %s: %w", vethPairSpec.Name, err)
+		}
+		if changes != nil && changes.HasUpdates() {
+			vethPairsUpdated = append(vethPairsUpdated, changes)
+		}
+	}
+
+	for _, cont := range containers {
+		err := withNsHandle(ctx, &cont, func(handle *netlink.Handle) error {
+			links, err := handle.LinkList()
+			if err != nil {
+				return fmt.Errorf("failed to list links: %w", err)
+			}
+
+			for _, link := range links {
+				if ifmap, ok := vethSpecMap[cont]; ok {
+					if _, ok := ifmap[link.Attrs().Name]; ok {
+						continue
+					}
+				}
+				vethPairsToDelete = append(vethPairsToDelete, &StubInterfaceCanceller{ContainerName: &cont, InterfaceName: link.Attrs().Name})
+			}
+
+			return nil
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to list links for container %s: %w", cont, err)
+		}
+	}
+
+	changeSet := new(DataplaneChangeSet)
+	changeSet.AddedInterfaces = make(map[string][]InterfaceProvisioner)
+	changeSet.UpdatedInterfaces = make(map[string][]InterfaceChangeSet)
+	changeSet.RemovedInterfaces = make(map[string][]InterfaceCanceller)
+
+	for _, vethPairSpec := range vethPairsToCreate {
+		nsKey := string(getContainerKey(vethPairSpec.GetContainerName()))
+		changeSet.AddedInterfaces[nsKey] = append(changeSet.AddedInterfaces[nsKey], &vethPairSpec)
+	}
+
+	for _, vethPairSpec := range vethPairsToDelete {
+		nsKey := string(getContainerKey(vethPairSpec.GetContainerName()))
+		changeSet.RemovedInterfaces[nsKey] = append(changeSet.RemovedInterfaces[nsKey], vethPairSpec)
+	}
+
+	for _, vethPairSpec := range vethPairsUpdated {
+		nsKey := string(getContainerKey(vethPairSpec.GetContainerName()))
+		changeSet.UpdatedInterfaces[nsKey] = append(changeSet.UpdatedInterfaces[nsKey], vethPairSpec)
+	}
+
+	return changeSet, nil
 }
 
 type BridgeConfigurationList []BridgeConfig
@@ -2536,15 +2633,12 @@ type StubInterfaceCanceller struct {
 func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
 	return withNsHandle(ctx, stubInterfaceCanceller.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(stubInterfaceCanceller.InterfaceName)
-		if err != nil {
-			if _, ok := err.(netlink.LinkNotFoundError); !ok {
-				return fmt.Errorf("failed to get link: %w", err)
+		if err == nil && link != nil {
+			// in case that the interface might be already deleted, we don't need to delete it again
+			// and such case is not considered as an error (for example, for a veth pair, another end will immediately get deleted once one end is deleted)
+			if err := handle.LinkDel(link); err != nil {
+				return fmt.Errorf("failed to delete link: %w", err)
 			}
-			return nil
-		}
-
-		if err := handle.LinkDel(link); err != nil {
-			return fmt.Errorf("failed to delete link: %w", err)
 		}
 
 		return nil
