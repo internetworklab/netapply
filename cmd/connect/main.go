@@ -935,64 +935,68 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		return nil
 	}
 
+	containerName := wgInterfaceChangeSet.ContainerName
+
 	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersToRemove != nil || wgInterfaceChangeSet.PeersToAdd != nil {
-		wgCtrl, err := wgctrl.New()
+		err := withNetnsWGCli(ctx, containerName, func(wgCtrl *wgctrl.Client) error {
+			currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.InterfaceName)
+			if err != nil {
+				return fmt.Errorf("failed to get wireguard device: %w", err)
+			}
+
+			if currentConfig == nil {
+				return fmt.Errorf("failed to get wireguard device: %s in %s", wgInterfaceChangeSet.InterfaceName, getContainerDisplayName(wgInterfaceChangeSet.ContainerName))
+			}
+
+			if wgInterfaceChangeSet.PrivateKeyToSet != nil {
+				patchConfig := new(wgtypes.Config)
+				patchConfig.PrivateKey = wgInterfaceChangeSet.PrivateKeyToSet
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+					return fmt.Errorf("failed to patch wireguard config: %w", err)
+				}
+			}
+
+			if wgInterfaceChangeSet.ListenPortToSet != nil {
+				patchConfig := new(wgtypes.Config)
+				patchConfig.ListenPort = wgInterfaceChangeSet.ListenPortToSet
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+					return fmt.Errorf("failed to patch wireguard config: %w", err)
+				}
+			}
+
+			for _, p := range wgInterfaceChangeSet.PeersToRemove {
+				patchConfig := new(wgtypes.Config)
+				patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
+				patchConfig.ReplacePeers = false
+				patchConfig.Peers = append(patchConfig.Peers, wgtypes.PeerConfig{
+					PublicKey: p.PublicKey,
+					Remove:    true,
+				})
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+					return fmt.Errorf("failed to patch wireguard config: %w", err)
+				}
+			}
+
+			for _, p := range wgInterfaceChangeSet.PeersToAdd {
+				patchConfig := new(wgtypes.Config)
+				patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
+				patchConfig.ReplacePeers = false
+				patchConfig.Peers = append(patchConfig.Peers, p)
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+					return fmt.Errorf("failed to patch wireguard config: %w", err)
+				}
+			}
+
+			return nil
+		})
+
 		if err != nil {
-			return fmt.Errorf("failed to create wireguard controller: %w", err)
-		}
-		defer wgCtrl.Close()
-
-		currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.InterfaceName)
-		if err != nil {
-			return fmt.Errorf("failed to get wireguard device: %w", err)
-		}
-
-		if currentConfig == nil {
-			return fmt.Errorf("failed to get wireguard device: %s in %s", wgInterfaceChangeSet.InterfaceName, getContainerDisplayName(wgInterfaceChangeSet.ContainerName))
-		}
-
-		if wgInterfaceChangeSet.PrivateKeyToSet != nil {
-			patchConfig := new(wgtypes.Config)
-			patchConfig.PrivateKey = wgInterfaceChangeSet.PrivateKeyToSet
-			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
-				return fmt.Errorf("failed to patch wireguard config: %w", err)
-			}
-		}
-
-		if wgInterfaceChangeSet.ListenPortToSet != nil {
-			patchConfig := new(wgtypes.Config)
-			patchConfig.ListenPort = wgInterfaceChangeSet.ListenPortToSet
-			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
-				return fmt.Errorf("failed to patch wireguard config: %w", err)
-			}
-		}
-
-		for _, p := range wgInterfaceChangeSet.PeersToRemove {
-			patchConfig := new(wgtypes.Config)
-			patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
-			patchConfig.ReplacePeers = false
-			patchConfig.Peers = append(patchConfig.Peers, wgtypes.PeerConfig{
-				PublicKey: p.PublicKey,
-				Remove:    true,
-			})
-			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
-				return fmt.Errorf("failed to patch wireguard config: %w", err)
-			}
-		}
-
-		for _, p := range wgInterfaceChangeSet.PeersToAdd {
-			patchConfig := new(wgtypes.Config)
-			patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
-			patchConfig.ReplacePeers = false
-			patchConfig.Peers = append(patchConfig.Peers, p)
-			if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
-				return fmt.Errorf("failed to patch wireguard config: %w", err)
-			}
+			return fmt.Errorf("failed to apply wireguard config: %w", err)
 		}
 	}
 
 	if wgInterfaceChangeSet.MTUToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil {
-		err := withNsHandle(ctx, wgInterfaceChangeSet.ContainerName, func(handle *netlink.Handle) error {
+		err := withNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard link: %w", err)
