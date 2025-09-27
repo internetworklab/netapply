@@ -1,0 +1,21 @@
+nodes:
+  lax1:
+    docker_containers:
+      - container_name: frr
+        image: quay.io/frrouting/frr:10.3.0
+        cap_add:
+          - net_admin
+          - sys_admin
+        hostname: lax1
+        volumes:
+          - type: bind
+            source: "./nodes/lax1/frr/config/daemons"
+            target: "/etc/frr/daemons"
+          - type: bind
+            source: "./nodes/lax1/frr/config/patches"
+            target: "/etc/frr/patches"
+        autoremove: false
+    controlplane:
+      container_name: frr
+      host_patch_dir: "./nodes/lax1/frr/config/patches"
+      container_patch_dir: "/etc/frr/patches"
