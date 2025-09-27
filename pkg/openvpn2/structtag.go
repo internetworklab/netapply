@@ -1,0 +1,171 @@
+package openvpn2
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+)
+
+// This package implements the `openvpn2` struct tag.
+
+// For example, given the following struct:
+//
+// ```go
+// type OpenVPN2 struct {
+// 	Server string `openvpn2:"server"`
+// 	Port   int    `openvpn2:"port"`
+// 	Proto  string `openvpn2:"proto"`
+// 	User   string `openvpn2:"user"`
+// 	Password string `openvpn2:"password"`
+// }
+// ```
+// We can marshal it to the following CLI arguments:
+// ["--server", "server", "--port", "port", "--proto", "proto", "--user", "user", "--password", "password"]
+//
+
+func marshelElem(v interface{}) (*string, error) {
+	ty := reflect.TypeOf(v)
+	valAny := reflect.ValueOf(v)
+	if ty.Kind() == reflect.Pointer {
+		if valAny.IsNil() {
+			return nil, nil
+		}
+
+		return marshelElem(valAny.Elem().Interface())
+	}
+
+	switch ty.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String:
+		s := fmt.Sprintf("%v", v)
+		return &s, nil
+	case reflect.Bool:
+		return nil, nil
+	}
+
+	return nil, nil
+}
+
+func marshalListlike(v interface{}) ([]string, error) {
+	ty := reflect.TypeOf(v)
+	valAny := reflect.ValueOf(v)
+
+	if ty.Kind() != reflect.Slice && ty.Kind() != reflect.Array {
+		return nil, fmt.Errorf("unsupported type: %v, expected slice or array", ty.Kind())
+	}
+
+	lst := make([]string, 0)
+
+	for i := 0; i < valAny.Len(); i++ {
+		elem := valAny.Index(i).Interface()
+		elemStrPtr, err := marshelElem(elem)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal element: %v", err)
+		}
+		if elemStrPtr != nil && *elemStrPtr != "" {
+			lst = append(lst, *elemStrPtr)
+		}
+	}
+
+	return lst, nil
+}
+
+const tagName string = "openvpn2"
+const tagValEmpty = ""
+const tagValSkip = "-"
+const interfaceMethodName = "ToCLIArgs"
+
+func marshalStruct(v interface{}) ([]string, error) {
+	ty := reflect.TypeOf(v)
+	if ty.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("unsupported type: %v, expected struct", ty.Kind())
+	}
+
+	valAny := reflect.ValueOf(v)
+
+	// There might be receiver defined on T or *T
+	// such as func (t T) ReceiverFoo() or func (t *T) ReceiverFoo()
+	// also have to deal with such case.
+
+	// Try func (t T) ToCLIArgs()
+	method := valAny.MethodByName(interfaceMethodName)
+	if !method.IsZero() {
+		callRetVals := method.Call(nil)
+		return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
+	}
+
+	// Try func (t *T) ToCLIArgs()
+	if valAny.CanAddr() {
+		method := valAny.Addr().MethodByName(interfaceMethodName)
+		if !method.IsZero() {
+			callRetVals := method.Call(nil)
+			return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
+		}
+	}
+
+	res := make([]string, 0)
+
+	for i := 0; i < ty.NumField(); i++ {
+		field := ty.Field(i)
+		tagval := field.Tag.Get(tagName)
+		if tagval == tagValEmpty || tagval == tagValSkip {
+			continue
+		}
+
+		fieldVal := valAny.Field(i)
+		if fieldVal.Type().Kind() == reflect.Pointer && fieldVal.IsNil() {
+			continue
+		}
+
+		res = append(res, tagval)
+
+		subCLIArgs, err := Marshal(fieldVal.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal field, key: %s: %v", field.Name, err)
+		}
+		res = append(res, subCLIArgs...)
+	}
+
+	return res, nil
+}
+
+func Marshal(v interface{}) ([]string, error) {
+	ty := reflect.TypeOf(v)
+	res := make([]string, 0)
+
+	switch ty.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String, reflect.Bool:
+		sPtr, err := marshelElem(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal element: %v", err)
+		}
+		if sPtr != nil && *sPtr != "" {
+			return []string{*sPtr}, nil
+		}
+	case reflect.Slice, reflect.Array:
+		lst, err := marshalListlike(v)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal listlike: %v", err)
+		}
+
+		return []string{strings.Join(lst, ",")}, nil
+	case reflect.Pointer:
+		if !reflect.ValueOf(v).IsNil() {
+			return Marshal(reflect.ValueOf(v).Elem().Interface())
+		}
+	case reflect.Struct:
+		return marshalStruct(v)
+	case reflect.Interface:
+		if !reflect.ValueOf(v).IsNil() {
+			method := reflect.ValueOf(v).MethodByName(interfaceMethodName)
+			if method.IsZero() {
+				return nil, fmt.Errorf("interface %v does not have receiver method %s", ty.String(), interfaceMethodName)
+			}
+			callRetVals := method.Call(nil)
+			return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
+		}
+	default:
+		return nil, fmt.Errorf("unsupported type: %v", ty.Kind())
+	}
+
+	return res, nil
+}
