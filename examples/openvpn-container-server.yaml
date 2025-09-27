@@ -1,0 +1,43 @@
+dev: tap0
+proto: tcp-server
+tls_server: true
+cert_file: /etc/openvpn/certs/cert.pem
+key_file: /etc/openvpn/certs/key.pem
+dh_pem_file: /etc/openvpn/certs/dh.pem
+peer_fingerprint: "06:00:DD:D5:77:82:A0:E6:E5:5F:C4:A0:F5:D3:5A:98:23:6E:E5:DC:86:D3:AB:60:9F:01:1B:97:D4:A6:60:BE"
+verb: 3
+keepalive:
+  interval_secs: 10
+  patience_secs: 120
+persist_tun: true
+server_bridge: true
+script_security_level: 3
+executable_path: "openvpn"
+docker_container:
+  autoremove: true
+  image: openvpn:latest
+  container_name: "openvpn-server"
+  cap_add:
+    - net_admin
+    - sys_admin
+  hostname: lax1
+  ports:
+    "1194/tcp":
+      - host_ip: "0.0.0.0"
+        host_port: 21194
+      - host_ip: "::"
+        host_port: 21194
+  volumes:
+    - type: bind
+      source: "../../nodes/lax1/openvpn/certs/server-cert.pem"
+      target: "/etc/openvpn/certs/cert.pem"
+    - type: bind
+      source: "../../nodes/lax1/openvpn/certs/server-key.pem"
+      target: "/etc/openvpn/certs/key.pem"
+    - type: bind
+      source: "../../nodes/lax1/openvpn/certs/dh2048.pem"
+      target: "/etc/openvpn/certs/dh.pem"
+  devices:
+    - path_on_host: "/dev/net/tun"
+      path_in_container: "/dev/net/tun"
+      cgroup_permissions: "rwm"

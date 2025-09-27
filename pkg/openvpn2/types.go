@@ -59,7 +59,7 @@ type OpenVPN2Instance struct {
 	HttpProxy           *OpenVPN2RemoteConfig            `openvpn2:"http-proxy" yaml:"http_proxy,omitempty"`
 	CertFile            string                           `openvpn2:"cert" yaml:"cert_file"`
 	KeyFile             string                           `openvpn2:"key" yaml:"key_file"`
-	DHPEMFile           *string                          `openvpn2:"dh" yaml:"dh,omitempty"`
+	DHPEMFile           *string                          `openvpn2:"dh" yaml:"dh_pem_file,omitempty"`
 	PeerFingerprint     string                           `openvpn2:"peer-fingerprint" yaml:"peer_fingerprint"`
 	RemoteCertTls       *OpenVPN2RemoteTLSCertType       `openvpn2:"remote-cert-tls" yaml:"remote_cert_tls,omitempty"`
 	Verb                *int                             `openvpn2:"verb" yaml:"verb,omitempty"`
