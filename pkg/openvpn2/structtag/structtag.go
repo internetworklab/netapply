@@ -1,4 +1,4 @@
-package openvpn2
+package structtag
 
 import (
 	"fmt"

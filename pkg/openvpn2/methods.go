@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pkgdocker "example.com/connector/pkg/docker"
+	openvpn2structtag "example.com/connector/pkg/openvpn2/structtag"
 	pkgreconcile "example.com/connector/pkg/reconcile"
 	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/api/types/container"
@@ -80,7 +81,7 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	}
 	cmd = append(cmd, exec)
 
-	openvpn2CLIArgs, err := Marshal(ovpInst)
+	openvpn2CLIArgs, err := openvpn2structtag.Marshal(ovpInst)
 	if err != nil {
 		return fmt.Errorf("failed to marshal openvpn2 instance into CLI arguments: %w", err)
 	}
