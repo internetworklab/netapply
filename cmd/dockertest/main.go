@@ -1,12 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
+	"strings"
+	"time"
 
 	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/api/types/container"
@@ -66,49 +67,54 @@ func main() {
 
 	log.Printf("Container started: %v", resp.ID)
 
-	// Attach to the container
-	log.Printf("Attaching to container: %v", resp.ID)
-
-	attachResp, err := cli.ContainerAttach(ctx, resp.ID, container.AttachOptions{
-		Stream: true,
-		Stdin:  true,
-		Stdout: true,
-		Stderr: true,
+	// 1. Create exec on the container with /usr/bin/cat command
+	log.Printf("Creating exec for /usr/bin/cat command")
+	execResp, err := cli.ContainerExecCreate(ctx, resp.ID, container.ExecOptions{
+		Cmd:          []string{"/usr/bin/tee", "/hi"},
+		AttachStdout: true,
+		AttachStdin:  true,
+		Tty:          true,
 	})
 	if err != nil {
-		log.Fatalf("failed to attach to container: %v", err)
+		log.Fatalf("failed to create exec: %v", err)
+	}
+	log.Printf("Exec created with ID: %v", execResp.ID)
+
+	// 2. Create a string buffer with content "hello, world\n"
+	helloBuffer := bytes.NewBufferString("hello, world\n")
+	log.Printf("Created string buffer with content: %q", strings.TrimSpace(helloBuffer.String()))
+
+	// 3. Attach to the exec that was just created
+	log.Printf("Attaching to exec")
+	attachResp, err := cli.ContainerExecAttach(ctx, execResp.ID, container.ExecAttachOptions{
+		Tty: true,
+	})
+	if err != nil {
+		log.Fatalf("failed to attach to exec: %v", err)
 	}
 	defer attachResp.Close()
 
-	// Set up signal handling for graceful shutdown
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Start goroutines for piping data
-	go func() {
-		io.Copy(attachResp.Conn, os.Stdin)
-	}()
+	// 4. Manipulate the HijackedResponse by writing to it
+	log.Printf("Manipulating HijackedResponse")
 
 	go func() {
 		io.Copy(os.Stdout, attachResp.Reader)
 	}()
 
-	// Wait for signal to exit
-	<-sigChan
-	log.Printf("Received signal, stopping container...")
-
-	// Stop the container
-	err = cli.ContainerStop(ctx, resp.ID, container.StopOptions{})
+	// 5. Pipe the "hello, world\n" string buffer to the exec
+	log.Printf("Piping string buffer to exec")
+	_, err = io.Copy(attachResp.Conn, helloBuffer)
 	if err != nil {
-		log.Printf("failed to stop container: %v", err)
+		log.Fatalf("failed to pipe data to exec: %v", err)
 	}
 
-	// Remove the container
-	err = cli.ContainerRemove(ctx, resp.ID, container.RemoveOptions{})
-	if err != nil {
-		log.Printf("failed to remove container: %v", err)
-	}
+	time.Sleep(10 * time.Second)
 
-	log.Printf("Container stopped and removed")
+	// Close the connection to signal end of input
+	attachResp.CloseWrite()
 
+	// Print the collected stdout
+	log.Printf("Exec completed successfully")
+
+	cli.ContainerStop(ctx, resp.ID, container.StopOptions{})
 }
