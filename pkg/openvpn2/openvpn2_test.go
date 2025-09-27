@@ -34,38 +34,8 @@ keepalive:
 up_cmd: /up-wrapper.sh
 script_security_level: 3
 executable_path: "openvpn"
-docker_container:
-  networks:
-    - ss
-  autoremove: true
-  image: openvpn:latest
-  container_name: "openvpn-connector-1"
-  cap_add:
-    - net_admin
-    - sys_admin
-  hostname: pi
-  ports:
-    "1194/tcp":
-      - host_ip: "0.0.0.0"
-        host_port: 21194
-      - host_ip: "::"
-        host_port: 21194
-  volumes:
-    - type: bind
-      source: "./nodes/pi/openvpn/up-wrapper.sh"
-      target: "/up-wrapper.sh"
-    - type: bind
-      source: "./nodes/pi/openvpn/certs/client-cert.pem"
-      target: "/etc/openvpn/certs/client-cert.pem"
-    - type: bind
-      source: "./nodes/pi/openvpn/certs/client-key.pem"
-      target: "/etc/openvpn/certs/client-key.pem"
-  devices:
-    - path_on_host: "/dev/net/tun"
-      path_in_container: "/dev/net/tun"
-      cgroup_permissions: "rwm"
+`
 
-	`
 	openvpn2YAML = strings.TrimSpace(openvpn2YAML)
 
 	ovpInst := new(openvpn2.OpenVPN2Instance)
