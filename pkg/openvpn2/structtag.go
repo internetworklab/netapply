@@ -23,16 +23,20 @@ import (
 // ["--server", "server", "--port", "port", "--proto", "proto", "--user", "user", "--password", "password"]
 //
 
+func errorUnSupportedType(ty reflect.Type) error {
+	return fmt.Errorf("unsupported type: kind %v, type %v", ty.Kind(), ty.String())
+}
+
+func errorWhileCallingMethod(err error, methodName string) error {
+	return fmt.Errorf("failed to call method %s: %v", methodName, err)
+}
+
+func errorNoReceiverDefined(ty reflect.Type, methodName string) error {
+	return fmt.Errorf("no receiver defined on type %v for method %s", ty.String(), methodName)
+}
+
 func marshelElem(v interface{}) (*string, error) {
 	ty := reflect.TypeOf(v)
-	valAny := reflect.ValueOf(v)
-	if ty.Kind() == reflect.Pointer {
-		if valAny.IsNil() {
-			return nil, nil
-		}
-
-		return marshelElem(valAny.Elem().Interface())
-	}
 
 	switch ty.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String:
@@ -40,9 +44,9 @@ func marshelElem(v interface{}) (*string, error) {
 		return &s, nil
 	case reflect.Bool:
 		return nil, nil
+	default:
+		return nil, errorUnSupportedType(ty)
 	}
-
-	return nil, nil
 }
 
 func marshalListlike(v interface{}) ([]string, error) {
@@ -50,7 +54,7 @@ func marshalListlike(v interface{}) ([]string, error) {
 	valAny := reflect.ValueOf(v)
 
 	if ty.Kind() != reflect.Slice && ty.Kind() != reflect.Array {
-		return nil, fmt.Errorf("unsupported type: %v, expected slice or array", ty.Kind())
+		return nil, errorUnSupportedType(ty)
 	}
 
 	lst := make([]string, 0)
@@ -59,7 +63,7 @@ func marshalListlike(v interface{}) ([]string, error) {
 		elem := valAny.Index(i).Interface()
 		elemStrPtr, err := marshelElem(elem)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal element: %v", err)
+			return nil, errorWhileCallingMethod(err, "marshelElem")
 		}
 		if elemStrPtr != nil && *elemStrPtr != "" {
 			lst = append(lst, *elemStrPtr)
@@ -77,7 +81,7 @@ const interfaceMethodName = "ToCLIArgs"
 func marshalStruct(v interface{}) ([]string, error) {
 	ty := reflect.TypeOf(v)
 	if ty.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("unsupported type: %v, expected struct", ty.Kind())
+		return nil, errorUnSupportedType(ty)
 	}
 
 	valAny := reflect.ValueOf(v)
@@ -116,11 +120,11 @@ func marshalStruct(v interface{}) ([]string, error) {
 			continue
 		}
 
-		res = append(res, tagval)
+		res = append(res, fmt.Sprintf("--%s", tagval))
 
 		subCLIArgs, err := Marshal(fieldVal.Interface())
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal field, key: %s: %v", field.Name, err)
+			return nil, errorWhileCallingMethod(err, "Marshal")
 		}
 		res = append(res, subCLIArgs...)
 	}
@@ -136,7 +140,7 @@ func Marshal(v interface{}) ([]string, error) {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String, reflect.Bool:
 		sPtr, err := marshelElem(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal element: %v", err)
+			return nil, errorWhileCallingMethod(err, "marshelElem")
 		}
 		if sPtr != nil && *sPtr != "" {
 			return []string{*sPtr}, nil
@@ -144,7 +148,7 @@ func Marshal(v interface{}) ([]string, error) {
 	case reflect.Slice, reflect.Array:
 		lst, err := marshalListlike(v)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal listlike: %v", err)
+			return nil, errorWhileCallingMethod(err, "marshalListlike")
 		}
 
 		return []string{strings.Join(lst, ",")}, nil
@@ -158,13 +162,13 @@ func Marshal(v interface{}) ([]string, error) {
 		if !reflect.ValueOf(v).IsNil() {
 			method := reflect.ValueOf(v).MethodByName(interfaceMethodName)
 			if method.IsZero() {
-				return nil, fmt.Errorf("interface %v does not have receiver method %s", ty.String(), interfaceMethodName)
+				return nil, errorNoReceiverDefined(ty, interfaceMethodName)
 			}
 			callRetVals := method.Call(nil)
 			return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
 		}
 	default:
-		return nil, fmt.Errorf("unsupported type: %v", ty.Kind())
+		return nil, errorUnSupportedType(ty)
 	}
 
 	return res, nil
