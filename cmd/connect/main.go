@@ -13,7 +13,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -31,6 +30,8 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 	"gopkg.in/yaml.v3"
+
+	pkgopenvpn2 "example.com/connector/pkg/openvpn2"
 )
 
 type OpenVPN2Role string
@@ -42,21 +43,6 @@ const (
 
 type OpenVPN2Proto string
 
-func (ovp *OpenVPN2Proto) ToCLIArgs() []string {
-	if ovp == nil {
-		return nil
-	}
-
-	res := make([]string, 0)
-
-	x := string(*ovp)
-	if x != "" {
-		res = append(res, x)
-	}
-
-	return res
-}
-
 const (
 	OpenVPN2ProtoTCP       OpenVPN2Proto = "tcp"
 	OpenVPN2ProtoUDP       OpenVPN2Proto = "udp"
@@ -67,14 +53,6 @@ const (
 )
 
 type OpenVPN2Topology string
-
-func (ovp *OpenVPN2Topology) ToCLIArgs() []string {
-	res := make([]string, 0)
-	if ovp != nil {
-		res = append(res, fmt.Sprintf("%v", *ovp))
-	}
-	return res
-}
 
 const (
 	OpenVPN2TopologySubnet OpenVPN2Topology = "subnet"
@@ -399,7 +377,13 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 		exec = *ovpInst.ExecutablePath
 	}
 	cmd = append(cmd, exec)
-	cmd = append(cmd, ovpInst.ToCLIArgs()...)
+
+	openvpn2CLIArgs, err := pkgopenvpn2.Marshal(ovpInst)
+	if err != nil {
+		return fmt.Errorf("failed to marshal openvpn2 instance into CLI arguments: %w", err)
+	}
+
+	cmd = append(cmd, openvpn2CLIArgs...)
 
 	containerConfig := &container.Config{}
 	networkConfig := &network.NetworkingConfig{}
@@ -2933,97 +2917,6 @@ func parseTag(tag string) (map[string]string, []string, string) {
 	}
 
 	return tagMap, tags, firstTag
-}
-
-func (ovInstPtr *OpenVPN2Instance) ToCLIArgs() []string {
-	if ovInstPtr == nil {
-		return nil
-	}
-
-	ovInst := *ovInstPtr
-
-	res := make([]string, 0)
-
-	v := reflect.ValueOf(ovInst)
-	// ty := reflect.TypeOf(ovInst)
-	for i := 0; i < v.NumField(); i++ {
-		// Get the field tag value
-		tag := v.Type().Field(i).Tag.Get(tagName)
-		if tag == "" || tag == "-" {
-			continue
-		}
-
-		_, _, firstTag := parseTag(tag)
-
-		// Get the field value
-		// fieldName := ty.Field(i).Name
-		val := v.Field(i).Interface()
-
-		switch typedval := val.(type) {
-		case *bool:
-			if typedval != nil {
-				if *typedval {
-					if firstTag != "" {
-						res = append(res, fmt.Sprintf("--%s", firstTag))
-					}
-				}
-			}
-		case *int:
-			if typedval != nil {
-				res = append(res, fmt.Sprintf("--%s", firstTag))
-				res = append(res, fmt.Sprintf("%v", *typedval))
-			}
-		case *string:
-
-			if typedval != nil {
-				res = append(res, fmt.Sprintf("--%s", firstTag))
-				res = append(res, fmt.Sprintf("%v", *typedval))
-			}
-		case bool:
-			if typedval {
-				res = append(res, fmt.Sprintf("--%s", firstTag))
-			}
-		case int:
-			res = append(res, fmt.Sprintf("--%s", firstTag))
-			res = append(res, fmt.Sprintf("%v", typedval))
-		case string:
-
-			res = append(res, fmt.Sprintf("--%s", firstTag))
-			res = append(res, fmt.Sprintf("%v", typedval))
-		default:
-
-			kind := v.Field(i).Kind()
-
-			if kind == reflect.Pointer && !v.Field(i).IsNil() {
-				method := v.Field(i).MethodByName("ToCLIArgs")
-				if !method.IsZero() {
-					res = append(res, fmt.Sprintf("--%s", firstTag))
-					if retval := method.Call(nil); len(retval) > 0 {
-						if retval1, ok := (retval[0].Interface()).([]string); ok {
-							res = append(res, retval1...)
-						}
-					}
-				}
-			} else if !v.Field(i).IsZero() {
-				res = append(res, fmt.Sprintf("--%s", firstTag))
-
-				valType := v.Field(i).Type()
-
-				valobj := reflect.New(valType)
-				valobj.Elem().Set(v.Field(i))
-
-				retval := valobj.MethodByName("ToCLIArgs").Call(nil)
-				if len(retval) > 0 {
-					if retval1, ok := (retval[0].Interface()).([]string); ok {
-						res = append(res, retval1...)
-					}
-				}
-
-			}
-		}
-	}
-
-	return res
 }
 
 type Instance struct {
