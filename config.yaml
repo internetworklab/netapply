@@ -11,14 +11,9 @@ nodes:
           - type: bind
             source: "./nodes/pi/frr/config/daemons"
             target: /etc/frr/daemons
-          - type: bind
-            source: "./nodes/pi/frr/config/patches"
-            target: /etc/frr/patches
         autoremove: true
     controlplane:
       container_name: frr
-      host_patch_dir: "./nodes/pi/frr/config/patches"
-      container_patch_dir: "/etc/frr/patches"
       ospf:
         - vrf: default
           router_id: "10.3.64.1"

@@ -11,11 +11,6 @@ nodes:
           - type: bind
             source: "./nodes/lax1/frr/config/daemons"
             target: "/etc/frr/daemons"
-          - type: bind
-            source: "./nodes/lax1/frr/config/patches"
-            target: "/etc/frr/patches"
         autoremove: false
     controlplane:
       container_name: frr
-      host_patch_dir: "./nodes/lax1/frr/config/patches"
-      container_patch_dir: "/etc/frr/patches"

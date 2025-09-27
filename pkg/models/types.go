@@ -17,11 +17,9 @@ type GlobalConfig struct {
 }
 
 type ControlplaneConfig struct {
-	OSPF              []pkgprotocolospf.OSPFConfig `yaml:"ospf,omitempty" json:"ospf,omitempty"`
-	BGP               []pkgprotocolbgp.BGPConfig   `yaml:"bgp,omitempty" json:"bgp,omitempty"`
-	ContainerName     *string                      `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	HostPatchDir      string                       `yaml:"host_patch_dir,omitempty" json:"host_patch_dir,omitempty"`
-	ContainerPatchDir string                       `yaml:"container_patch_dir,omitempty" json:"container_patch_dir,omitempty"`
+	OSPF          []pkgprotocolospf.OSPFConfig `yaml:"ospf,omitempty" json:"ospf,omitempty"`
+	BGP           []pkgprotocolbgp.BGPConfig   `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	ContainerName *string                      `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 }
 
 type NodeConfig struct {

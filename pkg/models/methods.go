@@ -4,13 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
-	"path"
 
-	pkgdocker "example.com/connector/pkg/docker"
 	pkgreconcile "example.com/connector/pkg/reconcile"
-	pkgutils "example.com/connector/pkg/utils"
-	"github.com/docker/docker/api/types/container"
+	pkgvtysh "example.com/connector/pkg/vtysh"
 )
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
@@ -128,75 +124,32 @@ func (dpConfig *DataplaneConfig) Apply(ctx context.Context, containers []string)
 
 func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error {
 
-	configsToApply := make([]string, 0)
-
 	if controlPlaneConfig.OSPF != nil {
-		ospfPatchPath := path.Join(controlPlaneConfig.HostPatchDir, "ospf.conf")
-		ospfPatchFile, err := os.OpenFile(ospfPatchPath, os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to open ospf patch file: %w", err)
-		}
-		defer ospfPatchFile.Close()
-
-		for _, ospfConf := range controlPlaneConfig.OSPF {
-			cmds := ospfConf.ToCLICommands()
-			for _, cmd := range cmds {
-				ospfPatchFile.WriteString(cmd + "\n")
+		log.Println("Applying OSPF configuration ...")
+		for _, ospfConfig := range controlPlaneConfig.OSPF {
+			containerName := controlPlaneConfig.ContainerName
+			configWriter, err := pkgvtysh.GetVtyshConfigWriter(ctx, containerName)
+			if err != nil {
+				return fmt.Errorf("failed to get vtysh config writer: %w", err)
+			}
+			if err := configWriter.WriteCommands(ctx, ospfConfig.ToCLICommands()); err != nil {
+				return fmt.Errorf("failed to write ospf config: %w", err)
 			}
 		}
-		configsToApply = append(configsToApply, path.Join(controlPlaneConfig.ContainerPatchDir, path.Base(ospfPatchPath)))
 	}
 
 	if controlPlaneConfig.BGP != nil {
-		bgpPatchPath := path.Join(controlPlaneConfig.HostPatchDir, "bgp.conf")
-		bgpPatchFile, err := os.OpenFile(bgpPatchPath, os.O_RDWR|os.O_CREATE, 0644)
-		if err != nil {
-			return fmt.Errorf("failed to create temporary file: %w", err)
-		}
-		defer bgpPatchFile.Close()
-
-		for _, bgpConf := range controlPlaneConfig.BGP {
-			cmds := bgpConf.ToCLICommands()
-			for _, cmd := range cmds {
-				bgpPatchFile.WriteString(cmd + "\n")
+		log.Println("Applying BGP configuration ...")
+		for _, bgpConfig := range controlPlaneConfig.BGP {
+			containerName := controlPlaneConfig.ContainerName
+			configWriter, err := pkgvtysh.GetVtyshConfigWriter(ctx, containerName)
+			if err != nil {
+				return fmt.Errorf("failed to get vtysh config writer: %w", err)
 			}
-		}
-		configsToApply = append(configsToApply, path.Join(controlPlaneConfig.ContainerPatchDir, path.Base(bgpPatchPath)))
-	}
 
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get docker cli from context: %w", err)
-	}
-	cont, err := pkgdocker.FindContainer(ctx, cli, *controlPlaneConfig.ContainerName)
-	if err != nil {
-		return fmt.Errorf("failed to find container: %w", err)
-	}
-	if cont == nil {
-		return fmt.Errorf("container %s not found", *controlPlaneConfig.ContainerName)
-	}
-
-	if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("failed to start container: %w", err)
-	}
-
-	for _, configToApply := range configsToApply {
-		execOptions := container.ExecOptions{
-			Cmd: []string{
-				"vtysh",
-				"-f",
-				configToApply,
-			},
-		}
-		exec, err := cli.ContainerExecCreate(ctx, cont.ID, execOptions)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "failed to create exec: %v\n", err)
-			continue
-		}
-
-		if err := cli.ContainerExecStart(ctx, exec.ID, container.ExecStartOptions{}); err != nil {
-			fmt.Fprintf(os.Stderr, "failed to start exec: %v\n", err)
-			continue
+			if err := configWriter.WriteCommands(ctx, bgpConfig.ToCLICommands()); err != nil {
+				return fmt.Errorf("failed to write bgp config: %w", err)
+			}
 		}
 	}
 
