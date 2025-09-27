@@ -67,7 +67,7 @@ func marshalListlike(v interface{}) (string, error) {
 		lst = append(lst, sublst...)
 	}
 
-	return strings.Join(lst, ","), nil
+	return strings.Join(lst, " "), nil
 }
 
 const tagName string = "openvpn2"
