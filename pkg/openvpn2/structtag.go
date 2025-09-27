@@ -3,7 +3,6 @@ package openvpn2
 import (
 	"fmt"
 	"reflect"
-	"strings"
 )
 
 // This package implements the `openvpn2` struct tag.
@@ -29,45 +28,6 @@ func errorUnSupportedType(ty reflect.Type) error {
 
 func errorWhileCallingMethod(err error, methodName string) error {
 	return fmt.Errorf("failed to call method %s: %v", methodName, err)
-}
-
-func errorNoReceiverDefined(ty reflect.Type, methodName string) error {
-	return fmt.Errorf("no receiver defined on type %v for method %s", ty.String(), methodName)
-}
-
-func marshelElem(v interface{}) (*string, error) {
-	ty := reflect.TypeOf(v)
-
-	switch ty.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String:
-		s := fmt.Sprintf("%v", v)
-		return &s, nil
-	case reflect.Bool:
-		return nil, nil
-	default:
-		return nil, errorUnSupportedType(ty)
-	}
-}
-
-func marshalListlike(v interface{}) (string, error) {
-
-	valAny := reflect.ValueOf(v)
-
-	lst := make([]string, 0)
-
-	for i := 0; i < valAny.Len(); i++ {
-		if valAny.Index(i).Kind() == reflect.Pointer && valAny.Index(i).IsNil() {
-			continue
-		}
-
-		sublst, err := Marshal(valAny.Index(i).Interface())
-		if err != nil {
-			return "", errorWhileCallingMethod(err, "Marshal")
-		}
-		lst = append(lst, sublst...)
-	}
-
-	return strings.Join(lst, " "), nil
 }
 
 const tagName string = "openvpn2"
@@ -146,21 +106,29 @@ func Marshal(v interface{}) ([]string, error) {
 	res := make([]string, 0)
 
 	switch ty.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.String, reflect.Bool:
-		sPtr, err := marshelElem(v)
-		if err != nil {
-			return nil, errorWhileCallingMethod(err, "marshelElem")
+	case reflect.Bool:
+		return res, nil
+	case reflect.String:
+		if v.(string) != "" {
+			return []string{v.(string)}, nil
 		}
-		if sPtr != nil && *sPtr != "" {
-			return []string{*sPtr}, nil
-		}
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
+		return []string{fmt.Sprintf("%v", v)}, nil
 	case reflect.Slice, reflect.Array:
-		v, err := marshalListlike(v)
-		if err != nil {
-			return nil, errorWhileCallingMethod(err, "marshalListlike")
+		for i := 0; i < reflect.ValueOf(v).Len(); i++ {
+			if reflect.ValueOf(v).Index(i).Kind() == reflect.Pointer && reflect.ValueOf(v).Index(i).IsNil() {
+				// skip nil pointer elem on a listlike object
+				continue
+			}
+
+			sublst, err := Marshal(reflect.ValueOf(v).Index(i).Interface())
+			if err != nil {
+				return nil, errorWhileCallingMethod(err, "Marshal")
+			}
+			res = append(res, sublst...)
 		}
 
-		return []string{v}, nil
+		return res, nil
 	case reflect.Pointer:
 		if !reflect.ValueOf(v).IsNil() {
 			return Marshal(reflect.ValueOf(v).Elem().Interface())
@@ -170,11 +138,12 @@ func Marshal(v interface{}) ([]string, error) {
 	case reflect.Interface:
 		if !reflect.ValueOf(v).IsNil() {
 			method := reflect.ValueOf(v).MethodByName(interfaceMethodName)
-			if method.IsZero() {
-				return nil, errorNoReceiverDefined(ty, interfaceMethodName)
+			if !method.IsZero() {
+				callRetVals := method.Call(nil)
+				return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
 			}
-			callRetVals := method.Call(nil)
-			return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
+
+			return Marshal(reflect.ValueOf(v).Elem().Interface())
 		}
 	default:
 		return nil, errorUnSupportedType(ty)
