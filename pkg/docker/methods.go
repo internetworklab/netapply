@@ -171,9 +171,7 @@ func StopAndRemoveContainer(ctx context.Context, containerName string) error {
 				return fmt.Errorf("failed to stop container: %w", err)
 			}
 		}
-		if err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{}); err != nil {
-			return fmt.Errorf("failed to remove container: %w", err)
-		}
+		cli.ContainerRemove(ctx, containerName, container.RemoveOptions{})
 	}
 
 	return nil
