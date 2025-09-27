@@ -122,6 +122,10 @@ func (dpConfig *DataplaneConfig) Apply(ctx context.Context, containers []string)
 	return nil
 }
 
+func prependConfigure(cmds []string) []string {
+	return append([]string{"configure terminal"}, cmds...)
+}
+
 func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error {
 
 	if controlPlaneConfig.OSPF != nil {
@@ -132,7 +136,7 @@ func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error 
 			if err != nil {
 				return fmt.Errorf("failed to get vtysh config writer: %w", err)
 			}
-			if err := configWriter.WriteCommands(ctx, ospfConfig.ToCLICommands()); err != nil {
+			if err := configWriter.WriteCommands(ctx, prependConfigure(ospfConfig.ToCLICommands())); err != nil {
 				return fmt.Errorf("failed to write ospf config: %w", err)
 			}
 		}
@@ -147,7 +151,7 @@ func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error 
 				return fmt.Errorf("failed to get vtysh config writer: %w", err)
 			}
 
-			if err := configWriter.WriteCommands(ctx, bgpConfig.ToCLICommands()); err != nil {
+			if err := configWriter.WriteCommands(ctx, prependConfigure(bgpConfig.ToCLICommands())); err != nil {
 				return fmt.Errorf("failed to write bgp config: %w", err)
 			}
 		}
