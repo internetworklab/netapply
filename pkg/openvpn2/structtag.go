@@ -24,7 +24,7 @@ import (
 //
 
 func errorUnSupportedType(ty reflect.Type) error {
-	return fmt.Errorf("unsupported type: kind %v, type %v", ty.Kind(), ty.String())
+	return fmt.Errorf("unsupported Type %s of kind %s", ty.String(), ty.Kind())
 }
 
 func errorWhileCallingMethod(err error, methodName string) error {
@@ -49,28 +49,25 @@ func marshelElem(v interface{}) (*string, error) {
 	}
 }
 
-func marshalListlike(v interface{}) ([]string, error) {
-	ty := reflect.TypeOf(v)
-	valAny := reflect.ValueOf(v)
+func marshalListlike(v interface{}) (string, error) {
 
-	if ty.Kind() != reflect.Slice && ty.Kind() != reflect.Array {
-		return nil, errorUnSupportedType(ty)
-	}
+	valAny := reflect.ValueOf(v)
 
 	lst := make([]string, 0)
 
 	for i := 0; i < valAny.Len(); i++ {
-		elem := valAny.Index(i).Interface()
-		elemStrPtr, err := marshelElem(elem)
+		if valAny.Index(i).Kind() == reflect.Pointer && valAny.Index(i).IsNil() {
+			continue
+		}
+
+		sublst, err := Marshal(valAny.Index(i).Interface())
 		if err != nil {
-			return nil, errorWhileCallingMethod(err, "marshelElem")
+			return "", errorWhileCallingMethod(err, "Marshal")
 		}
-		if elemStrPtr != nil && *elemStrPtr != "" {
-			lst = append(lst, *elemStrPtr)
-		}
+		lst = append(lst, sublst...)
 	}
 
-	return lst, nil
+	return strings.Join(lst, ","), nil
 }
 
 const tagName string = "openvpn2"
@@ -80,10 +77,6 @@ const interfaceMethodName = "ToCLIArgs"
 
 func marshalStruct(v interface{}) ([]string, error) {
 	ty := reflect.TypeOf(v)
-	if ty.Kind() != reflect.Struct {
-		return nil, errorUnSupportedType(ty)
-	}
-
 	valAny := reflect.ValueOf(v)
 
 	// There might be receiver defined on T or *T
@@ -116,8 +109,24 @@ func marshalStruct(v interface{}) ([]string, error) {
 		}
 
 		fieldVal := valAny.Field(i)
-		if fieldVal.Type().Kind() == reflect.Pointer && fieldVal.IsNil() {
-			continue
+		if fieldVal.Type().Kind() == reflect.Pointer {
+			if fieldVal.IsNil() {
+				continue
+			}
+
+			if fieldVal.Elem().Kind() == reflect.Bool {
+				boolVal := fieldVal.Elem().Interface().(bool)
+				if !boolVal {
+					continue
+				}
+			}
+		}
+
+		if fieldVal.Kind() == reflect.Bool {
+			boolVal := fieldVal.Interface().(bool)
+			if !boolVal {
+				continue
+			}
 		}
 
 		res = append(res, fmt.Sprintf("--%s", tagval))
@@ -146,12 +155,12 @@ func Marshal(v interface{}) ([]string, error) {
 			return []string{*sPtr}, nil
 		}
 	case reflect.Slice, reflect.Array:
-		lst, err := marshalListlike(v)
+		v, err := marshalListlike(v)
 		if err != nil {
 			return nil, errorWhileCallingMethod(err, "marshalListlike")
 		}
 
-		return []string{strings.Join(lst, ",")}, nil
+		return []string{v}, nil
 	case reflect.Pointer:
 		if !reflect.ValueOf(v).IsNil() {
 			return Marshal(reflect.ValueOf(v).Elem().Interface())
