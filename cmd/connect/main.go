@@ -2897,28 +2897,6 @@ type GlobalConfig struct {
 	Nodes map[string]NodeConfig `yaml:"nodes" json:"nodes"`
 }
 
-func parseTag(tag string) (map[string]string, []string, string) {
-	tags := make([]string, 0)
-
-	parts := strings.Split(tag, ",")
-	tagMap := make(map[string]string)
-	for _, part := range parts {
-		kv := strings.Split(part, "=")
-		if len(kv) > 1 && kv[1] != "" {
-			tagMap[kv[0]] = kv[1]
-		} else {
-			tagMap[kv[0]] = ""
-		}
-	}
-
-	firstTag := ""
-	if len(parts) > 0 {
-		firstTag = parts[0]
-	}
-
-	return tagMap, tags, firstTag
-}
-
 type Instance struct {
 	Name   string
 	Target string
@@ -3017,8 +2995,6 @@ func down(ctx context.Context) error {
 
 	return nil
 }
-
-const tagName string = "openvpn2"
 
 // getGlobalConfig reads configuration from either a file, stdin, or HTTP(S) endpoint
 // path: file path, "-" for stdin, or HTTP(S) URL
