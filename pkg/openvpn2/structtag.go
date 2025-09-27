@@ -35,29 +35,56 @@ const tagValEmpty = ""
 const tagValSkip = "-"
 const interfaceMethodName = "ToCLIArgs"
 
-func marshalStruct(v interface{}) ([]string, error) {
+func callCustomMethod(method reflect.Value) ([]string, error) {
+	var firstRetVal []string
+	var secondRetVal error
+	callRetVals := method.Call(nil)
+
+	if len(callRetVals) > 0 {
+		if !callRetVals[0].IsNil() {
+			firstRetVal = callRetVals[0].Interface().([]string)
+		}
+		if len(callRetVals) > 1 {
+			if !callRetVals[1].IsNil() {
+				secondRetVal = callRetVals[1].Interface().(error)
+			}
+		}
+	}
+
+	return firstRetVal, secondRetVal
+}
+
+func marshalStructOrPointerToStruct(v interface{}) ([]string, error) {
 	ty := reflect.TypeOf(v)
 	valAny := reflect.ValueOf(v)
+
+	fmt.Println("Serializing struct: ", ty.String())
 
 	// There might be receiver defined on T or *T
 	// such as func (t T) ReceiverFoo() or func (t *T) ReceiverFoo()
 	// also have to deal with such case.
 
-	// Try func (t T) ToCLIArgs()
-	method := valAny.MethodByName(interfaceMethodName)
-	if !method.IsZero() {
-		callRetVals := method.Call(nil)
-		return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
+	// Try func (t *T) ToCLIArgs()
+	if valAny.Kind() == reflect.Pointer {
+		fmt.Printf("%s is a pointer\n", ty.String())
+		fmt.Println("Probing func (t *T) ToCLIArgs(): ", ty.String())
+		if method := valAny.MethodByName(interfaceMethodName); method.IsValid() {
+			fmt.Println("Found func (t *T) ToCLIArgs(): ", ty.String())
+			return callCustomMethod(method)
+		}
+		fmt.Println("No func (t *T) ToCLIArgs() found on ", ty.String(), ", falling back to serializing fields")
+
+		return Marshal(valAny.Elem().Interface())
 	}
 
-	// Try func (t *T) ToCLIArgs()
-	if valAny.CanAddr() {
-		method := valAny.Addr().MethodByName(interfaceMethodName)
-		if !method.IsZero() {
-			callRetVals := method.Call(nil)
-			return callRetVals[0].Interface().([]string), callRetVals[1].Interface().(error)
-		}
+	// Try func (t T) ToCLIArgs()
+	fmt.Println("Probing func (t T) ToCLIArgs(): ", ty.String())
+	if method := valAny.MethodByName(interfaceMethodName); method.IsValid() {
+		fmt.Println("Found func (t T) ToCLIArgs(): ", ty.String())
+		return callCustomMethod(method)
 	}
+
+	fmt.Println("No ToCLIArgs() method found, falling back to serializing fields")
 
 	res := make([]string, 0)
 
@@ -109,8 +136,9 @@ func Marshal(v interface{}) ([]string, error) {
 	case reflect.Bool:
 		return res, nil
 	case reflect.String:
-		if v.(string) != "" {
-			return []string{v.(string)}, nil
+		s := reflect.ValueOf(v).String()
+		if s != "" {
+			return []string{s}, nil
 		}
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Float32, reflect.Float64, reflect.Complex64, reflect.Complex128:
 		return []string{fmt.Sprintf("%v", v)}, nil
@@ -130,11 +158,17 @@ func Marshal(v interface{}) ([]string, error) {
 
 		return res, nil
 	case reflect.Pointer:
-		if !reflect.ValueOf(v).IsNil() {
-			return Marshal(reflect.ValueOf(v).Elem().Interface())
+		if reflect.ValueOf(v).IsNil() {
+			return nil, nil
 		}
+
+		if reflect.ValueOf(v).Elem().Kind() == reflect.Struct {
+			return marshalStructOrPointerToStruct(v)
+		}
+
+		return Marshal(reflect.ValueOf(v).Elem().Interface())
 	case reflect.Struct:
-		return marshalStruct(v)
+		return marshalStructOrPointerToStruct(v)
 	case reflect.Interface:
 		if !reflect.ValueOf(v).IsNil() {
 			method := reflect.ValueOf(v).MethodByName(interfaceMethodName)

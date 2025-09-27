@@ -1,5 +1,9 @@
 package openvpn2_test
 
+// In project's root, run:
+// go test -v ./pkg/openvpn2
+// `-v` is for printing out the logs generated from `t.Logf` during the test
+
 import (
 	"strings"
 	"testing"
@@ -45,8 +49,14 @@ executable_path: "openvpn"
 
 	openvpn2CLIArgs, err := openvpn2.Marshal(ovpInst)
 	if err != nil {
-		t.Fatalf("failed to marshal openvpn2 instance into CLI arguments: %v", err)
+		t.Fatalf("failed to marshal openvpn2 instance into CLI arguments: %v\n", err)
 	}
 
-	t.Logf("openvpn2CLIArgs: %v", openvpn2CLIArgs)
+	if len(openvpn2CLIArgs) == 0 {
+		t.Fatalf("failed to marshal openvpn2 instance into CLI arguments: %v\n", err)
+	}
+
+	for i, arg := range openvpn2CLIArgs {
+		t.Logf("openvpn2CLIArgs[%d]: %s", i, arg)
+	}
 }

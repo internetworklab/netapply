@@ -1,8 +1,6 @@
 package openvpn2
 
 import (
-	"fmt"
-
 	pkgdocker "example.com/connector/pkg/docker"
 )
 
@@ -47,14 +45,6 @@ const (
 	OpenVPN2RemoteTLSCertTypeServer OpenVPN2RemoteTLSCertType = "server"
 	OpenVPN2RemoteTLSCertTypeClient OpenVPN2RemoteTLSCertType = "client"
 )
-
-func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() []string {
-	res := make([]string, 0)
-	if ovp != nil {
-		res = append(res, fmt.Sprintf("%v", *ovp))
-	}
-	return res
-}
 
 type OpenVPN2Instance struct {
 	Name                string                           `openvpn2:"-" yaml:"name"`

@@ -11,23 +11,31 @@ import (
 	"github.com/docker/docker/api/types/network"
 )
 
-func (ovp *OpenVPN2KeepaliveConfig) ToCLIArgs() []string {
+func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() ([]string, error) {
+	res := make([]string, 0)
+	if ovp != nil {
+		res = append(res, fmt.Sprintf("%v", *ovp))
+	}
+	return res, nil
+}
+
+func (ovp *OpenVPN2KeepaliveConfig) ToCLIArgs() ([]string, error) {
 
 	res := make([]string, 0)
 	if ovp != nil {
 		res = append(res, fmt.Sprintf("%d", ovp.IntervalSecs))
 		res = append(res, fmt.Sprintf("%d", ovp.PatienceSecs))
 	}
-	return res
+	return res, nil
 }
 
-func (ovp *OpenVPN2RemoteConfig) ToCLIArgs() []string {
+func (ovp *OpenVPN2RemoteConfig) ToCLIArgs() ([]string, error) {
 	res := make([]string, 0)
 	if ovp != nil {
 		res = append(res, ovp.Host)
 		res = append(res, fmt.Sprintf("%d", ovp.Port))
 	}
-	return res
+	return res, nil
 }
 
 func (ovpInst *OpenVPN2Instance) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
