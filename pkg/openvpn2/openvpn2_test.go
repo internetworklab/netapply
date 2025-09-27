@@ -12,9 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestMarshal(t *testing.T) {
-
-	openvpn2YAML := `
+const openvpn2YAML string = `
 name: pi
 client: true
 dev: tap0
@@ -40,7 +38,9 @@ script_security_level: 3
 executable_path: "openvpn"
 `
 
-	openvpn2YAML = strings.TrimSpace(openvpn2YAML)
+func TestMarshal(t *testing.T) {
+
+	var openvpn2YAML string = strings.TrimSpace(openvpn2YAML)
 
 	ovpInst := new(openvpn2.OpenVPN2Instance)
 	if err := yaml.Unmarshal([]byte(openvpn2YAML), ovpInst); err != nil {
@@ -58,5 +58,31 @@ executable_path: "openvpn"
 
 	for i, arg := range openvpn2CLIArgs {
 		t.Logf("openvpn2CLIArgs[%d]: %s", i, arg)
+	}
+
+	if len(openvpn2CLIArgs) == 0 {
+		t.Fatalf("failed to marshal openvpn2 instance into CLI arguments: %v\n", err)
+	}
+}
+
+func TestMarshalElement(t *testing.T) {
+	var openvpn2YAML string = strings.TrimSpace(openvpn2YAML)
+
+	ovpInst := new(openvpn2.OpenVPN2Instance)
+	if err := yaml.Unmarshal([]byte(openvpn2YAML), ovpInst); err != nil {
+		t.Fatalf("failed to unmarshal openvpn2 instance: %v", err)
+	}
+
+	openvpn2CLIArgs, err := openvpn2.Marshal(*ovpInst)
+	if err != nil {
+		t.Fatalf("failed to marshal openvpn2 instance into CLI arguments: %v\n", err)
+	}
+
+	for i, arg := range openvpn2CLIArgs {
+		t.Logf("openvpn2CLIArgs[%d]: %s", i, arg)
+	}
+
+	if len(openvpn2CLIArgs) == 0 {
+		t.Fatalf("failed to marshal openvpn2 instance into CLI arguments: %v\n", err)
 	}
 }

@@ -58,33 +58,23 @@ func marshalStructOrPointerToStruct(v interface{}) ([]string, error) {
 	ty := reflect.TypeOf(v)
 	valAny := reflect.ValueOf(v)
 
-	fmt.Println("Serializing struct: ", ty.String())
-
 	// There might be receiver defined on T or *T
 	// such as func (t T) ReceiverFoo() or func (t *T) ReceiverFoo()
 	// also have to deal with such case.
 
 	// Try func (t *T) ToCLIArgs()
 	if valAny.Kind() == reflect.Pointer {
-		fmt.Printf("%s is a pointer\n", ty.String())
-		fmt.Println("Probing func (t *T) ToCLIArgs(): ", ty.String())
 		if method := valAny.MethodByName(interfaceMethodName); method.IsValid() {
-			fmt.Println("Found func (t *T) ToCLIArgs(): ", ty.String())
 			return callCustomMethod(method)
 		}
-		fmt.Println("No func (t *T) ToCLIArgs() found on ", ty.String(), ", falling back to serializing fields")
 
 		return Marshal(valAny.Elem().Interface())
 	}
 
 	// Try func (t T) ToCLIArgs()
-	fmt.Println("Probing func (t T) ToCLIArgs(): ", ty.String())
 	if method := valAny.MethodByName(interfaceMethodName); method.IsValid() {
-		fmt.Println("Found func (t T) ToCLIArgs(): ", ty.String())
 		return callCustomMethod(method)
 	}
-
-	fmt.Println("No ToCLIArgs() method found, falling back to serializing fields")
 
 	res := make([]string, 0)
 
