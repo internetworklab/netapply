@@ -158,6 +158,27 @@ func FindContainer(ctx context.Context, cli *client.Client, containerName string
 	return &containers[0], nil
 }
 
+func StopAndRemoveContainer(ctx context.Context, containerName string) error {
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker client from context: %w", err)
+	}
+
+	cont, err := FindContainer(ctx, cli, containerName)
+	if err == nil && cont != nil {
+		if cont.State == container.StateRunning {
+			if err := cli.ContainerStop(ctx, containerName, container.StopOptions{}); err != nil {
+				return fmt.Errorf("failed to stop container: %w", err)
+			}
+		}
+		if err := cli.ContainerRemove(ctx, containerName, container.RemoveOptions{}); err != nil {
+			return fmt.Errorf("failed to remove container: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func GetNetNSHandle(ctx context.Context, cli *client.Client, containerName string) (netns.NsHandle, error) {
 	container, err := FindContainer(ctx, cli, containerName)
 	if err != nil {

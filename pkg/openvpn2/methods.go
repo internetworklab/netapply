@@ -195,16 +195,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 }
 
 func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) Cancel(ctx context.Context) error {
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get docker client: %w", err)
-	}
-
-	if err := cli.ContainerStop(ctx, ovpInterfaceCanceller.ContainerName, container.StopOptions{}); err != nil {
-		return fmt.Errorf("failed to stop container: %w", err)
-	}
-
-	return nil
+	return pkgdocker.StopAndRemoveContainer(ctx, ovpInterfaceCanceller.ContainerName)
 }
 
 func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetContainerName() *string {

@@ -42,3 +42,27 @@ func TestOpenVPN2ServerCreate(t *testing.T) {
 		t.Fatalf("Failed to create OpenVPN2 instance: %v", err)
 	}
 }
+
+func TestOpenVPN2ServerDelete(t *testing.T) {
+	ctx := context.Background()
+
+	// Initialize Docker client
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		t.Fatalf("failed to create docker client: %v", err)
+	}
+	defer cli.Close()
+
+	serviceName := "openvpn-server"
+
+	ctx = pkgutils.SetServiceNameInCtx(ctx, serviceName)
+	ctx = pkgutils.SetDockerCliInCtx(ctx, cli)
+
+	stubInterface := &openvpn2.OpenVPN2InterfaceCanceller{
+		ContainerName: serviceName,
+	}
+
+	if err := stubInterface.Cancel(ctx); err != nil {
+		t.Fatalf("Failed to cancel OpenVPN2 instance: %v", err)
+	}
+}
