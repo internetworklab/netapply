@@ -3,23 +3,22 @@ package container
 import (
 	"context"
 	"fmt"
+
 	"os"
 	"path"
 	"strings"
 
 	pkgdocker "example.com/connector/pkg/docker"
+	pkgfrrdaemons "example.com/connector/pkg/frr/daemons"
 	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/api/types/mount"
 )
 
 func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
-	statefulDir, err := pkgutils.StatefulDirFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get stateful dir from context: %w", err)
-	}
+	statefulDir := pkgutils.GetStatefulDir(ctx)
 
 	frrConfigDir := path.Join(statefulDir, "frr")
-	err = os.MkdirAll(frrConfigDir, 0755)
+	err := os.MkdirAll(frrConfigDir, 0755)
 	if err != nil {
 		if !os.IsExist(err) {
 			return fmt.Errorf("failed to create frr config dir: %w", err)
@@ -36,9 +35,9 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 		return fmt.Errorf("failed to write daemons file: %w", err)
 	}
 
-	serviceName, err := pkgutils.ServiceNameFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get service name from context: %w", err)
+	serviceName := ""
+	if s, err := pkgutils.ServiceNameFromCtx(ctx); err == nil {
+		serviceName = s
 	}
 
 	containerConfig := &pkgdocker.DockerContainerConfig{
@@ -48,14 +47,18 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 		Hostname:      frrContainerConfig.Hostname,
 		Volumes: []pkgdocker.DockerMountConfig{
 			{
-				Type:   mount.TypeVolume,
+				Type:   mount.TypeBind,
 				Source: daemonsFilePath,
 				Target: "/etc/frr/daemons",
 			},
 		},
-		Labels: map[string]string{
+	}
+
+	if serviceName != "" {
+		labels := map[string]string{
 			pkgdocker.LabelKeyService: serviceName,
-		},
+		}
+		containerConfig.Labels = labels
 	}
 
 	if frrContainerConfig.Image != nil {
@@ -63,4 +66,15 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 	}
 
 	return containerConfig.Apply(ctx)
+}
+
+func DefaultFRRContainerConfig() *FRRContainerConfig {
+	cfg := new(FRRContainerConfig)
+	cfg.ContainerName = "frr"
+	cfg.Daemons = *pkgfrrdaemons.DefaultFRRDaemonsConfig()
+	cfg.Image = new(string)
+	*cfg.Image = DefaultImage
+	cfg.Hostname = new(string)
+	*cfg.Hostname = "frr-test-node"
+	return cfg
 }

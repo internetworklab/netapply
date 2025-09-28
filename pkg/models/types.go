@@ -34,8 +34,11 @@ type NodeConfig struct {
 	Containers []string `yaml:"containers,omitempty" json:"containers,omitempty"`
 
 	// By default, it would use $CWD/.go-reconciler-state as the stateful directory.
+	// There is a GetStatefulDir method in pkgutils model for it.
 	StatefulDir string `yaml:"stateful_dir,omitempty" json:"stateful_dir,omitempty"`
 }
+
+const DefaultStatefulDirRel = ".go-reconciler-state"
 
 type DataplaneConfig struct {
 	OpenVPN   pkgopenvpn2.OpenVPN2ConfigurationList            `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`

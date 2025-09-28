@@ -9,4 +9,5 @@ type ContainerVtyshConfigWriter struct {
 	vtyshPath     *string
 	dockerIO      *types.HijackedResponse
 	execID        string
+	contID        string
 }

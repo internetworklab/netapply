@@ -1,8 +1,11 @@
 package container
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
+	"strings"
 
 	pkgdocker "example.com/connector/pkg/docker"
 	pkgutils "example.com/connector/pkg/utils"
@@ -29,6 +32,12 @@ func NewContainerVtyshConfigWriter(ctx context.Context, containerName string, vt
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
+
+	if contSummary == nil {
+		return nil, fmt.Errorf("container %s not found", containerName)
+	}
+
+	w.contID = contSummary.ID
 
 	execResp, err := cli.ContainerExecCreate(ctx, contSummary.ID, dockercontainer.ExecOptions{
 		Cmd:          []string{*w.vtyshPath},
@@ -64,6 +73,66 @@ func (writer *ContainerVtyshConfigWriter) WriteCommands(ctx context.Context, com
 		}
 	}
 	return nil
+}
+
+func (writer *ContainerVtyshConfigWriter) ExecuteCommands(ctx context.Context, commands []string) ([]byte, error) {
+	trimmedCommands := make([]string, 0)
+	for _, command := range commands {
+		if c := strings.TrimSpace(command); c != "" {
+			trimmedCommands = append(trimmedCommands, "-c")
+			trimmedCommands = append(trimmedCommands, c)
+		}
+	}
+	if len(trimmedCommands) == 0 {
+		return nil, fmt.Errorf("no commands to execute")
+	}
+	cmd := make([]string, 0)
+	cmd = append(cmd, *writer.vtyshPath)
+	cmd = append(cmd, trimmedCommands...)
+
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	execResp, err := cli.ContainerExecCreate(ctx, writer.contID, dockercontainer.ExecOptions{
+		Cmd:          cmd,
+		AttachStdout: true,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to create exec: %v", err)
+	}
+
+	attachResp, err := cli.ContainerExecAttach(ctx, execResp.ID, dockercontainer.ExecAttachOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to attach to exec: %v", err)
+	}
+	defer attachResp.Close()
+
+	outputStrChan := make(chan []byte)
+	errChan := make(chan error)
+	go func() {
+		var outBuf bytes.Buffer
+		_, err := io.Copy(&outBuf, attachResp.Reader)
+		if err != nil {
+			errChan <- err
+		}
+		outputStrChan <- outBuf.Bytes()
+	}()
+
+	err = cli.ContainerExecStart(ctx, execResp.ID, dockercontainer.ExecStartOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to start exec: %v", err)
+	}
+
+	var outputStr []byte
+	select {
+	case err = <-errChan:
+		return nil, fmt.Errorf("failed to copy output: %v", err)
+	case outputStr = <-outputStrChan:
+	}
+
+	return outputStr, nil
 }
 
 func (writer *ContainerVtyshConfigWriter) Write(p []byte) (n int, err error) {
