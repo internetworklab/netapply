@@ -9,6 +9,16 @@ import (
 
 func TestHostVtyshConfigWriter(t *testing.T) {
 	writer := host.NewHostVtyshConfigWriter(nil)
+	defer writer.Close()
+
 	ctx := context.Background()
-	writer.WriteCommands(ctx, []string{"show ip route"})
+	if err := writer.WriteCommands(ctx, []string{
+		"configure",
+		"router ospf vrf v1",
+		"ospf router-id 1.2.3.4",
+		"exit",
+	}); err != nil {
+		t.Fatalf("failed to write commands: %v", err)
+	}
+
 }
