@@ -33,47 +33,13 @@ func (dockerConfig *DockerContainerConfig) ReCreate(ctx context.Context) error {
 		return dockerConfig.Create(ctx)
 	}
 
-	if cont.State == container.StateRunning {
-		if err := cli.ContainerStop(ctx, cont.ID, container.StopOptions{}); err != nil {
-			return fmt.Errorf("failed to stop container: %w", err)
-		}
-
-		respCh, errCh := cli.ContainerWait(ctx, cont.ID, container.WaitConditionNotRunning)
-		var err error
-		select {
-		case <-respCh:
-		case err = <-errCh:
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to wait for container to stop: %w", err)
-		}
-
-		cont, err := FindContainer(ctx, cli, dockerConfig.ContainerName)
-		if err != nil {
-			return fmt.Errorf("failed to find container: %w", err)
-		}
-
-		if cont == nil {
-			return dockerConfig.Create(ctx)
-		}
-
-		err = cli.ContainerRemove(ctx, cont.ID, container.RemoveOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to remove container: %w", err)
-		}
-
-		respCh, errCh = cli.ContainerWait(ctx, cont.ID, container.WaitConditionNotRunning)
-		select {
-		case <-respCh:
-		case err = <-errCh:
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to wait for container to be removed: %w", err)
-		}
+	log.Printf("Deleting container %s", dockerConfig.ContainerName)
+	err = StopAndRemoveContainer(ctx, dockerConfig.ContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to stop and remove container: %w", err)
 	}
 
+	log.Printf("Re-creating container %s with desired spec", dockerConfig.ContainerName)
 	return dockerConfig.Create(ctx)
 }
 
@@ -130,17 +96,18 @@ func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 	containerConfig.Cmd = dockerConfig.Command
 	containerConfig.Tty = true
 	containerConfig.OpenStdin = true
-	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get service name from context: %w", err)
-	}
+
 	labels := make(map[string]string)
 	if dockerConfig.Labels != nil {
 		for k, v := range dockerConfig.Labels {
 			labels[k] = v
 		}
 	}
-	labels[LabelKeyService] = servicename
+
+	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
+	if err == nil {
+		labels[LabelKeyService] = servicename
+	}
 
 	containerConfig.Labels = labels
 
@@ -149,6 +116,7 @@ func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to get docker cli from context: %w", err)
 	}
 
+	log.Printf("Creating container %s", containerName)
 	resp, err := cli.ContainerCreate(
 		ctx,
 		containerConfig,
@@ -161,6 +129,7 @@ func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to create container: %w", err)
 	}
 
+	log.Printf("Starting container %s", containerName)
 	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
@@ -271,14 +240,61 @@ func StopAndRemoveContainer(ctx context.Context, containerName string) error {
 	}
 
 	cont, err := FindContainer(ctx, cli, containerName)
-	if err == nil && cont != nil {
-		if cont.State == container.StateRunning {
-			if err := cli.ContainerStop(ctx, containerName, container.StopOptions{}); err != nil {
-				return fmt.Errorf("failed to stop container: %w", err)
-			}
-		}
-		cli.ContainerRemove(ctx, containerName, container.RemoveOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to find container: %w", err)
 	}
+
+	if cont == nil {
+		log.Printf("Container %s is already removed, nothing to do", containerName)
+		return nil
+	}
+
+	log.Printf("Stop and removing container %s, container id: %s, state: %s", containerName, cont.ID, cont.State)
+	switch cont.State {
+	case container.StateRunning, container.StateRestarting:
+		log.Printf("Container %s is running, shutting it down...", containerName)
+		if err := cli.ContainerStop(ctx, containerName, container.StopOptions{}); err != nil {
+			return fmt.Errorf("failed to stop container: %w", err)
+		}
+
+		log.Printf("Waiting for container %s to stop...", containerName)
+		respCh, errCh := cli.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
+		var err error
+		select {
+		case <-respCh:
+		case err = <-errCh:
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to wait for container to stop: %w", err)
+		}
+
+		log.Printf("Container %s stopped", containerName)
+	}
+
+	log.Printf("Removing container %s", containerName)
+	err = cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
+	if err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+
+	cont, err = FindContainer(ctx, cli, containerName)
+	if err != nil {
+		return fmt.Errorf("failed to find container: %w", err)
+	}
+	if cont != nil {
+		log.Printf("Waiting for container %s to be removed...", containerName)
+		respCh, errCh := cli.ContainerWait(ctx, containerName, container.WaitConditionRemoved)
+		select {
+		case <-respCh:
+		case err = <-errCh:
+		}
+		if err != nil {
+			return fmt.Errorf("failed to wait for container to be removed: %w", err)
+		}
+	}
+
+	log.Printf("Container %s is removed", containerName)
 
 	return nil
 }
