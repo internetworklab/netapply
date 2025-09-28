@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	host "example.com/connector/pkg/vtysh/host"
+	pkgfrrvtyshhost "example.com/connector/pkg/frr/vtysh/host"
 )
 
 func TestHostVtyshConfigWriter(t *testing.T) {
-	writer := host.NewHostVtyshConfigWriter(nil)
+	writer := pkgfrrvtyshhost.NewHostVtyshConfigWriter(nil)
 	defer writer.Close()
 
 	ctx := context.Background()

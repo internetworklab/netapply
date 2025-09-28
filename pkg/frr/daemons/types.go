@@ -27,6 +27,7 @@ type FRREnabledDaemonsConfig struct {
 }
 
 type FRRPerDaemonCLIArgumentsConfig struct {
+	VtyshEnabled   bool     `yaml:"vtysh_enabled,omitempty" json:"vtysh_enabled,omitempty"`
 	ZebraOptions   []string `yaml:"zebra_options,omitempty" json:"zebra_options,omitempty"`
 	MGMTdOptions   []string `yaml:"mgmtd_options,omitempty" json:"mgmtd_options,omitempty"`
 	BGPdOptions    []string `yaml:"bgpd_options,omitempty" json:"bgpd_options,omitempty"`
@@ -48,4 +49,9 @@ type FRRPerDaemonCLIArgumentsConfig struct {
 	FabricdOptions []string `yaml:"fabricd_options,omitempty" json:"fabricd_options,omitempty"`
 	VRRPdOptions   []string `yaml:"vrrpd_options,omitempty" json:"vrrpd_options,omitempty"`
 	PathdOptions   []string `yaml:"pathd_options,omitempty" json:"pathd_options,omitempty"`
+}
+
+type FRRDaemonsConfig struct {
+	EnableDaemons         FRREnabledDaemonsConfig        `yaml:"enable_daemons,omitempty" json:"enable_daemons,omitempty"`
+	PerDaemonCLIArguments FRRPerDaemonCLIArgumentsConfig `yaml:"per_daemon_cli_arguments,omitempty" json:"per_daemon_cli_arguments,omitempty"`
 }

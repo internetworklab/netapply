@@ -6,8 +6,8 @@ import (
 	"log"
 
 	pkgdocker "example.com/connector/pkg/docker"
+	pkgfrrvtysh "example.com/connector/pkg/frr/vtysh"
 	pkgreconcile "example.com/connector/pkg/reconcile"
-	pkgvtysh "example.com/connector/pkg/vtysh"
 )
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
@@ -126,7 +126,7 @@ func prependConfigure(cmds []string) []string {
 }
 
 func writeCommands(ctx context.Context, containerName *string, cmds []string) error {
-	configWriter, err := pkgvtysh.GetVtyshConfigWriter(ctx, containerName)
+	configWriter, err := pkgfrrvtysh.GetVtyshConfigWriter(ctx, containerName)
 	if err != nil {
 		return fmt.Errorf("failed to get vtysh config writer: %w", err)
 	}

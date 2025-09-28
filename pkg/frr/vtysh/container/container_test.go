@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	pkgfrrvtyshcontainer "example.com/connector/pkg/frr/vtysh/container"
 	pkgutils "example.com/connector/pkg/utils"
-	"example.com/connector/pkg/vtysh/container"
 	"github.com/docker/docker/client"
 )
 
@@ -29,7 +29,7 @@ func TestContainerVtyshConfigWriter(t *testing.T) {
 		"exit",
 	}
 
-	writer, err := container.NewContainerVtyshConfigWriter(ctx, containerName, nil)
+	writer, err := pkgfrrvtyshcontainer.NewContainerVtyshConfigWriter(ctx, containerName, nil)
 	if err != nil {
 		t.Fatalf("failed to create container vtysh config writer: %v", err)
 	}

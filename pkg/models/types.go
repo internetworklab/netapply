@@ -25,14 +25,9 @@ type ControlplaneConfig struct {
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 }
 
-type FRRDaemonsConfig struct {
-	EnableDaemons         pkgfrrdaemons.FRREnabledDaemonsConfig        `yaml:"enable_daemons,omitempty" json:"enable_daemons,omitempty"`
-	PerDaemonCLIArguments pkgfrrdaemons.FRRPerDaemonCLIArgumentsConfig `yaml:"per_daemon_cli_arguments,omitempty" json:"per_daemon_cli_arguments,omitempty"`
-}
-
 type FRRContainerConfig struct {
-	ContainerName string           `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	Daemons       FRRDaemonsConfig `yaml:"daemons,omitempty" json:"daemons,omitempty"`
+	ContainerName string                         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Daemons       pkgfrrdaemons.FRRDaemonsConfig `yaml:"daemons,omitempty" json:"daemons,omitempty"`
 }
 
 type NodeConfig struct {
