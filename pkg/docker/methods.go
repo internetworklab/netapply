@@ -18,6 +18,40 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
+func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	cont, err := FindContainer(ctx, cli, dockerConfig.ContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to find container: %w", err)
+	}
+
+	if cont != nil {
+		fmt.Printf("Container %s found: %s\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.ID)
+		switch cont.State {
+		case container.StateRunning, container.StateRestarting:
+			fmt.Printf("Container %s state: %s, skipping...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
+			return nil
+		case container.StateCreated, container.StatePaused:
+			fmt.Printf("Container %s is %s, starting...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
+			if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
+				return fmt.Errorf("failed to start container: %w", err)
+			}
+		case container.StateExited, container.StateRemoving, container.StateDead:
+			return fmt.Errorf("container %s is %s, please try again later", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
+		default:
+			return fmt.Errorf("unknown container state: %s, container %s", cont.State, GetContainerDisplayName(&dockerConfig.ContainerName))
+		}
+		return nil
+	}
+
+	fmt.Printf("Container %s not found, creating...\n", GetContainerDisplayName(&dockerConfig.ContainerName))
+	return dockerConfig.Create(ctx)
+}
+
 func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
@@ -140,6 +174,7 @@ func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
 	}
 }
 
+// If no container is found, return (nil, nil)
 func FindContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
 	filters := filters.NewArgs()
 	filters.Add("name", containerName)

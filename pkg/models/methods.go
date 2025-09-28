@@ -13,12 +13,10 @@ import (
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	if nodeConfig.DockerContainers != nil {
 		log.Println("Setting up docker containers ...")
-
 		for _, dockerContainer := range nodeConfig.DockerContainers {
-			log.Printf("Setting up docker container %s ...", dockerContainer.ContainerName)
-
-			if err := dockerContainer.Create(ctx); err != nil {
-				return fmt.Errorf("failed to create docker container %s: %w", dockerContainer.ContainerName, err)
+			log.Printf("Setting up %s ...", pkgdocker.GetContainerDisplayName(&dockerContainer.ContainerName))
+			if err := dockerContainer.Apply(ctx); err != nil {
+				return fmt.Errorf("failed to create container %s: %w", pkgdocker.GetContainerDisplayName(&dockerContainer.ContainerName), err)
 			}
 		}
 	}
@@ -143,7 +141,7 @@ func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 		log.Println("Applying OSPF configuration ...")
 		for _, ospfConfig := range controlPlaneConfig.OSPF {
 			log.Printf("Writing OSPF configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
-			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, prependConfigure(ospfConfig.ToCLICommands())); err != nil {
+			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, ospfConfig.ToCLICommands()); err != nil {
 				return fmt.Errorf("failed to write ospf config: %w", err)
 			}
 		}
@@ -153,7 +151,7 @@ func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 		log.Println("Applying BGP configuration ...")
 		for _, bgpConfig := range controlPlaneConfig.BGP {
 			log.Printf("Writing BGP configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
-			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, prependConfigure(bgpConfig.ToCLICommands())); err != nil {
+			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, bgpConfig.ToCLICommands()); err != nil {
 				return fmt.Errorf("failed to write bgp config: %w", err)
 			}
 		}
