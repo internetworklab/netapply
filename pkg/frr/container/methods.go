@@ -36,6 +36,11 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 		return fmt.Errorf("failed to write daemons file: %w", err)
 	}
 
+	serviceName, err := pkgutils.ServiceNameFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get service name from context: %w", err)
+	}
+
 	containerConfig := &pkgdocker.DockerContainerConfig{
 		ContainerName: frrContainerConfig.ContainerName,
 		Image:         DefaultImage,
@@ -47,6 +52,9 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 				Source: daemonsFilePath,
 				Target: "/etc/frr/daemons",
 			},
+		},
+		Labels: map[string]string{
+			pkgdocker.LabelKeyService: serviceName,
 		},
 	}
 

@@ -3,6 +3,7 @@ package docker
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 
 	pkgutils "example.com/connector/pkg/utils"
@@ -18,6 +19,64 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
+func (dockerConfig *DockerContainerConfig) ReCreate(ctx context.Context) error {
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	cont, err := FindContainer(ctx, cli, dockerConfig.ContainerName)
+	if err != nil {
+		return fmt.Errorf("failed to find container: %w", err)
+	}
+	if cont == nil {
+		return dockerConfig.Create(ctx)
+	}
+
+	if cont.State == container.StateRunning {
+		if err := cli.ContainerStop(ctx, cont.ID, container.StopOptions{}); err != nil {
+			return fmt.Errorf("failed to stop container: %w", err)
+		}
+
+		respCh, errCh := cli.ContainerWait(ctx, cont.ID, container.WaitConditionNotRunning)
+		var err error
+		select {
+		case <-respCh:
+		case err = <-errCh:
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to wait for container to stop: %w", err)
+		}
+
+		cont, err := FindContainer(ctx, cli, dockerConfig.ContainerName)
+		if err != nil {
+			return fmt.Errorf("failed to find container: %w", err)
+		}
+
+		if cont == nil {
+			return dockerConfig.Create(ctx)
+		}
+
+		err = cli.ContainerRemove(ctx, cont.ID, container.RemoveOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to remove container: %w", err)
+		}
+
+		respCh, errCh = cli.ContainerWait(ctx, cont.ID, container.WaitConditionNotRunning)
+		select {
+		case <-respCh:
+		case err = <-errCh:
+		}
+
+		if err != nil {
+			return fmt.Errorf("failed to wait for container to be removed: %w", err)
+		}
+	}
+
+	return dockerConfig.Create(ctx)
+}
+
 func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
 	// todo: reconcile more things such as ports, volumes, and image (mostly important)
 
@@ -32,13 +91,17 @@ func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
 	}
 
 	if cont != nil {
-		fmt.Printf("Container %s found: %s\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.ID)
+		log.Printf("Container %s found: %s\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.ID)
 		switch cont.State {
 		case container.StateRunning, container.StateRestarting:
-			fmt.Printf("Container %s state: %s, skipping...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
+			if checkIfRecreateNeeded(dockerConfig, cont) {
+				log.Printf("Container %s is %s, recreating...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
+				return dockerConfig.ReCreate(ctx)
+			}
+			log.Printf("Container %s state: %s, skipping...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
 			return nil
 		case container.StateCreated, container.StatePaused:
-			fmt.Printf("Container %s is %s, starting...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
+			log.Printf("Container %s is %s, starting...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
 			if err := cli.ContainerStart(ctx, cont.ID, container.StartOptions{}); err != nil {
 				return fmt.Errorf("failed to start container: %w", err)
 			}
@@ -50,7 +113,7 @@ func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
 		return nil
 	}
 
-	fmt.Printf("Container %s not found, creating...\n", GetContainerDisplayName(&dockerConfig.ContainerName))
+	log.Printf("Container %s not found, creating...\n", GetContainerDisplayName(&dockerConfig.ContainerName))
 	return dockerConfig.Create(ctx)
 }
 
@@ -71,9 +134,15 @@ func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get service name from context: %w", err)
 	}
-	containerConfig.Labels = map[string]string{
-		LabelKeyService: servicename,
+	labels := make(map[string]string)
+	if dockerConfig.Labels != nil {
+		for k, v := range dockerConfig.Labels {
+			labels[k] = v
+		}
 	}
+	labels[LabelKeyService] = servicename
+
+	containerConfig.Labels = labels
 
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
@@ -356,4 +425,86 @@ func NewContainerListFromServiceName(ctx context.Context, serviceName string) (*
 	}
 
 	return &ContainerList{containers: containers}, nil
+}
+
+func checkDiffSet(lhs, rhs map[string]string) bool {
+	for k, v := range lhs {
+		if v1, ok := rhs[k]; !ok || v1 != v {
+			return true
+		}
+	}
+	return false
+}
+
+func checkLabelsMapDiffer(lhs, rhs map[string]string) bool {
+	return checkDiffSet(lhs, rhs) || checkDiffSet(rhs, lhs)
+}
+
+func portSpecToKeys(spec map[string][]DockerPortMapping) map[string]string {
+	keys := make(map[string]string)
+
+	for containerPortAndType, hostPortMappings := range spec {
+		for _, hostPortMapping := range hostPortMappings {
+			// might looks like 0.0.0.0:8080 -> 8080/tcp
+			key := fmt.Sprintf("%s:%d -> %s", hostPortMapping.HostIP, hostPortMapping.HostPort, containerPortAndType)
+			keys[key] = containerPortAndType
+		}
+
+	}
+
+	return keys
+}
+
+func portStatusToKeys(status []container.Port) map[string]string {
+	keys := make(map[string]string)
+
+	for _, port := range status {
+		key := fmt.Sprintf("%s:%d -> %d/%s", port.IP, port.PublicPort, port.PrivatePort, port.Type)
+		keys[key] = fmt.Sprintf("%d/%s", port.PrivatePort, port.Type)
+	}
+
+	return keys
+}
+
+func checkPortsDiffer(lhs map[string][]DockerPortMapping, rhs []container.Port) bool {
+	specKeys := portSpecToKeys(lhs)
+	statusKeys := portStatusToKeys(rhs)
+	return checkLabelsMapDiffer(specKeys, statusKeys)
+}
+
+func checkVolumesDiffer(lhs []DockerMountConfig, rhs []container.MountPoint) bool {
+
+	lhsKeys := make(map[string]string)
+	for _, volume := range lhs {
+		key := fmt.Sprintf("%s -> %s/%s", volume.Source, volume.Target, volume.Type)
+		lhsKeys[key] = volume.Target
+	}
+
+	rhsKeys := make(map[string]string)
+	for _, volume := range rhs {
+		key := fmt.Sprintf("%s -> %s/%s", volume.Source, volume.Destination, volume.Type)
+		rhsKeys[key] = volume.Destination
+	}
+
+	return checkLabelsMapDiffer(lhsKeys, rhsKeys)
+}
+
+func checkIfRecreateNeeded(containerSpec *DockerContainerConfig, containerSummary *container.Summary) bool {
+	if containerSpec.Image != containerSummary.Image {
+		return true
+	}
+
+	if checkLabelsMapDiffer(containerSpec.Labels, containerSummary.Labels) {
+		return true
+	}
+
+	if checkPortsDiffer(containerSpec.Ports, containerSummary.Ports) {
+		return true
+	}
+
+	if checkVolumesDiffer(containerSpec.Volumes, containerSummary.Mounts) {
+		return true
+	}
+
+	return false
 }

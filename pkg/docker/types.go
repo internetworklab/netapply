@@ -38,6 +38,7 @@ type DockerContainerConfig struct {
 	AutoRemove    *bool                          `yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
 	Networks      []string                       `yaml:"networks,omitempty" json:"networks,omitempty"`
 	Command       []string                       `yaml:"command,omitempty" json:"command,omitempty"`
+	Labels        map[string]string              `yaml:"labels,omitempty" json:"labels,omitempty"`
 }
 
 type ContainerKey string
