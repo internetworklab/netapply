@@ -1,8 +1,8 @@
-package ospf
+package ospfv2
 
 import "fmt"
 
-func (interfaceConfig *OSPFInterfaceConfig) ToCLICommands(ospfConfig *OSPFConfig) []string {
+func (interfaceConfig *OSPFV2InterfaceConfig) ToCLICommands(ospfConfig *OSPFV2Config) []string {
 	cmds := make([]string, 0)
 
 	cmds = append(cmds, fmt.Sprintf("interface %s vrf %s", interfaceConfig.Name, ospfConfig.VRF))
@@ -20,7 +20,7 @@ func (interfaceConfig *OSPFInterfaceConfig) ToCLICommands(ospfConfig *OSPFConfig
 	return cmds
 }
 
-func (ospfConf *OSPFConfig) ToCLICommands() []string {
+func (ospfConf *OSPFV2Config) ToCLICommands() []string {
 	cmds := make([]string, 0)
 
 	cmds = append(cmds, fmt.Sprintf("router ospf vrf %s", ospfConf.VRF))

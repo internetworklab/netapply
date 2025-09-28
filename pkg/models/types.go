@@ -1,7 +1,7 @@
 package models
 
 import (
-	pkgdocker "example.com/connector/pkg/docker"
+	pkgfrrdaemons "example.com/connector/pkg/frr/daemons"
 	pkginterfacebridge "example.com/connector/pkg/interface/bridge"
 	pkginterfacedummy "example.com/connector/pkg/interface/dummy"
 	pkginterfaceveth "example.com/connector/pkg/interface/veth"
@@ -9,7 +9,7 @@ import (
 	pkginterfacewireguard "example.com/connector/pkg/interface/wireguard"
 	pkgopenvpn2 "example.com/connector/pkg/openvpn2"
 	pkgprotocolbgp "example.com/connector/pkg/protocol/bgp"
-	pkgprotocolospf "example.com/connector/pkg/protocol/ospf"
+	pkgprotocolospfv2 "example.com/connector/pkg/protocol/ospfv2"
 )
 
 type GlobalConfig struct {
@@ -17,16 +17,34 @@ type GlobalConfig struct {
 }
 
 type ControlplaneConfig struct {
-	OSPF          []pkgprotocolospf.OSPFConfig `yaml:"ospf,omitempty" json:"ospf,omitempty"`
-	BGP           []pkgprotocolbgp.BGPConfig   `yaml:"bgp,omitempty" json:"bgp,omitempty"`
-	ContainerName *string                      `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	OSPFv2 []pkgprotocolospfv2.OSPFV2Config `yaml:"ospfv2,omitempty" json:"ospfv2,omitempty"`
+	BGP    []pkgprotocolbgp.BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+
+	// The container where the vtysh and FRR daemons are running, if it's nil then FRR is considered to be running
+	// in the host netns.
+	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+}
+
+type FRRDaemonsConfig struct {
+	EnableDaemons         pkgfrrdaemons.FRREnabledDaemonsConfig        `yaml:"enable_daemons,omitempty" json:"enable_daemons,omitempty"`
+	PerDaemonCLIArguments pkgfrrdaemons.FRRPerDaemonCLIArgumentsConfig `yaml:"per_daemon_cli_arguments,omitempty" json:"per_daemon_cli_arguments,omitempty"`
+}
+
+type FRRContainerConfig struct {
+	ContainerName string           `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	Daemons       FRRDaemonsConfig `yaml:"daemons,omitempty" json:"daemons,omitempty"`
 }
 
 type NodeConfig struct {
-	DockerContainers []pkgdocker.DockerContainerConfig `yaml:"docker_containers,omitempty" json:"docker_containers,omitempty"`
-	Controlplane     *ControlplaneConfig               `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
-	Dataplane        *DataplaneConfig                  `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
-	Containers       []string                          `yaml:"containers,omitempty" json:"containers,omitempty"`
+	FRRContainers []FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
+	Controlplane  *ControlplaneConfig  `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
+	Dataplane     *DataplaneConfig     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+
+	// The list of containers to scan when doing a reconciliation loop
+	Containers []string `yaml:"containers,omitempty" json:"containers,omitempty"`
+
+	// By default, it would use $CWD/.go-reconciler-state as the stateful directory.
+	StatefulDir string `yaml:"stateful_dir,omitempty" json:"stateful_dir,omitempty"`
 }
 
 type DataplaneConfig struct {

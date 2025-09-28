@@ -11,9 +11,9 @@ import (
 )
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
-	if nodeConfig.DockerContainers != nil {
+	if nodeConfig.FRRContainers != nil {
 		log.Println("Setting up docker containers ...")
-		for _, dockerContainer := range nodeConfig.DockerContainers {
+		for _, dockerContainer := range nodeConfig.FRRContainers {
 			log.Printf("Setting up %s ...", pkgdocker.GetContainerDisplayName(&dockerContainer.ContainerName))
 			if err := dockerContainer.Apply(ctx); err != nil {
 				return fmt.Errorf("failed to create container %s: %w", pkgdocker.GetContainerDisplayName(&dockerContainer.ContainerName), err)
@@ -137,12 +137,12 @@ func writeCommands(ctx context.Context, containerName *string, cmds []string) er
 
 func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 
-	if controlPlaneConfig.OSPF != nil {
-		log.Println("Applying OSPF configuration ...")
-		for _, ospfConfig := range controlPlaneConfig.OSPF {
-			log.Printf("Writing OSPF configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
+	if controlPlaneConfig.OSPFv2 != nil {
+		log.Println("Applying OSPFv2 configuration ...")
+		for _, ospfConfig := range controlPlaneConfig.OSPFv2 {
+			log.Printf("Writing OSPFv2 configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
 			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, ospfConfig.ToCLICommands()); err != nil {
-				return fmt.Errorf("failed to write ospf config: %w", err)
+				return fmt.Errorf("failed to write OSPFv2 config to %s: %w", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName), err)
 			}
 		}
 	}
@@ -152,10 +152,15 @@ func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 		for _, bgpConfig := range controlPlaneConfig.BGP {
 			log.Printf("Writing BGP configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
 			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, bgpConfig.ToCLICommands()); err != nil {
-				return fmt.Errorf("failed to write bgp config: %w", err)
+				return fmt.Errorf("failed to write BGP config to %s: %w", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName), err)
 			}
 		}
 	}
 
+	return nil
+}
+
+func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
+	// todo
 	return nil
 }
