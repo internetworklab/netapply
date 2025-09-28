@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 
+	pkgdocker "example.com/connector/pkg/docker"
 	pkgreconcile "example.com/connector/pkg/reconcile"
 	pkgvtysh "example.com/connector/pkg/vtysh"
 )
@@ -31,7 +32,7 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 
 	if nodeConfig.Controlplane != nil {
 		log.Println("Setting up controlplane ...")
-		if err := nodeConfig.Controlplane.Create(ctx); err != nil {
+		if err := nodeConfig.Controlplane.Apply(ctx); err != nil {
 			return fmt.Errorf("failed to create controlplane: %w", err)
 		}
 	}
@@ -126,17 +127,23 @@ func prependConfigure(cmds []string) []string {
 	return append([]string{"configure terminal"}, cmds...)
 }
 
-func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error {
+func writeCommands(ctx context.Context, containerName *string, cmds []string) error {
+	configWriter, err := pkgvtysh.GetVtyshConfigWriter(ctx, containerName)
+	if err != nil {
+		return fmt.Errorf("failed to get vtysh config writer: %w", err)
+	}
+	defer configWriter.Close()
+	return configWriter.WriteCommands(ctx, prependConfigure(cmds))
+
+}
+
+func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 
 	if controlPlaneConfig.OSPF != nil {
 		log.Println("Applying OSPF configuration ...")
 		for _, ospfConfig := range controlPlaneConfig.OSPF {
-			containerName := controlPlaneConfig.ContainerName
-			configWriter, err := pkgvtysh.GetVtyshConfigWriter(ctx, containerName)
-			if err != nil {
-				return fmt.Errorf("failed to get vtysh config writer: %w", err)
-			}
-			if err := configWriter.WriteCommands(ctx, prependConfigure(ospfConfig.ToCLICommands())); err != nil {
+			log.Printf("Writing OSPF configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
+			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, prependConfigure(ospfConfig.ToCLICommands())); err != nil {
 				return fmt.Errorf("failed to write ospf config: %w", err)
 			}
 		}
@@ -145,13 +152,8 @@ func (controlPlaneConfig *ControlplaneConfig) Create(ctx context.Context) error 
 	if controlPlaneConfig.BGP != nil {
 		log.Println("Applying BGP configuration ...")
 		for _, bgpConfig := range controlPlaneConfig.BGP {
-			containerName := controlPlaneConfig.ContainerName
-			configWriter, err := pkgvtysh.GetVtyshConfigWriter(ctx, containerName)
-			if err != nil {
-				return fmt.Errorf("failed to get vtysh config writer: %w", err)
-			}
-
-			if err := configWriter.WriteCommands(ctx, prependConfigure(bgpConfig.ToCLICommands())); err != nil {
+			log.Printf("Writing BGP configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
+			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, prependConfigure(bgpConfig.ToCLICommands())); err != nil {
 				return fmt.Errorf("failed to write bgp config: %w", err)
 			}
 		}
