@@ -11,6 +11,7 @@ type CtxKey string
 
 const ctxKeyDockerCli CtxKey = "docker_cli"
 const ctxKeyServiceName CtxKey = "service_name"
+const ctxKeyStatefulDir CtxKey = "stateful_dir"
 
 func DockerCliFromCtx(ctx context.Context) (*client.Client, error) {
 	cli, ok := ctx.Value(ctxKeyDockerCli).(*client.Client)
@@ -35,4 +36,16 @@ func SetDockerCliInCtx(ctx context.Context, cli *client.Client) context.Context 
 
 func SetServiceNameInCtx(ctx context.Context, serviceName string) context.Context {
 	return context.WithValue(ctx, ctxKeyServiceName, serviceName)
+}
+
+func SetStatefulDirInCtx(ctx context.Context, statefulDir string) context.Context {
+	return context.WithValue(ctx, ctxKeyStatefulDir, statefulDir)
+}
+
+func StatefulDirFromCtx(ctx context.Context) (string, error) {
+	statefulDir, ok := ctx.Value(ctxKeyStatefulDir).(string)
+	if !ok {
+		return "", fmt.Errorf("stateful dir is not set in context")
+	}
+	return statefulDir, nil
 }

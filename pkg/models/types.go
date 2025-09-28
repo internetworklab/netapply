@@ -1,7 +1,7 @@
 package models
 
 import (
-	pkgfrrdaemons "example.com/connector/pkg/frr/daemons"
+	pkgfrrcontainer "example.com/connector/pkg/frr/container"
 	pkginterfacebridge "example.com/connector/pkg/interface/bridge"
 	pkginterfacedummy "example.com/connector/pkg/interface/dummy"
 	pkginterfaceveth "example.com/connector/pkg/interface/veth"
@@ -25,15 +25,10 @@ type ControlplaneConfig struct {
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 }
 
-type FRRContainerConfig struct {
-	ContainerName string                         `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	Daemons       pkgfrrdaemons.FRRDaemonsConfig `yaml:"daemons,omitempty" json:"daemons,omitempty"`
-}
-
 type NodeConfig struct {
-	FRRContainers []FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
-	Controlplane  *ControlplaneConfig  `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
-	Dataplane     *DataplaneConfig     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+	FRRContainers []pkgfrrcontainer.FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
+	Controlplane  *ControlplaneConfig                  `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
+	Dataplane     *DataplaneConfig                     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 
 	// The list of containers to scan when doing a reconciliation loop
 	Containers []string `yaml:"containers,omitempty" json:"containers,omitempty"`

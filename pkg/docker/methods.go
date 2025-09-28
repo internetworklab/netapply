@@ -19,6 +19,8 @@ import (
 )
 
 func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
+	// todo: reconcile more things such as ports, volumes, and image (mostly important)
+
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get docker cli from context: %w", err)

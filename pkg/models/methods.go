@@ -159,8 +159,3 @@ func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 
 	return nil
 }
-
-func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
-	// todo
-	return nil
-}
