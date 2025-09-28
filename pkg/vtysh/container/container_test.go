@@ -10,9 +10,7 @@ import (
 )
 
 func TestContainerVtyshConfigWriter(t *testing.T) {
-	writer := container.NewContainerVtyshConfigWriter("test-container")
 	ctx := context.Background()
-
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
 		t.Fatalf("failed to create docker client: %v", err)
@@ -21,5 +19,23 @@ func TestContainerVtyshConfigWriter(t *testing.T) {
 
 	ctx = pkgutils.SetDockerCliInCtx(ctx, cli)
 
-	writer.WriteCommands(ctx, []string{"show ip route"})
+	containerName := "frr"
+	vrf := "v1"
+	routerID := "1.2.3.4"
+	commands := []string{
+		"configure",
+		"router ospf vrf " + vrf,
+		"ospf router-id " + routerID,
+		"exit",
+	}
+
+	writer, err := container.NewContainerVtyshConfigWriter(ctx, containerName, nil)
+	if err != nil {
+		t.Fatalf("failed to create container vtysh config writer: %v", err)
+	}
+	defer writer.Close()
+
+	if err := writer.WriteCommands(ctx, commands); err != nil {
+		t.Fatalf("failed to write commands: %v", err)
+	}
 }

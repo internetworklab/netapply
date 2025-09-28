@@ -1,7 +1,7 @@
 package host
 
-const defaultHostCmd = "vtysh"
+const DefaultVtyshPath = "vtysh"
 
 type HostVtyshConfigWriter struct {
-	hostCmd string
+	vtyshPath string
 }

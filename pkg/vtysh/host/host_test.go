@@ -8,7 +8,7 @@ import (
 )
 
 func TestHostVtyshConfigWriter(t *testing.T) {
-	writer := host.NewHostVtyshConfigWriter()
+	writer := host.NewHostVtyshConfigWriter(nil)
 	ctx := context.Background()
 	writer.WriteCommands(ctx, []string{"show ip route"})
 }
