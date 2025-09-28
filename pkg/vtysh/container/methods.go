@@ -31,9 +31,9 @@ func NewContainerVtyshConfigWriter(ctx context.Context, containerName string, vt
 	}
 
 	execResp, err := cli.ContainerExecCreate(ctx, contSummary.ID, dockercontainer.ExecOptions{
-		Cmd:         []string{*w.vtyshPath},
-		AttachStdin: true,
-		Tty:         true,
+		Cmd:          []string{*w.vtyshPath},
+		AttachStdin:  true,
+		AttachStdout: true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create exec: %v", err)
@@ -41,18 +41,14 @@ func NewContainerVtyshConfigWriter(ctx context.Context, containerName string, vt
 
 	w.execID = execResp.ID
 
-	attachResp, err := cli.ContainerExecAttach(ctx, w.execID, dockercontainer.ExecAttachOptions{
-		Tty: true,
-	})
+	attachResp, err := cli.ContainerExecAttach(ctx, w.execID, dockercontainer.ExecAttachOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to attach to exec: %v", err)
 	}
 
 	w.dockerIO = &attachResp
 
-	err = cli.ContainerExecStart(ctx, w.execID, dockercontainer.ExecStartOptions{
-		Tty: true,
-	})
+	err = cli.ContainerExecStart(ctx, w.execID, dockercontainer.ExecStartOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to start exec: %v", err)
 	}
