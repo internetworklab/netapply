@@ -38,6 +38,14 @@ type BGPNeighborGroupConfig struct {
 	// Addresses of the peers in the group
 	Peers []string `yaml:"peers,omitempty" json:"peers,omitempty"`
 	ASN   int      `yaml:"asn,omitempty" json:"asn,omitempty"`
+
+	RPKIStrict *bool `yaml:"rpki_strict,omitempty" json:"rpki_strict,omitempty"`
+}
+
+type BGPRPKIRTRConfig struct {
+	RTRHost       string `yaml:"rtr_host" json:"rtr_host"`
+	RTRPort       int    `yaml:"rtr_port" json:"rtr_port"`
+	RTRPreference int    `yaml:"rtr_preference" json:"rtr_preference"`
 }
 
 type BGPRPKIConfig struct {
@@ -49,6 +57,8 @@ type BGPRPKIConfig struct {
 
 	// 1-7200, the default is 600 seconds
 	RetryInterval *int `yaml:"retry_interval,omitempty" json:"retry_interval,omitempty"`
+
+	RTRServers []BGPRPKIRTRConfig `yaml:"rtr_servers,omitempty" json:"rtr_servers,omitempty"`
 }
 
 type BGPConfig struct {

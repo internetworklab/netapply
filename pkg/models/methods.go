@@ -8,9 +8,12 @@ import (
 	pkgdocker "example.com/connector/pkg/docker"
 	pkgfrrvtysh "example.com/connector/pkg/frr/vtysh"
 	pkgreconcile "example.com/connector/pkg/reconcile"
+	pkgutils "example.com/connector/pkg/utils"
 )
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
+	ctx = pkgutils.SetStatefulDirInCtx(ctx, nodeConfig.StatefulDir)
+
 	if nodeConfig.FRRContainers != nil {
 		log.Println("Setting up docker containers ...")
 		for _, dockerContainer := range nodeConfig.FRRContainers {

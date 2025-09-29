@@ -7,10 +7,19 @@ func (afConf *MPBGPAddressFamilyConfig) ToCLICommands(bgpConf *BGPConfig) []stri
 
 	cmds = append(cmds, fmt.Sprintf("address-family %s %s", afConf.AFI, afConf.SAFI))
 
-	if bgpConf.Neighbors != nil && afConf.Activate != nil && *afConf.Activate {
-		for groupName := range bgpConf.Neighbors {
-			cmds = append(cmds, fmt.Sprintf("neighbor %s activate", groupName))
+	if bgpConf.Neighbors != nil {
+		if afConf.Activate != nil && *afConf.Activate {
+			for groupName := range bgpConf.Neighbors {
+				cmds = append(cmds, fmt.Sprintf("neighbor %s activate", groupName))
+			}
 		}
+
+		for groupName, neighbor := range bgpConf.Neighbors {
+			if neighbor.RPKIStrict != nil && *neighbor.RPKIStrict {
+				cmds = append(cmds, fmt.Sprintf("neighbor %s rpki strict", groupName))
+			}
+		}
+
 	}
 
 	for _, network := range afConf.Networks {
@@ -56,6 +65,11 @@ func (rpkiConf *BGPRPKIConfig) ToCLICommands() []string {
 	cmds = append(cmds, fmt.Sprintf("rpki polling-period %d", rpkiConf.PollingPeriod))
 	cmds = append(cmds, fmt.Sprintf("rpki expire-interval %d", rpkiConf.ExpireInterval))
 	cmds = append(cmds, fmt.Sprintf("rpki retry-interval %d", rpkiConf.RetryInterval))
+
+	for _, rtrServer := range rpkiConf.RTRServers {
+		cmds = append(cmds, fmt.Sprintf("rpki cache tcp %s %d preference %d", rtrServer.RTRHost, rtrServer.RTRPort, rtrServer.RTRPreference))
+	}
+
 	return cmds
 }
 
