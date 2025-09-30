@@ -33,8 +33,11 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 
 	if nodeConfig.Controlplane != nil {
 		log.Println("Setting up controlplane ...")
-		if err := nodeConfig.Controlplane.Apply(ctx); err != nil {
-			return fmt.Errorf("failed to create controlplane: %w", err)
+		for _, controlPlaneConfig := range nodeConfig.Controlplane {
+			log.Printf("Setting up controlplane for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
+			if err := controlPlaneConfig.Apply(ctx); err != nil {
+				return fmt.Errorf("failed to create controlplane: %w", err)
+			}
 		}
 	}
 
@@ -140,12 +143,50 @@ func writeCommands(ctx context.Context, containerName *string, cmds []string) er
 
 func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 
+	globalCommands := make([]string, 0)
+	if controlPlaneConfig.DebugBGPUpdates != nil && *controlPlaneConfig.DebugBGPUpdates {
+		globalCommands = append(globalCommands, "debug bgp updates")
+	}
+	if controlPlaneConfig.DebugOSPFUpdates != nil && *controlPlaneConfig.DebugOSPFUpdates {
+		globalCommands = append(globalCommands, "debug ospf updates")
+	}
+	if controlPlaneConfig.DebugRPKI != nil && *controlPlaneConfig.DebugRPKI {
+		globalCommands = append(globalCommands, "debug rpki")
+	}
+	if len(globalCommands) > 0 {
+		log.Println("Applying global debugging commands ...")
+		if err := writeCommands(ctx, controlPlaneConfig.ContainerName, globalCommands); err != nil {
+			return fmt.Errorf("failed to write global debugging commands to %s: %w", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName), err)
+		}
+	}
+
 	if controlPlaneConfig.OSPFv2 != nil {
 		log.Println("Applying OSPFv2 configuration ...")
 		for _, ospfConfig := range controlPlaneConfig.OSPFv2 {
 			log.Printf("Writing OSPFv2 configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
 			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, ospfConfig.ToCLICommands()); err != nil {
 				return fmt.Errorf("failed to write OSPFv2 config to %s: %w", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName), err)
+			}
+		}
+	}
+
+	// It's better to enable RPKI before BGP
+	if controlPlaneConfig.RPKI != nil {
+		log.Println("Applying RPKI configuration ...")
+		for _, rpkiConfig := range controlPlaneConfig.RPKI {
+			log.Printf("Writing RPKI configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
+			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, rpkiConfig.ToCLICommands()); err != nil {
+				return fmt.Errorf("failed to write RPKI config to %s: %w", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName), err)
+			}
+		}
+	}
+
+	if controlPlaneConfig.RouteMap != nil {
+		log.Println("Applying RouteMap configuration ...")
+		for _, routeMapConfig := range controlPlaneConfig.RouteMap {
+			log.Printf("Writing RouteMap configuration for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
+			if err := writeCommands(ctx, controlPlaneConfig.ContainerName, routeMapConfig.ToCLICommands()); err != nil {
+				return fmt.Errorf("failed to write RouteMap config to %s: %w", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName), err)
 			}
 		}
 	}

@@ -17,18 +17,27 @@ type GlobalConfig struct {
 }
 
 type ControlplaneConfig struct {
-	OSPFv2 []pkgprotocolospfv2.OSPFV2Config `yaml:"ospfv2,omitempty" json:"ospfv2,omitempty"`
-	BGP    []pkgprotocolbgp.BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`
-
 	// The container where the vtysh and FRR daemons are running, if it's nil then FRR is considered to be running
 	// in the host netns.
+	// However, there would be one host netns is allowed at most.
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+
+	DebugBGPUpdates  *bool `yaml:"debug_bgp_updates,omitempty" json:"debug_bgp_updates,omitempty"`
+	DebugOSPFUpdates *bool `yaml:"debug_ospf_updates,omitempty" json:"debug_ospf_updates,omitempty"`
+	DebugRPKI        *bool `yaml:"debug_rpki,omitempty" json:"debug_rpki,omitempty"`
+
+	OSPFv2   []pkgprotocolospfv2.OSPFV2Config `yaml:"ospfv2,omitempty" json:"ospfv2,omitempty"`
+	BGP      []pkgprotocolbgp.BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`
+	RPKI     []pkgprotocolbgp.BGPRPKIConfig   `yaml:"rpki,omitempty" json:"rpki,omitempty"`
+	RouteMap []pkgprotocolbgp.RouteMapConfig  `yaml:"route_map,omitempty" json:"route_map,omitempty"`
 }
 
 type NodeConfig struct {
 	FRRContainers []pkgfrrcontainer.FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
-	Controlplane  *ControlplaneConfig                  `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
-	Dataplane     *DataplaneConfig                     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+
+	// Currently, the implementation of the controlplane are largely outsourced to (maybe containerized) FRR instance.
+	Controlplane []ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
+	Dataplane    *DataplaneConfig     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 
 	// The list of containers to scan when doing a reconciliation loop
 	Containers []string `yaml:"containers,omitempty" json:"containers,omitempty"`

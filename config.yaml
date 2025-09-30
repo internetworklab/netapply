@@ -12,35 +12,35 @@ nodes:
         hostname: pi
         autoremove: true
     controlplane:
-      container_name: frr
-      ospf:
-        - vrf: default
-          router_id: "10.3.64.1"
-          interfaces:
-            - name: dummy0
-              area: "0.0.0.0"
-              passive: true
-            - name: veth1
-              area: "0.0.0.0"
-              network: point-to-point
-      bgp:
-        - vrf: default
-          asn: 65001
-          router_id: "10.3.64.1"
-          no_ipv4_unicast: true
-          address_families:
-            - afi: l2vpn
-              safi: evpn
-              advertise_all_vni: true
-              advertise_svi_ip: true
-          neighbors:
-            group1:
-              asn: 65001
-              capabilities:
-                - extended-nexthop
-              peers:
-                - address: "10.3.82.66"
-                - address: "10.3.98.66"
+      - container_name: frr
+        ospf:
+          - vrf: default
+            router_id: "10.3.64.1"
+            interfaces:
+              - name: dummy0
+                area: "0.0.0.0"
+                passive: true
+              - name: veth1
+                area: "0.0.0.0"
+                network: point-to-point
+        bgp:
+          - vrf: default
+            asn: 65001
+            router_id: "10.3.64.1"
+            no_ipv4_unicast: true
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                advertise_all_vni: true
+                advertise_svi_ip: true
+            neighbors:
+              group1:
+                asn: 65001
+                capabilities:
+                  - extended-nexthop
+                peers:
+                  - address: "10.3.82.66"
+                  - address: "10.3.98.66"
     dataplane:
       dummy:
         - name: dummy0
@@ -103,20 +103,20 @@ nodes:
 
   lax1:
     controlplane:
-      container_name: frr
-      ospf:
-        - vrf: default
-          router_id: 10.3.64.1
-          interfaces:
-            - name: v5-dummy
-              area: 0.0.0.0
-              passive: true
-            - name: veth1
-              area: 0.0.0.0
-              network: point-to-point
-      bgp:
-        - vrf: default
-          router_id: 10.3.64.1
+      - container_name: frr
+        ospf:
+          - vrf: default
+            router_id: 10.3.64.1
+            interfaces:
+              - name: v5-dummy
+                area: 0.0.0.0
+                passive: true
+              - name: veth1
+                area: 0.0.0.0
+                network: point-to-point
+        bgp:
+          - vrf: default
+            router_id: 10.3.64.1
     dataplane:
       openvpn:
         - name: tap0
@@ -156,6 +156,10 @@ nodes:
           peer:
             name: veth1
             container_name: frr
+      dummy:
+        - name: v5-dummy
+          cidr: "10.3.64.1/24"
+          container_name: frr
       bridge:
         - name: br0
           slave_interfaces:
@@ -166,8 +170,3 @@ nodes:
             - tap0
             - veth1
           container_name: openvpn-connector-1
-    virtual_interface:
-      dummy:
-        - name: v5-dummy
-          cidr: "10.3.64.1/24"
-          container_name: frr

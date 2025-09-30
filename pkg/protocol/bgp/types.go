@@ -29,7 +29,7 @@ type MPBGPAddressFamilyConfig struct {
 
 	// This configuration modifies whether to enable an address family for a specific neighbor.
 	// By default only the IPv4 unicast address family is enabled.
-	Activate *bool `yaml:"activate" json:"activate"`
+	Activate []string `yaml:"activate,omitempty" json:"activate,omitempty"`
 }
 
 type BGPNeighborGroupConfig struct {
@@ -38,8 +38,6 @@ type BGPNeighborGroupConfig struct {
 	// Addresses of the peers in the group
 	Peers []string `yaml:"peers,omitempty" json:"peers,omitempty"`
 	ASN   int      `yaml:"asn,omitempty" json:"asn,omitempty"`
-
-	RPKIStrict *bool `yaml:"rpki_strict,omitempty" json:"rpki_strict,omitempty"`
 }
 
 type BGPRPKIRTRConfig struct {
@@ -49,6 +47,8 @@ type BGPRPKIRTRConfig struct {
 }
 
 type BGPRPKIConfig struct {
+	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+
 	// 1 - 3600 seconds, the default is 300 seconds
 	PollingPeriod *int `yaml:"polling_period,omitempty" json:"polling_period,omitempty"`
 
@@ -72,6 +72,27 @@ type BGPConfig struct {
 	// key is the group name
 	Neighbors map[string]BGPNeighborGroupConfig `yaml:"neighbors" json:"neighbors"`
 
-	RPKI       bool           `yaml:"rpki" json:"rpki"`
-	RPKIConfig *BGPRPKIConfig `yaml:"rpki_config,omitempty" json:"rpki_config,omitempty"`
+	NeighborRPKIStrict []string `yaml:"neighbor_rpki_strict,omitempty" json:"neighbor_rpki_strict,omitempty"`
+}
+
+type RouteMapPolicy string
+
+const (
+	// If the entry matches, then carry out the Set Actions.
+	RouteMapPolicyPermit RouteMapPolicy = "permit"
+	//  If the entry matches, then finish processing the route-map and deny the route (return deny).
+	RouteMapPolicyDeny RouteMapPolicy = "deny"
+)
+
+type RouteMapConfig struct {
+	Name string `yaml:"name" json:"name"`
+
+	// This specifies the policy implied if the Matching Conditions are met or not met, and which actions of the route-map are to be taken, if any.
+	Policy RouteMapPolicy `yaml:"policy" json:"policy"`
+	Order  int            `yaml:"order" json:"order"`
+
+	MatchCommands      []string `yaml:"match_commands,omitempty" json:"match_commands,omitempty"`
+	SetCommands        []string `yaml:"set_commands,omitempty" json:"set_commands,omitempty"`
+	CallCommands       []string `yaml:"call_commands,omitempty" json:"call_commands,omitempty"`
+	ExitActionCommands []string `yaml:"exit_action_commands,omitempty" json:"exit_action_commands,omitempty"`
 }

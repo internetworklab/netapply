@@ -7,19 +7,8 @@ func (afConf *MPBGPAddressFamilyConfig) ToCLICommands(bgpConf *BGPConfig) []stri
 
 	cmds = append(cmds, fmt.Sprintf("address-family %s %s", afConf.AFI, afConf.SAFI))
 
-	if bgpConf.Neighbors != nil {
-		if afConf.Activate != nil && *afConf.Activate {
-			for groupName := range bgpConf.Neighbors {
-				cmds = append(cmds, fmt.Sprintf("neighbor %s activate", groupName))
-			}
-		}
-
-		for groupName, neighbor := range bgpConf.Neighbors {
-			if neighbor.RPKIStrict != nil && *neighbor.RPKIStrict {
-				cmds = append(cmds, fmt.Sprintf("neighbor %s rpki strict", groupName))
-			}
-		}
-
+	for _, nb := range afConf.Activate {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s activate", nb))
 	}
 
 	for _, network := range afConf.Networks {
@@ -62,12 +51,24 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 
 func (rpkiConf *BGPRPKIConfig) ToCLICommands() []string {
 	cmds := make([]string, 0)
+
+	if rpkiConf.VRF != nil {
+		cmds = append(cmds, fmt.Sprintf("vrf %s", *rpkiConf.VRF))
+	}
+
+	cmds = append(cmds, "rpki")
 	cmds = append(cmds, fmt.Sprintf("rpki polling-period %d", rpkiConf.PollingPeriod))
 	cmds = append(cmds, fmt.Sprintf("rpki expire-interval %d", rpkiConf.ExpireInterval))
 	cmds = append(cmds, fmt.Sprintf("rpki retry-interval %d", rpkiConf.RetryInterval))
 
 	for _, rtrServer := range rpkiConf.RTRServers {
 		cmds = append(cmds, fmt.Sprintf("rpki cache tcp %s %d preference %d", rtrServer.RTRHost, rtrServer.RTRPort, rtrServer.RTRPreference))
+	}
+
+	cmds = append(cmds, "exit")
+
+	if rpkiConf.VRF != nil {
+		cmds = append(cmds, "exit-vrf")
 	}
 
 	return cmds
@@ -93,13 +94,24 @@ func (bgpConf *BGPConfig) ToCLICommands() []string {
 			cmds = append(cmds, afConf.ToCLICommands(bgpConf)...)
 		}
 	}
-
-	if bgpConf.RPKI {
-		cmds = append(cmds, "rpki enable")
-		if bgpConf.RPKIConfig != nil {
-			cmds = append(cmds, bgpConf.RPKIConfig.ToCLICommands()...)
-		}
+	for _, nb := range bgpConf.NeighborRPKIStrict {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s rpki strict", nb))
 	}
+
+	cmds = append(cmds, "exit")
+
+	return cmds
+}
+
+func (routeMapConf *RouteMapConfig) ToCLICommands() []string {
+	cmds := make([]string, 0)
+
+	cmds = append(cmds, fmt.Sprintf("route-map %s %s %d", routeMapConf.Name, routeMapConf.Policy, routeMapConf.Order))
+
+	cmds = append(cmds, routeMapConf.MatchCommands...)
+	cmds = append(cmds, routeMapConf.SetCommands...)
+	cmds = append(cmds, routeMapConf.CallCommands...)
+	cmds = append(cmds, routeMapConf.ExitActionCommands...)
 
 	cmds = append(cmds, "exit")
 
