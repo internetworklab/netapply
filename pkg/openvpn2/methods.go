@@ -56,10 +56,6 @@ func (ovpInst *OpenVPN2Instance) Update(ctx context.Context) error {
 	return nil
 }
 
-func getContainerName(service string, instance string) string {
-	return fmt.Sprintf("%s-%s", service, instance)
-}
-
 func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
 	if err != nil {
