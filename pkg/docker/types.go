@@ -39,6 +39,8 @@ type DockerContainerConfig struct {
 	Networks      []string                       `yaml:"networks,omitempty" json:"networks,omitempty"`
 	Command       []string                       `yaml:"command,omitempty" json:"command,omitempty"`
 	Labels        map[string]string              `yaml:"labels,omitempty" json:"labels,omitempty"`
+	TTY           *bool                           `yaml:"tty,omitempty" json:"tty,omitempty"`
+	OpenStdin     *bool                           `yaml:"stdin_open,omitempty" json:"stdin_open,omitempty"`
 }
 
 type ContainerKey string

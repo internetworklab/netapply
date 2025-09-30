@@ -3,13 +3,14 @@ package openvpn2
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"strings"
 
 	pkgdocker "example.com/connector/pkg/docker"
-	openvpn2structtag "example.com/connector/pkg/openvpn2/structtag"
 	pkgreconcile "example.com/connector/pkg/reconcile"
 	pkgutils "example.com/connector/pkg/utils"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
+	"github.com/docker/docker/api/types/mount"
 )
 
 func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() ([]string, error) {
@@ -44,7 +45,7 @@ func (ovpInst *OpenVPN2Instance) DetectChanges(ctx context.Context) (pkgreconcil
 }
 
 func (ovpInst *OpenVPN2Instance) GetContainerName() *string {
-	return &ovpInst.DockerContainer.ContainerName
+	return &ovpInst.ContainerName
 }
 
 func (ovpInst *OpenVPN2Instance) GetInterfaceName() string {
@@ -62,67 +63,98 @@ func getContainerName(service string, instance string) string {
 func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
 	if err != nil {
+		// servicename is needed, otherwise the controller won't be able
+		// to do the cleanup job later.
 		return fmt.Errorf("failed to get service name from context: %w", err)
 	}
 
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	tty := true
+	openStdin := true
+	autoRemove := true
+	devPermRWM := "rwm"
+	containerConfig := pkgdocker.DockerContainerConfig{
+		ContainerName: ovpInst.ContainerName,
+		Hostname:      ovpInst.HostName,
+		Labels: map[string]string{
+			pkgdocker.LabelKeyService:  servicename,
+			pkgdocker.LabelKeyInstance: ovpInst.Name,
+		},
+		TTY:        &tty,
+		OpenStdin:  &openStdin,
+		AutoRemove: &autoRemove,
+		Networks:   ovpInst.DockerNetworks,
+		Image:      ovpInst.Image,
+		Capabilities: []string{
+			"net_admin",
+			"sys_admin",
+		},
+		Ports: ovpInst.Ports,
+		Devices: []pkgdocker.DockerDeviceMapping{
+			{
+				PathOnHost:        "/dev/net/tun",
+				PathInContainer:   "/dev/net/tun",
+				CgroupPermissions: &devPermRWM,
+			},
+		},
+	}
+	stateDir := pkgutils.GetStatefulDir(ctx)
+	ovpConfigDir := path.Join(stateDir, "openvpn")
+	err = os.MkdirAll(ovpConfigDir, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to get docker cli from context: %w", err)
+		if !os.IsExist(err) {
+			return fmt.Errorf("failed to create openvpn config dir: %w", err)
+		}
 	}
-
-	if ovpInst.DockerContainer == nil {
-		return fmt.Errorf("docker container config is not set, currently only support to run in docker container")
-	}
-
-	cmd := make([]string, 0)
-	exec := "openvpn"
-	if ovpInst.ExecutablePath != nil && *ovpInst.ExecutablePath != "" {
-		exec = *ovpInst.ExecutablePath
-	}
-	cmd = append(cmd, exec)
-
-	openvpn2CLIArgs, err := openvpn2structtag.Marshal(ovpInst)
+	ovpScriptDir := path.Join(ovpConfigDir, "scripts")
+	err = os.MkdirAll(ovpScriptDir, 0755)
 	if err != nil {
-		return fmt.Errorf("failed to marshal openvpn2 instance into CLI arguments: %w", err)
+		if !os.IsExist(err) {
+			return fmt.Errorf("failed to create openvpn script dir: %w", err)
+		}
+	}
+	upWrapperScriptPath := path.Join(ovpScriptDir, "up-wrapper.sh")
+
+	scriptContent := []byte(strings.Join([]string{
+		"#!/bin/bash",
+		"",
+		"echo \"Setting up $1\"",
+		"ip link set $1 up",
+		"",
+	}, "\n"))
+
+	// Repetitive write will simply override the previous content,
+	// so nothing to worry about.
+	if err := os.WriteFile(upWrapperScriptPath, scriptContent, 0755); err != nil {
+		return fmt.Errorf("failed to write up-wrapper script: %w", err)
 	}
 
-	cmd = append(cmd, openvpn2CLIArgs...)
-
-	containerConfig := &container.Config{}
-	networkConfig := &network.NetworkingConfig{}
-	hostConfig := &container.HostConfig{}
-
-	ovpInst.DockerContainer.ApplyToContainerCreateConfig(containerConfig, hostConfig, networkConfig)
-	containerConfig.Cmd = cmd
-	containerConfig.Tty = true
-	containerConfig.OpenStdin = true
-	containerConfig.Labels = map[string]string{
-		pkgdocker.LabelKeyService:  servicename,
-		pkgdocker.LabelKeyInstance: ovpInst.Name,
+	volumes := []pkgdocker.DockerMountConfig{
+		{
+			Type:   mount.TypeBind,
+			Source: pkgutils.ResolvePath(upWrapperScriptPath),
+			Target: "/up-wrapper.sh",
+		},
+		{
+			Type:   mount.TypeBind,
+			Source: pkgutils.ResolvePath(ovpInst.CertFile),
+			Target: "/etc/openvpn/certs/cert.pem",
+		},
+		{
+			Type:   mount.TypeBind,
+			Source: pkgutils.ResolvePath(ovpInst.KeyFile),
+			Target: "/etc/openvpn/certs/key.pem",
+		},
+	}
+	if ovpInst.DHPEMFile != nil {
+		volumes = append(volumes, pkgdocker.DockerMountConfig{
+			Type:   mount.TypeBind,
+			Source: pkgutils.ResolvePath(*ovpInst.DHPEMFile),
+			Target: "/etc/openvpn/certs/dh.pem",
+		})
 	}
 
-	containerName := ovpInst.DockerContainer.ContainerName
-	if containerName == "" {
-		containerName = getContainerName(servicename, ovpInst.Name)
-	}
-
-	resp, err := cli.ContainerCreate(
-		ctx,
-		containerConfig,
-		hostConfig,
-		networkConfig,
-		nil,
-		containerName,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to create container: %w", err)
-	}
-
-	if err := cli.ContainerStart(ctx, resp.ID, container.StartOptions{}); err != nil {
-		return fmt.Errorf("failed to start container: %w", err)
-	}
-
-	return nil
+	containerConfig.Volumes = volumes
+	return containerConfig.Apply(ctx)
 }
 
 func (ovpInst *OpenVPN2Instance) IsLinkExists(ctx context.Context) bool {
@@ -131,7 +163,7 @@ func (ovpInst *OpenVPN2Instance) IsLinkExists(ctx context.Context) bool {
 		panic(err)
 	}
 
-	cont, err := pkgdocker.FindContainer(ctx, cli, ovpInst.DockerContainer.ContainerName)
+	cont, err := pkgdocker.FindContainer(ctx, cli, ovpInst.ContainerName)
 	if err != nil {
 		return false
 	}
@@ -168,7 +200,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 
 	specMap := make(map[string]OpenVPN2Instance)
 	for _, c := range ovpList {
-		specMap[c.DockerContainer.ContainerName] = c
+		specMap[c.ContainerName] = c
 	}
 
 	containersMap := make(map[string]interface{})
@@ -181,9 +213,9 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 	}
 
 	for _, c := range specMap {
-		if _, ok := containersMap[c.DockerContainer.ContainerName]; !ok {
-			addedSet[c.DockerContainer.ContainerName] = make([]pkgreconcile.InterfaceProvisioner, 0)
-			addedSet[c.DockerContainer.ContainerName] = append(addedSet[c.DockerContainer.ContainerName], &c)
+		if _, ok := containersMap[c.ContainerName]; !ok {
+			addedSet[c.ContainerName] = make([]pkgreconcile.InterfaceProvisioner, 0)
+			addedSet[c.ContainerName] = append(addedSet[c.ContainerName], &c)
 		}
 	}
 

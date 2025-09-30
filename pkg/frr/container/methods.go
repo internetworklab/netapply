@@ -26,7 +26,11 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 	}
 
 	daemonsFilePath := path.Join(frrConfigDir, "daemons")
-	daemonsConfigLines, err := frrContainerConfig.Daemons.ToConfigLines(ctx)
+	daemonsConfig := frrContainerConfig.Daemons
+	if daemonsConfig == nil {
+		daemonsConfig = pkgfrrdaemons.DefaultFRRDaemonsConfig()
+	}
+	daemonsConfigLines, err := daemonsConfig.ToConfigLines(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to convert daemons config to config lines: %w", err)
 	}
@@ -71,7 +75,7 @@ func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 func DefaultFRRContainerConfig() *FRRContainerConfig {
 	cfg := new(FRRContainerConfig)
 	cfg.ContainerName = "frr"
-	cfg.Daemons = *pkgfrrdaemons.DefaultFRRDaemonsConfig()
+	cfg.Daemons = pkgfrrdaemons.DefaultFRRDaemonsConfig()
 	cfg.Image = new(string)
 	*cfg.Image = DefaultImage
 	cfg.Hostname = new(string)

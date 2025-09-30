@@ -6,9 +6,6 @@ nodes:
     frr_containers:
       - container_name: frr
         image: quay.io/frrouting/frr:10.3.0
-        cap_add:
-          - net_admin
-          - sys_admin
         hostname: pi
         autoremove: true
     controlplane:
@@ -59,8 +56,8 @@ nodes:
           http_proxy:
             host: "ss"
             port: 8080
-          cert_file: /etc/openvpn/certs/client-cert.pem
-          key_file: /etc/openvpn/certs/client-key.pem
+          cert_file: /etc/openvpn/certs/cert.pem
+          key_file: /etc/openvpn/certs/key.pem
           peer_fingerprint: "A6:79:F7:4A:0C:A6:4A:D1:6F:85:2E:25:8F:D8:C2:2A:62:4F:61:FB:4C:5C:38:11:5E:4E:39:51:93:11:DD:DF"
           remote_cert_tls: server
           verb: 3
@@ -70,37 +67,12 @@ nodes:
           up_cmd: /up-wrapper.sh
           script_security_level: 3
           executable_path: "openvpn"
-          docker_container:
-            networks:
-              - ss
-            autoremove: true
-            image: openvpn:latest
-            container_name: "openvpn-connector-1"
-            cap_add:
-              - net_admin
-              - sys_admin
-            hostname: pi
-            ports:
-              "1194/tcp":
-                - host_ip: "0.0.0.0"
-                  host_port: 21194
-                - host_ip: "::"
-                  host_port: 21194
-            volumes:
-              - type: bind
-                source: "./nodes/pi/openvpn/up-wrapper.sh"
-                target: "/up-wrapper.sh"
-              - type: bind
-                source: "./nodes/pi/openvpn/certs/client-cert.pem"
-                target: "/etc/openvpn/certs/client-cert.pem"
-              - type: bind
-                source: "./nodes/pi/openvpn/certs/client-key.pem"
-                target: "/etc/openvpn/certs/client-key.pem"
-            devices:
-              - path_on_host: "/dev/net/tun"
-                path_in_container: "/dev/net/tun"
-                cgroup_permissions: "rwm"
-
+          image: openvpn:test
+          container_name: openvpn-client
+          hostname: pi
+          docker_networks: [ "ss" ]
+          host_tls_cert_file: /root/certs/openvpn/cert.pem
+          host_tls_key_file: /root/certs/openvpn/key.pem
   lax1:
     controlplane:
       - container_name: frr

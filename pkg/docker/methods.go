@@ -149,6 +149,14 @@ func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
 		if dockerConfig.Hostname != nil {
 			containerConfig.Hostname = *dockerConfig.Hostname
 		}
+
+		if dockerConfig.TTY != nil {
+			containerConfig.Tty = *dockerConfig.TTY
+		}
+
+		if dockerConfig.OpenStdin != nil {
+			containerConfig.OpenStdin = *dockerConfig.OpenStdin
+		}
 	}
 
 	if networkConfig != nil {
