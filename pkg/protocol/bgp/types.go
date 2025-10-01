@@ -32,8 +32,24 @@ type MPBGPAddressFamilyConfig struct {
 	Activate []string `yaml:"activate,omitempty" json:"activate,omitempty"`
 }
 
+type RouteMapDirection string
+
+const (
+	RouteMapDirectionIn  RouteMapDirection = "in"
+	RouteMapDirectionOut RouteMapDirection = "out"
+)
+
+type BGPNeighborRouteMapApply struct {
+	// Name of the route-map to apply to the neighbor
+	Name string `yaml:"name" json:"name"`
+
+	// Direction of the route-map to apply to the neighbor
+	Direction RouteMapDirection `yaml:"direction" json:"direction"`
+}
+
 type BGPNeighborGroupConfig struct {
-	Capabilities []string `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
+	Capabilities []string                   `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
+	RouteMaps    []BGPNeighborRouteMapApply `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
 
 	// Addresses of the peers in the group
 	Peers []string `yaml:"peers,omitempty" json:"peers,omitempty"`

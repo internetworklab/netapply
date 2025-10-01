@@ -46,6 +46,13 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 		}
 	}
 
+	for _, routeMap := range bgpNeighborGroupConfig.RouteMaps {
+		cmds = append(
+			cmds,
+			fmt.Sprintf("neighbor %s route-map %s %s", groupName, routeMap.Name, routeMap.Direction),
+		)
+	}
+
 	return cmds
 }
 
