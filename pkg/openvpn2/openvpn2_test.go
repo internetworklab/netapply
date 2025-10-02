@@ -13,4 +13,5 @@ func TestOpenVPN2ContainerCreateAndRemoval(t *testing.T) {
 	// 4. Stop the container
 	// 5. If the container still exists, remote the container
 	// 6. Confirm that the container is really removed
+
 }

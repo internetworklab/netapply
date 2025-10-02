@@ -36,6 +36,9 @@ func (ovp *OpenVPN2RemoteConfig) ToCLIArgs() ([]string, error) {
 	if ovp != nil {
 		res = append(res, ovp.Host)
 		res = append(res, fmt.Sprintf("%d", ovp.Port))
+		if ovp.Proto != nil && *ovp.Proto != "" {
+			res = append(res, *ovp.Proto)
+		}
 	}
 	return res, nil
 }
@@ -45,7 +48,7 @@ func (ovpInst *OpenVPN2Instance) DetectChanges(ctx context.Context) (pkgreconcil
 }
 
 func (ovpInst *OpenVPN2Instance) GetContainerName() *string {
-	return &ovpInst.ContainerName
+	return &ovpInst.Name
 }
 
 func (ovpInst *OpenVPN2Instance) GetInterfaceName() string {
@@ -69,7 +72,7 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	autoRemove := true
 	devPermRWM := "rwm"
 	containerConfig := pkgdocker.DockerContainerConfig{
-		ContainerName: ovpInst.ContainerName,
+		ContainerName: ovpInst.Name,
 		Hostname:      ovpInst.HostName,
 		Labels: map[string]string{
 			pkgdocker.LabelKeyService:  servicename,
@@ -159,7 +162,7 @@ func (ovpInst *OpenVPN2Instance) IsLinkExists(ctx context.Context) bool {
 		panic(err)
 	}
 
-	cont, err := pkgdocker.FindContainer(ctx, cli, ovpInst.ContainerName)
+	cont, err := pkgdocker.FindContainer(ctx, cli, ovpInst.Name)
 	if err != nil {
 		return false
 	}
@@ -196,7 +199,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 
 	specMap := make(map[string]OpenVPN2Instance)
 	for _, c := range ovpList {
-		specMap[c.ContainerName] = c
+		specMap[c.Name] = c
 	}
 
 	containersMap := make(map[string]interface{})
@@ -209,9 +212,9 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 	}
 
 	for _, c := range specMap {
-		if _, ok := containersMap[c.ContainerName]; !ok {
-			addedSet[c.ContainerName] = make([]pkgreconcile.InterfaceProvisioner, 0)
-			addedSet[c.ContainerName] = append(addedSet[c.ContainerName], &c)
+		if _, ok := containersMap[c.Name]; !ok {
+			addedSet[c.Name] = make([]pkgreconcile.InterfaceProvisioner, 0)
+			addedSet[c.Name] = append(addedSet[c.Name], &c)
 		}
 	}
 
