@@ -44,7 +44,6 @@ func (dockerConfig *DockerContainerConfig) ReCreate(ctx context.Context) error {
 }
 
 func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
-	// todo: reconcile more things such as ports, volumes, and image (mostly important)
 
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
@@ -222,10 +221,10 @@ func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
 	}
 }
 
-// If no container is found, return (nil, nil)
+// If no container is found, return (nil, nil), by default, it expects exact match
 func FindContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
 	filters := filters.NewArgs()
-	filters.Add("name", containerName)
+	filters.Add("name", "^"+containerName+"$")
 
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: filters,
@@ -515,18 +514,22 @@ func checkVolumesDiffer(lhs []DockerMountConfig, rhs []container.MountPoint) boo
 
 func checkIfRecreateNeeded(containerSpec *DockerContainerConfig, containerSummary *container.Summary) bool {
 	if containerSpec.Image != containerSummary.Image {
+		log.Printf("Container %s image is %s, but expected is %s", containerSummary.Names[0], containerSummary.Image, containerSpec.Image)
 		return true
 	}
 
 	if checkLabelsMapDiffer(containerSpec.Labels, containerSummary.Labels) {
+		log.Printf("Container %s labels are %v, but expected are %v", containerSummary.Names[0], containerSummary.Labels, containerSpec.Labels)
 		return true
 	}
 
 	if checkPortsDiffer(containerSpec.Ports, containerSummary.Ports) {
+		log.Printf("Container %s ports are %v, but expected are %v", containerSummary.Names[0], containerSummary.Ports, containerSpec.Ports)
 		return true
 	}
 
 	if checkVolumesDiffer(containerSpec.Volumes, containerSummary.Mounts) {
+		log.Printf("Container %s volumes are %v, but expected are %v", containerSummary.Names[0], containerSummary.Mounts, containerSpec.Volumes)
 		return true
 	}
 
