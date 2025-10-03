@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
@@ -294,4 +295,36 @@ func DetectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 	}
 
 	return totalChanges, nil
+}
+
+func (dpChangeSet *DataplaneChangeSet) Log() {
+	log.Print("Dataplane change set:\n")
+
+	log.Print("Removed interfaces:\n")
+	for ns, ifaces := range dpChangeSet.RemovedInterfaces {
+		ifaceList := make([]string, 0)
+		for _, iface := range ifaces {
+			ifaceList = append(ifaceList, iface.GetInterfaceName())
+		}
+		log.Printf("%v: %v", ns, strings.Join(ifaceList, ", "))
+	}
+
+	log.Print("Added interfaces:\n")
+	for ns, ifaces := range dpChangeSet.AddedInterfaces {
+		ifaceList := make([]string, 0)
+		for _, iface := range ifaces {
+			ifaceList = append(ifaceList, iface.GetInterfaceName())
+		}
+		log.Printf("%v: %v", ns, strings.Join(ifaceList, ", "))
+	}
+
+	log.Print("Updated interfaces:\n")
+	for ns, ifaces := range dpChangeSet.UpdatedInterfaces {
+		ifaceList := make([]string, 0)
+		for _, iface := range ifaces {
+			ifaceList = append(ifaceList, iface.GetInterfaceName())
+		}
+		log.Printf("%v: %v", ns, strings.Join(ifaceList, ", "))
+	}
+
 }

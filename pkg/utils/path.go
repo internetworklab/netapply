@@ -18,3 +18,7 @@ func ResolvePath(path string) string {
 
 	return filepath.Join(wd, path)
 }
+
+func NormalizeContainerName(containerName string) string {
+	return strings.TrimPrefix(containerName, "/")
+}

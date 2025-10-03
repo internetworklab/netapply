@@ -216,17 +216,19 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 
 	containersMap := make(map[string]interface{})
 	for _, container := range containerList.GetContainers() {
-		containersMap[container.Names[0]] = container
-		if _, ok := specMap[container.Names[0]]; !ok {
-			removedSet[container.Names[0]] = make([]pkgreconcile.InterfaceCanceller, 0)
-			removedSet[container.Names[0]] = append(removedSet[container.Names[0]], &OpenVPN2InterfaceCanceller{ContainerName: container.Names[0]})
+		contName := pkgutils.NormalizeContainerName(container.Names[0])
+		containersMap[contName] = container
+		if _, ok := specMap[contName]; !ok {
+			removedSet[contName] = make([]pkgreconcile.InterfaceCanceller, 0)
+			removedSet[contName] = append(removedSet[contName], &OpenVPN2InterfaceCanceller{ContainerName: contName})
 		}
 	}
 
 	for _, c := range specMap {
 		if _, ok := containersMap[c.Name]; !ok {
-			addedSet[c.Name] = make([]pkgreconcile.InterfaceProvisioner, 0)
-			addedSet[c.Name] = append(addedSet[c.Name], &c)
+			contName := pkgutils.NormalizeContainerName(c.Name)
+			addedSet[contName] = make([]pkgreconcile.InterfaceProvisioner, 0)
+			addedSet[contName] = append(addedSet[contName], &c)
 		}
 	}
 

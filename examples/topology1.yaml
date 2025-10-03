@@ -10,6 +10,10 @@ nodes:
       - container_name: ix
         image: quay.io/frrouting/frr:10.3.0
         hostname: ix
+    containers:
+      - lax1
+      - lax2
+      - ix
     stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
     dataplane:
       dummy:
