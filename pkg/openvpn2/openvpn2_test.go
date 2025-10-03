@@ -3,7 +3,9 @@ package openvpn2_test
 import (
 	"context"
 	"testing"
+	"time"
 
+	pkgdocker "example.com/connector/pkg/docker"
 	openvpn2 "example.com/connector/pkg/openvpn2"
 	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/client"
@@ -20,7 +22,6 @@ func TestOpenVPN2ContainerCreateAndRemoval(t *testing.T) {
 	// 6. Confirm that the container is really removed
 
 	ovpInst := new(openvpn2.OpenVPN2Instance)
-	ovpInst.Server = true
 	ovpInst.Port = new(int)
 	*ovpInst.Port = 1194
 	ovpInst.Dev = "tap0"
@@ -81,4 +82,45 @@ func TestOpenVPN2ContainerCreateAndRemoval(t *testing.T) {
 	if err := ovpInst.Create(ctx); err != nil {
 		t.Fatalf("failed to create openvpn2 container: %v", err)
 	}
+
+	// slepping 3 seconds for container to be initialized
+
+	time.Sleep(3 * time.Second)
+
+	// checking if the container is running
+	cont, err := pkgdocker.FindContainer(ctx, cli, ovpInst.Name)
+	if err != nil {
+		t.Fatalf("failed to find openvpn2 container: %v", err)
+	}
+	if cont == nil {
+		t.Fatalf("openvpn2 container %s not found", ovpInst.Name)
+	}
+
+	contId := cont.ID
+	contState := cont.State
+	t.Logf("openvpn2 container %s found, container id: %s, container state: %s", ovpInst.Name, contId, contState)
+
+	if contState != "running" {
+		t.Fatalf("openvpn2 container %s is not running, container state: %s", ovpInst.Name, contState)
+	}
+
+	t.Logf("Stopping openvpn2 container %s", ovpInst.Name)
+	err = pkgdocker.StopAndRemoveContainer(ctx, ovpInst.Name)
+	if err != nil {
+		t.Fatalf("failed to stop and remove openvpn2 container: %v", err)
+	}
+
+	// sleeping 3 seconds for container to be stopped and removed
+	time.Sleep(3 * time.Second)
+
+	// checking if the container is removed
+	cont, err = pkgdocker.FindContainer(ctx, cli, ovpInst.Name)
+	if err != nil {
+		t.Fatalf("failed to find openvpn2 container: %v", err)
+	}
+	if cont != nil {
+		t.Fatalf("openvpn2 container %s is not removed", ovpInst.Name)
+	}
+
+	t.Logf("OpenVPN2 container %s is successfully created, stopped and removed", ovpInst.Name)
 }

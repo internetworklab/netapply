@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	pkgdocker "example.com/connector/pkg/docker"
+	pkgopenvpnstructtag "example.com/connector/pkg/openvpn2/structtag"
 	pkgreconcile "example.com/connector/pkg/reconcile"
 	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/api/types/mount"
@@ -67,6 +68,19 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to get service name from context: %w", err)
 	}
 
+	openvpnExec := "openvpn"
+	if ovpInst.ExecutablePath != nil && *ovpInst.ExecutablePath != "" {
+		openvpnExec = *ovpInst.ExecutablePath
+	}
+
+	cmd := make([]string, 0)
+	cmd = append(cmd, openvpnExec)
+	cliargs, err := pkgopenvpnstructtag.Marshal(ovpInst)
+	if err != nil {
+		return fmt.Errorf("failed to marshal openvpn2 instance into CLI arguments: %w", err)
+	}
+	cmd = append(cmd, cliargs...)
+
 	devPermRWM := "rwm"
 	containerConfig := pkgdocker.DockerContainerConfig{
 		ContainerName: ovpInst.Name,
@@ -75,6 +89,7 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 			pkgdocker.LabelKeyService:  servicename,
 			pkgdocker.LabelKeyInstance: ovpInst.Name,
 		},
+		Command:    cmd,
 		TTY:        ovpInst.TTY,
 		OpenStdin:  ovpInst.OpenStdin,
 		AutoRemove: ovpInst.AutoRemove,
@@ -132,19 +147,19 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 		},
 		{
 			Type:   mount.TypeBind,
-			Source: pkgutils.ResolvePath(ovpInst.CertFile),
+			Source: pkgutils.ResolvePath(ovpInst.HostTLSCertFile),
 			Target: "/etc/openvpn/certs/cert.pem",
 		},
 		{
 			Type:   mount.TypeBind,
-			Source: pkgutils.ResolvePath(ovpInst.KeyFile),
+			Source: pkgutils.ResolvePath(ovpInst.HostTLSKeyFile),
 			Target: "/etc/openvpn/certs/key.pem",
 		},
 	}
 	if ovpInst.DHPEMFile != nil {
 		volumes = append(volumes, pkgdocker.DockerMountConfig{
 			Type:   mount.TypeBind,
-			Source: pkgutils.ResolvePath(*ovpInst.DHPEMFile),
+			Source: pkgutils.ResolvePath(*ovpInst.HostDHPEMFile),
 			Target: "/etc/openvpn/certs/dh.pem",
 		})
 	}
