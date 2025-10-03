@@ -123,6 +123,14 @@ nodes:
               - "192.168.31.1"
 ```
 
+Save above YAML manifest to [examples/topology1.yaml](./examples/topology1.yaml) and run
+
+```shell
+# (in project's root)
+go build -o bin/netapply ./main.go
+./bin/netapply up --service-name exp1 --node testnode --config ./examples/topology1.yaml
+```
+
 And this is how you would implement it using traditional linux shell commands (netlink, docker, etc.):
 
 ```shell
