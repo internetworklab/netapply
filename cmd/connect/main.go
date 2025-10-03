@@ -2,16 +2,12 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
-	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/docker/docker/api/types/container"
@@ -21,10 +17,6 @@ import (
 	pkgdocker "example.com/connector/pkg/docker"
 	pkgmodels "example.com/connector/pkg/models"
 	pkgutils "example.com/connector/pkg/utils"
-)
-
-const (
-	OVTagFlagEmptyKey string = "emptykey"
 )
 
 func down(ctx context.Context) error {
@@ -79,13 +71,13 @@ func getGlobalConfig(cmd *UpCmd, config *pkgmodels.GlobalConfig) error {
 	} else if strings.HasPrefix(path, "https://") {
 		log.Printf("Reading configuration from HTTPS endpoint %s ...", path)
 
-		tlsConfig, err := getTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
+		tlsConfig, err := pkgutils.GetTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
 		if err != nil {
 			return fmt.Errorf("failed to create TLS config: %w", err)
 		}
 
 		// Read from HTTPS endpoint
-		reader, err = fetchHTTPConfig(path, tlsConfig, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
+		reader, err = pkgutils.FetchHTTPConfig(path, tlsConfig, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
 		if err != nil {
 			return fmt.Errorf("failed to fetch HTTPS config from '%s': %w", path, err)
 		}
@@ -93,7 +85,7 @@ func getGlobalConfig(cmd *UpCmd, config *pkgmodels.GlobalConfig) error {
 		log.Printf("Reading configuration from HTTP endpoint %s ...", path)
 
 		// Read from HTTP endpoint
-		reader, err = fetchHTTPConfig(path, nil, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
+		reader, err = pkgutils.FetchHTTPConfig(path, nil, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
 		if err != nil {
 			return fmt.Errorf("failed to fetch HTTP config from '%s': %w", path, err)
 		}
@@ -115,90 +107,6 @@ func getGlobalConfig(cmd *UpCmd, config *pkgmodels.GlobalConfig) error {
 	}
 
 	return nil
-}
-
-// fetchHTTPConfig fetches configuration from an HTTP(S) endpoint
-func fetchHTTPConfig(url string, tlsConfig *tls.Config, username, password string) (io.Reader, error) {
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
-	if tlsConfig != nil {
-		client.Transport = &http.Transport{
-			TLSClientConfig: tlsConfig,
-		}
-	}
-
-	request, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-
-	request.Header.Set("Accept", "application/yaml")
-
-	// Add basic authentication if credentials are provided
-	if username != "" && password != "" {
-		request.SetBasicAuth(username, password)
-	}
-
-	// Make HTTP request
-	resp, err := client.Do(request)
-	if err != nil {
-		return nil, fmt.Errorf("HTTP request failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check HTTP status code
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
-	}
-
-	// Read response body into memory
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	return strings.NewReader(string(body)), nil
-}
-
-// getTLSConfig creates a TLS configuration from the provided certificate files
-func getTLSConfig(caCertPath, clientCertPath, clientKeyPath string) (*tls.Config, error) {
-	// If no TLS parameters are provided, return nil (use default TLS config)
-	if caCertPath == "" && clientCertPath == "" && clientKeyPath == "" {
-		return nil, nil
-	}
-
-	config := &tls.Config{}
-
-	// Load CA certificate if provided
-	if caCertPath != "" {
-		caCert, err := os.ReadFile(caCertPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read CA certificate from '%s': %w", caCertPath, err)
-		}
-
-		caCertPool := x509.NewCertPool()
-		if !caCertPool.AppendCertsFromPEM(caCert) {
-			return nil, fmt.Errorf("failed to parse CA certificate from '%s'", caCertPath)
-		}
-		config.RootCAs = caCertPool
-	}
-
-	// Load client certificate and key if both are provided
-	if clientCertPath != "" && clientKeyPath != "" {
-		cert, err := tls.LoadX509KeyPair(clientCertPath, clientKeyPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load client certificate pair (cert: '%s', key: '%s'): %w", clientCertPath, clientKeyPath, err)
-		}
-		config.Certificates = []tls.Certificate{cert}
-	} else if clientCertPath != "" || clientKeyPath != "" {
-		// If only one of client cert or key is provided, that's an error
-		return nil, fmt.Errorf("both client certificate and key must be provided together")
-	}
-
-	return config, nil
 }
 
 // CLI structure for Kong

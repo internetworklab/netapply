@@ -12,7 +12,7 @@ import (
 )
 
 func TestOpenVPN2ContainerCreateAndRemoval(t *testing.T) {
-	// todo: rewrite such test
+
 	// Strategy:
 	// 1. Create the container
 	// 2. Extract the container id and state
