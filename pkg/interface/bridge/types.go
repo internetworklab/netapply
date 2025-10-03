@@ -1,7 +1,7 @@
 package bridge
 
 import (
-	pkginterfacecommon "example.com/connector/pkg/interface/common"
+	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	"github.com/vishvananda/netlink"
 )
 

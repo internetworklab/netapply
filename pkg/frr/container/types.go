@@ -1,7 +1,7 @@
 package container
 
 import (
-	pkgfrrdaemons "example.com/connector/pkg/frr/daemons"
+	pkgfrrdaemons "github.com/internetworklab/netapply/pkg/frr/daemons"
 )
 
 type FRRContainerConfig struct {

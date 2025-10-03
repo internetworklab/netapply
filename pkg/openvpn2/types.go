@@ -1,7 +1,7 @@
 package openvpn2
 
 import (
-	pkgdocker "example.com/connector/pkg/docker"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 )
 
 type OpenVPN2Role string

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	pkgfrrvtyshhost "example.com/connector/pkg/frr/vtysh/host"
+	pkgfrrvtyshhost "github.com/internetworklab/netapply/pkg/frr/vtysh/host"
 )
 
 func TestHostVtyshConfigWriter(t *testing.T) {

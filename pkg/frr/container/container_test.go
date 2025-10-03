@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgfrrcontainer "example.com/connector/pkg/frr/container"
-	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/client"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgfrrcontainer "github.com/internetworklab/netapply/pkg/frr/container"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 // To test, simply invoke `go test -v --run TestDefaultFRRContainerConfig ./pkg/frr/container`

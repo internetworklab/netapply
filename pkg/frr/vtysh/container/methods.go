@@ -7,9 +7,9 @@ import (
 	"io"
 	"strings"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgutils "example.com/connector/pkg/utils"
 	dockercontainer "github.com/docker/docker/api/types/container"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func NewContainerVtyshConfigWriter(ctx context.Context, containerName string, vtyshPath *string) (*ContainerVtyshConfigWriter, error) {

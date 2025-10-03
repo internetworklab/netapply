@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgfrrvtysh "example.com/connector/pkg/frr/vtysh"
-	pkgreconcile "example.com/connector/pkg/reconcile"
-	pkgutils "example.com/connector/pkg/utils"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgfrrvtysh "github.com/internetworklab/netapply/pkg/frr/vtysh"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context) error {

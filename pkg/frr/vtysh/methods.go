@@ -3,8 +3,8 @@ package vtysh
 import (
 	"context"
 
-	pkgfrrvtyshcontainer "example.com/connector/pkg/frr/vtysh/container"
-	pkgfrrvtyshhost "example.com/connector/pkg/frr/vtysh/host"
+	pkgfrrvtyshcontainer "github.com/internetworklab/netapply/pkg/frr/vtysh/container"
+	pkgfrrvtyshhost "github.com/internetworklab/netapply/pkg/frr/vtysh/host"
 )
 
 func GetVtyshConfigWriter(ctx context.Context, containerName *string) (VtyshConfigWriter, error) {

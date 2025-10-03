@@ -14,9 +14,9 @@ import (
 	"github.com/docker/docker/client"
 	"gopkg.in/yaml.v3"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgmodels "example.com/connector/pkg/models"
-	pkgutils "example.com/connector/pkg/utils"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgmodels "github.com/internetworklab/netapply/pkg/models"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func down(ctx context.Context) error {

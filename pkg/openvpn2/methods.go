@@ -7,11 +7,11 @@ import (
 	"path"
 	"strings"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgopenvpnstructtag "example.com/connector/pkg/openvpn2/structtag"
-	pkgreconcile "example.com/connector/pkg/reconcile"
-	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/api/types/mount"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgopenvpnstructtag "github.com/internetworklab/netapply/pkg/openvpn2/structtag"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() ([]string, error) {

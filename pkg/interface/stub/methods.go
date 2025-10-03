@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	pkgdocker "example.com/connector/pkg/docker"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	"github.com/vishvananda/netlink"
 )
 

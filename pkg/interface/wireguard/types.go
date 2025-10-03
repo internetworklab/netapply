@@ -1,7 +1,7 @@
 package wireguard
 
 import (
-	pkginterfacecommon "example.com/connector/pkg/interface/common"
+	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	"github.com/vishvananda/netlink"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )

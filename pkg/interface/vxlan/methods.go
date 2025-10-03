@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkginterfacecommon "example.com/connector/pkg/interface/common"
-	pkgreconcile "example.com/connector/pkg/reconcile"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 )
 

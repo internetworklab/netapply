@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkginterfacecommon "example.com/connector/pkg/interface/common"
-	pkgreconcile "example.com/connector/pkg/reconcile"
-	pkgutils "example.com/connector/pkg/utils"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 

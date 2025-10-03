@@ -1,15 +1,15 @@
 package models
 
 import (
-	pkgfrrcontainer "example.com/connector/pkg/frr/container"
-	pkginterfacebridge "example.com/connector/pkg/interface/bridge"
-	pkginterfacedummy "example.com/connector/pkg/interface/dummy"
-	pkginterfaceveth "example.com/connector/pkg/interface/veth"
-	pkginterfacevxlan "example.com/connector/pkg/interface/vxlan"
-	pkginterfacewireguard "example.com/connector/pkg/interface/wireguard"
-	pkgopenvpn2 "example.com/connector/pkg/openvpn2"
-	pkgprotocolbgp "example.com/connector/pkg/protocol/bgp"
-	pkgprotocolospfv2 "example.com/connector/pkg/protocol/ospfv2"
+	pkgfrrcontainer "github.com/internetworklab/netapply/pkg/frr/container"
+	pkginterfacebridge "github.com/internetworklab/netapply/pkg/interface/bridge"
+	pkginterfacedummy "github.com/internetworklab/netapply/pkg/interface/dummy"
+	pkginterfaceveth "github.com/internetworklab/netapply/pkg/interface/veth"
+	pkginterfacevxlan "github.com/internetworklab/netapply/pkg/interface/vxlan"
+	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
+	pkgopenvpn2 "github.com/internetworklab/netapply/pkg/openvpn2"
+	pkgprotocolbgp "github.com/internetworklab/netapply/pkg/protocol/bgp"
+	pkgprotocolospfv2 "github.com/internetworklab/netapply/pkg/protocol/ospfv2"
 )
 
 type GlobalConfig struct {

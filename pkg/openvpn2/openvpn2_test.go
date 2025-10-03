@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	openvpn2 "example.com/connector/pkg/openvpn2"
-	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/client"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	openvpn2 "github.com/internetworklab/netapply/pkg/openvpn2"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func TestOpenVPN2ContainerCreateAndRemoval(t *testing.T) {

@@ -8,10 +8,10 @@ import (
 	"path"
 	"strings"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgfrrdaemons "example.com/connector/pkg/frr/daemons"
-	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/api/types/mount"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgfrrdaemons "github.com/internetworklab/netapply/pkg/frr/daemons"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {

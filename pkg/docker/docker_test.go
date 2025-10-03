@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/client"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func TestDockerListingNoMatched(t *testing.T) {

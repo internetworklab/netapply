@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"log"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkginterfacestub "example.com/connector/pkg/interface/stub"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	"github.com/vishvananda/netlink"
 )
 

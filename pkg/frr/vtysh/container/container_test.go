@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	pkgdocker "example.com/connector/pkg/docker"
-	pkgfrrcontainer "example.com/connector/pkg/frr/container"
-	pkgfrrvtyshcontainer "example.com/connector/pkg/frr/vtysh/container"
-	pkgutils "example.com/connector/pkg/utils"
 	"github.com/docker/docker/client"
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgfrrcontainer "github.com/internetworklab/netapply/pkg/frr/container"
+	pkgfrrvtyshcontainer "github.com/internetworklab/netapply/pkg/frr/vtysh/container"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 // To test, simply invoke `go test -v --run TestContainerVtyshConfigWriter ./pkg/frr/vtysh/container`

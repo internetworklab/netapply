@@ -1,4 +1,4 @@
-module example.com/connector
+module github.com/internetworklab/netapply
 
 go 1.23.4
 

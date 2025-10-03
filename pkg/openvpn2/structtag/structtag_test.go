@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	openvpn2 "example.com/connector/pkg/openvpn2"
-	openvpn2structtag "example.com/connector/pkg/openvpn2/structtag"
+	openvpn2 "github.com/internetworklab/netapply/pkg/openvpn2"
+	openvpn2structtag "github.com/internetworklab/netapply/pkg/openvpn2/structtag"
 	"gopkg.in/yaml.v3"
 )
 
