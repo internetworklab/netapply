@@ -67,9 +67,6 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to get service name from context: %w", err)
 	}
 
-	tty := true
-	openStdin := true
-	autoRemove := true
 	devPermRWM := "rwm"
 	containerConfig := pkgdocker.DockerContainerConfig{
 		ContainerName: ovpInst.Name,
@@ -78,9 +75,9 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 			pkgdocker.LabelKeyService:  servicename,
 			pkgdocker.LabelKeyInstance: ovpInst.Name,
 		},
-		TTY:        &tty,
-		OpenStdin:  &openStdin,
-		AutoRemove: &autoRemove,
+		TTY:        ovpInst.TTY,
+		OpenStdin:  ovpInst.OpenStdin,
+		AutoRemove: ovpInst.AutoRemove,
 		Networks:   ovpInst.DockerNetworks,
 		Image:      ovpInst.Image,
 		Capabilities: []string{

@@ -26,6 +26,7 @@ type OpenVPN2Topology string
 
 const (
 	OpenVPN2TopologySubnet OpenVPN2Topology = "subnet"
+	OpenVPN2TopologyP2P    OpenVPN2Topology = "p2p"
 	OpenVPN2TopologyNet30  OpenVPN2Topology = "net30"
 )
 
@@ -237,15 +238,21 @@ type OpenVPN2Instance struct {
 
 	// Path to the TLS cert file in the host
 	// By default, it would be bind mount to /etc/openvpn/certs/cert.pem in the container
-	HostTLSCertFile *string `openvpn2:"-" yaml:"host_tls_cert_file,omitempty" json:"host_tls_cert_file,omitempty"`
+	HostTLSCertFile string `openvpn2:"-" yaml:"host_tls_cert_file" json:"host_tls_cert_file"`
 
 	// Path to the TLS cert key file in the host
 	// By default, it would be bind mount to /etc/openvpn/certs/key.pem in the container
-	HostTLSKeyFile *string `openvpn2:"-" yaml:"host_tls_key_file,omitempty" json:"host_tls_key_file,omitempty"`
+	HostTLSKeyFile string `openvpn2:"-" yaml:"host_tls_key_file" json:"host_tls_key_file"`
 
 	// Path to the DH PEM file in the host, only needed when in server mode
 	// By default, it would be bind mount to /etc/openvpn/certs/dh.pem in the container (when provided)
 	HostDHPEMFile *string `openvpn2:"-" yaml:"host_dh_pem_file,omitempty" json:"host_dh_pem_file,omitempty"`
+
+	AutoRemove *bool `openvpn2:"-" yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
+
+	TTY *bool `openvpn2:"-" yaml:"tty,omitempty" json:"tty,omitempty"`
+
+	OpenStdin *bool `openvpn2:"-" yaml:"stdin_open,omitempty" json:"stdin_open,omitempty"`
 }
 
 type OpenVPN2ConfigurationList []OpenVPN2Instance
