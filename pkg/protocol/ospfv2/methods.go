@@ -25,6 +25,11 @@ func (ospfConf *OSPFV2Config) ToCLICommands() []string {
 
 	cmds = append(cmds, fmt.Sprintf("router ospf vrf %s", ospfConf.VRF))
 	cmds = append(cmds, fmt.Sprintf("ospf router-id %s", ospfConf.RouterID))
+
+	for _, nb := range ospfConf.NBMANeighbors {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s", nb))
+	}
+
 	cmds = append(cmds, "exit")
 
 	for _, interfaceConfig := range ospfConf.Interfaces {
