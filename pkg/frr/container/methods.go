@@ -17,7 +17,7 @@ import (
 func (frrContainerConfig *FRRContainerConfig) Apply(ctx context.Context) error {
 	statefulDir := pkgutils.GetStatefulDir(ctx)
 
-	frrConfigDir := path.Join(statefulDir, "frr")
+	frrConfigDir := path.Join(statefulDir, "frr", "containers", frrContainerConfig.ContainerName)
 	err := os.MkdirAll(frrConfigDir, 0755)
 	if err != nil {
 		if !os.IsExist(err) {

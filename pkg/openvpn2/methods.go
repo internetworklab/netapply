@@ -109,7 +109,7 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 		},
 	}
 	stateDir := pkgutils.GetStatefulDir(ctx)
-	ovpConfigDir := path.Join(stateDir, "openvpn")
+	ovpConfigDir := path.Join(stateDir, "openvpn", "containers", ovpInst.Name)
 	err = os.MkdirAll(ovpConfigDir, 0755)
 	if err != nil {
 		if !os.IsExist(err) {
