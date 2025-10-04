@@ -488,6 +488,30 @@ nodes:
           mtu: 1420
 ```
 
+To test inter-container wg connectivity:
+
+```shell
+docker exec -it lax1 ping -c3 10.1.0.2
+docker exec -it lax2 ping -c3 10.1.0.1
+```
+
+### Experiment four: VxLAN over WireGuard
+
+The network topology will looks like this
+
+```
++-------------+        +-------------+        +-------------+
+| lax1        |   wg   | lax2        |   wg   | rr          |
+| 10.1.0.1/24 | <====> | 10.1.0.2/24 | <====> | 10.1.0.3/24 |
++-------------+        +-------------+        +-------------+
+```
+
+However we use the interconnected L3 network as a underlay, to support a VxLAN overlay build upon lax1 and lax2.
+
+Where 'rr' means 'BGP Route Reflector'.
+
+
+
 (More Example configuration YAMLs are coming ...)
 
 ## Others

@@ -23,6 +23,12 @@ func (afConf *MPBGPAddressFamilyConfig) ToCLICommands(bgpConf *BGPConfig) []stri
 		cmds = append(cmds, "advertise-svi-ip")
 	}
 
+	if afConf.RouteReflectorClientNeighbors != nil {
+		for _, nb := range afConf.RouteReflectorClientNeighbors {
+			cmds = append(cmds, fmt.Sprintf("neighbor %s route-reflector-client", nb))
+		}
+	}
+
 	cmds = append(cmds, "exit-address-family")
 
 	return cmds
@@ -33,17 +39,16 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 
 	cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group", groupName))
 	cmds = append(cmds, fmt.Sprintf("neighbor %s remote-as %d", groupName, bgpNeighborGroupConfig.ASN))
-
-	if bgpNeighborGroupConfig.Capabilities != nil {
-		for _, capability := range bgpNeighborGroupConfig.Capabilities {
-			cmds = append(cmds, fmt.Sprintf("neighbor %s capability %s", groupName, capability))
-		}
+	if bgpNeighborGroupConfig.UpdateSource != nil && *bgpNeighborGroupConfig.UpdateSource != "" {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s update-source %s", groupName, *bgpNeighborGroupConfig.UpdateSource))
 	}
 
-	if bgpNeighborGroupConfig.Peers != nil {
-		for _, peer := range bgpNeighborGroupConfig.Peers {
-			cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group %s", peer, groupName))
-		}
+	for _, capability := range bgpNeighborGroupConfig.Capabilities {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s capability %s", groupName, capability))
+	}
+
+	for _, peer := range bgpNeighborGroupConfig.Peers {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group %s", peer, groupName))
 	}
 
 	for _, routeMap := range bgpNeighborGroupConfig.RouteMaps {
@@ -51,6 +56,10 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 			cmds,
 			fmt.Sprintf("neighbor %s route-map %s %s", groupName, routeMap.Name, routeMap.Direction),
 		)
+	}
+
+	if bgpNeighborGroupConfig.ListenRange != nil && *bgpNeighborGroupConfig.ListenRange != "" {
+		cmds = append(cmds, fmt.Sprintf("bgp listen range %s peer-group %s", *bgpNeighborGroupConfig.ListenRange, groupName))
 	}
 
 	return cmds
@@ -86,8 +95,16 @@ func (bgpConf *BGPConfig) ToCLICommands() []string {
 	cmds = append(cmds, fmt.Sprintf("router bgp %d vrf %s", bgpConf.ASN, bgpConf.VRF))
 	cmds = append(cmds, fmt.Sprintf("bgp router-id %s", bgpConf.RouterID))
 
+	if bgpConf.ClusterID != nil && *bgpConf.ClusterID != "" {
+		cmds = append(cmds, fmt.Sprintf("bgp cluster-id %s", *bgpConf.ClusterID))
+	}
+
 	if bgpConf.NoIPv4Unicast {
 		cmds = append(cmds, "no bgp default ipv4-unicast")
+	}
+
+	if bgpConf.LogNeighborChanges != nil && *bgpConf.LogNeighborChanges {
+		cmds = append(cmds, "bgp log-neighbor-changes")
 	}
 
 	if bgpConf.Neighbors != nil {

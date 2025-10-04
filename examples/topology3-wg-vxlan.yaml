@@ -29,7 +29,7 @@ nodes:
                 - "::/0"
           addresses:
             - local: "10.1.0.1"
-              peer: "10.1.0.2/32"
+              peer: "10.1.0.2/24"
           mtu: 1420
         - name: wg-lax2-1
           listen_port: 14142
@@ -71,5 +71,32 @@ nodes:
               endpoint: "lax1.exploro.one:14143"
           addresses:
             - local: "10.1.0.3"
-              peer: "10.1.0.2/32"
+              peer: "10.1.0.2/24"
           mtu: 1420
+    controlplane:
+      - container_name: rr
+        debug_bgp_updates: true
+        route_map:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            asn: 65001
+            router_id: "0.0.0.3"
+            cluster_id: "0.0.0.3"
+            no_ipv4_unicast: true
+            neighbors:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                listen_range: "10.1.0.0/16"
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                activate:
+                  - group1
+                route_reflector_client:
+                  - group1

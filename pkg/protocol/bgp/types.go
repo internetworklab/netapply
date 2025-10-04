@@ -30,6 +30,9 @@ type MPBGPAddressFamilyConfig struct {
 	// This configuration modifies whether to enable an address family for a specific neighbor.
 	// By default only the IPv4 unicast address family is enabled.
 	Activate []string `yaml:"activate,omitempty" json:"activate,omitempty"`
+
+	// Useful in BGP Route Reflector, treat peer as the client of BGP RR.
+	RouteReflectorClientNeighbors []string `yaml:"route_reflector_client,omitempty" json:"route_reflector_client,omitempty"`
 }
 
 type RouteMapDirection string
@@ -52,8 +55,10 @@ type BGPNeighborGroupConfig struct {
 	RouteMaps    []BGPNeighborRouteMapApply `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
 
 	// Addresses of the peers in the group
-	Peers []string `yaml:"peers,omitempty" json:"peers,omitempty"`
-	ASN   int      `yaml:"asn,omitempty" json:"asn,omitempty"`
+	Peers        []string `yaml:"peers,omitempty" json:"peers,omitempty"`
+	ASN          int      `yaml:"asn,omitempty" json:"asn,omitempty"`
+	UpdateSource *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
+	ListenRange  *string  `yaml:"listen_range,omitempty" json:"listen_range,omitempty"`
 }
 
 type BGPRPKIRTRConfig struct {
@@ -82,6 +87,7 @@ type BGPConfig struct {
 	VRF             string                     `yaml:"vrf" json:"vrf"`
 	ASN             int                        `yaml:"asn" json:"asn"`
 	RouterID        string                     `yaml:"router_id" json:"router_id"`
+	ClusterID       *string                    `yaml:"cluster_id,omitempty" json:"cluster_id,omitempty"`
 	NoIPv4Unicast   bool                       `yaml:"no_ipv4_unicast" json:"no_ipv4_unicast"`
 	AddressFamilies []MPBGPAddressFamilyConfig `yaml:"address_families" json:"address_families"`
 
@@ -89,6 +95,7 @@ type BGPConfig struct {
 	Neighbors map[string]BGPNeighborGroupConfig `yaml:"neighbors" json:"neighbors"`
 
 	NeighborRPKIStrict []string `yaml:"neighbor_rpki_strict,omitempty" json:"neighbor_rpki_strict,omitempty"`
+	LogNeighborChanges *bool `yaml:"log_neighbor_changes,omitempty" json:"log_neighbor_changes,omitempty"`
 }
 
 type RouteMapPolicy string
