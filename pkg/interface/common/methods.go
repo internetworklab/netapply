@@ -27,13 +27,14 @@ func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 		return nlAddr, nil
 	}
 
-	_, ipNet, err := net.ParseCIDR(*addrConfig.CIDR)
+	ipobj, ipNet, err := net.ParseCIDR(*addrConfig.CIDR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse cidr: %w", err)
 	}
 
 	nlAddr := new(netlink.Addr)
 	nlAddr.IPNet = ipNet
+	nlAddr.IP = ipobj
 	return nlAddr, nil
 }
 

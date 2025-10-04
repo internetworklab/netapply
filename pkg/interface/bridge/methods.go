@@ -3,6 +3,8 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"log"
+	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
@@ -80,7 +82,7 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 		specSlaveIfs := make(map[string]interface{})
 		for _, slaveInterface := range bridgeConfig.SlaveInterfaces {
 			specSlaveIfs[slaveInterface] = true
-			if _, ok := enslavedLinks[slaveInterface]; ok {
+			if _, ok := enslavedLinks[slaveInterface]; !ok {
 				changeSet.InterfaceToEnslave[slaveInterface] = true
 			}
 		}
@@ -90,6 +92,18 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 				changeSet.InterfaceToUnslave[slif.Attrs().Name] = true
 			}
 		}
+
+		log.Println("Debugging bridge changeset for ", bridgeConfig.Name, "ns", pkgdocker.GetContainerDisplayName(bridgeConfig.ContainerName))
+		ifaceList := make([]string, 0)
+		for iface := range changeSet.InterfaceToEnslave {
+			ifaceList = append(ifaceList, iface)
+		}
+		log.Println("interface to enslave:", strings.Join(ifaceList, ", "))
+		ifaceList = make([]string, 0)
+		for iface := range changeSet.InterfaceToUnslave {
+			ifaceList = append(ifaceList, iface)
+		}
+		log.Println("interface to unenslave:", strings.Join(ifaceList, ", "))
 
 		addrsChangeSet, err := pkginterfacecommon.CompareSpecAddrsAgainstActualAddrs(bridgeConfig.Addresses, link, handle)
 		if err != nil {
