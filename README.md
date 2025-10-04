@@ -684,7 +684,15 @@ nodes:
 To test effects:
 
 ```shell
+# check bgp session establishment from view point of RR
 docker exec -it rr vtysh -c 'show bgp summary'
+
+# check evpn type 2 routes announcement
+docker exec -it rr vtysh -c 'show bgp l2vpn evpn route type macip'
+docker exec -it lax1 ip a show br101
+docker exec -it lax2 ip a show br101
+
+# check l2 connectivity
 docker exec -it lax1 ping -c3 ff02::1%br101
 docker exec -it lax2 ping -c3 ff02::1%br101
 ```
