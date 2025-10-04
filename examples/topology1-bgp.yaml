@@ -1,0 +1,103 @@
+nodes:
+  testnode:
+    frr_containers:
+      - container_name: lax1
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax1
+      - container_name: lax2
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax2
+      - container_name: ix
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: ix
+    containers:
+      - lax1
+      - lax2
+      - ix
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      dummy:
+        - name: dummy0
+          container_name: lax1
+          addresses:
+            - cidr: "10.1.0.0/16"
+        - name: dummy0
+          container_name: lax2
+          addresses:
+            - cidr: "10.2.0.0/16"
+      veth:
+        - name: v-lax1-a
+          container_name: lax1
+          addresses:
+            - cidr: "192.168.31.1/30"
+          peer:
+            name: v-lax1-b
+            container_name: ix
+        - name: v-lax2-a
+          container_name: lax2
+          addresses:
+            - cidr: "192.168.31.2/30"
+          peer:
+            name: v-lax2-b
+            container_name: ix
+      bridge:
+        - name: br0
+          container_name: ix
+          slave_interfaces:
+            - v-lax1-b
+            - v-lax2-b
+    controlplane:
+      - container_name: lax1
+        debug_bgp_updates: true
+        route_map:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            asn: 65001
+            router_id: "0.0.0.1"
+            address_families:
+              - afi: ipv4
+                safi: unicast
+                networks:
+                  - "10.1.0.0/16"
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                asn: 65002
+                peers:
+                  - "192.168.31.2"
+                route_maps:
+                  - name: allow-all
+                    direction: in
+                  - name: allow-all
+                    direction: out
+      - container_name: lax2
+        debug_bgp_updates: true
+        route_map:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            asn: 65002
+            router_id: "0.0.0.2"
+            address_families:
+              - afi: ipv4
+                safi: unicast
+                networks:
+                  - "10.2.0.0/16"
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                asn: 65001
+                peers:
+                  - "192.168.31.1"
+                route_maps:
+                  - name: allow-all
+                    direction: in
+                  - name: allow-all
+                    direction: out

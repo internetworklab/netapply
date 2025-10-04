@@ -31,7 +31,7 @@ Here's the main steps the program takes:
 
 ## Example configurations
 
-### Experiment one
+### Experiment one: Simple OSPF
 
 ![topology1](./docs/imgs/topology1.drawio.png)
 
@@ -262,7 +262,174 @@ for name in lax1 lax2 ix; do
 done
 ```
 
-(More Example configuration YAMLs are on the way ...)
+### Experiment two: Simple BGP
+
+You will reuse the network topology from Case 1. However, the control plane in Case 2 differs, as it utilizes BGP instead of the OSPF used in Case 1.
+
+You need to perform the following configurations:
+
+1. Configure the FRR on the lax1 node so that lax1 advertises 10.1.0.0/16 to lax2 via BGP.
+2. Configure the FRR on the lax2 node so that lax2 advertises 10.2.0.0/16 to lax1 via BGP.
+3. Verify that lax1 receives the route for 10.2.0.0/16 advertised by lax2 via BGP.
+4. Verify that lax2 receives the route for 10.1.0.0/16 advertised by lax1 via BGP.
+
+Before proceed to experiment two, make sure that you have clean up the environment setup by experiment one.
+
+In YAML, you can delcare it in this way:
+
+```yaml
+nodes:
+  testnode:
+    frr_containers:
+      - container_name: lax1
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax1
+      - container_name: lax2
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax2
+      - container_name: ix
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: ix
+    containers:
+      - lax1
+      - lax2
+      - ix
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      dummy:
+        - name: dummy0
+          container_name: lax1
+          addresses:
+            - cidr: "10.1.0.0/16"
+        - name: dummy0
+          container_name: lax2
+          addresses:
+            - cidr: "10.2.0.0/16"
+      veth:
+        - name: v-lax1-a
+          container_name: lax1
+          addresses:
+            - cidr: "192.168.31.1/30"
+          peer:
+            name: v-lax1-b
+            container_name: ix
+        - name: v-lax2-a
+          container_name: lax2
+          addresses:
+            - cidr: "192.168.31.2/30"
+          peer:
+            name: v-lax2-b
+            container_name: ix
+      bridge:
+        - name: br0
+          container_name: ix
+          slave_interfaces:
+            - v-lax1-b
+            - v-lax2-b
+    controlplane:
+      - container_name: lax1
+        debug_bgp_updates: true
+        route_map:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            asn: 65001
+            router_id: "0.0.0.1"
+            address_families:
+              - afi: ipv4
+                safi: unicast
+                networks:
+                  - "10.1.0.0/16"
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                asn: 65002
+                peers:
+                  - "192.168.31.2"
+                route_maps:
+                  - name: allow-all
+                    direction: in
+                  - name: allow-all
+                    direction: out
+      - container_name: lax2
+        debug_bgp_updates: true
+        route_map:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            asn: 65002
+            router_id: "0.0.0.2"
+            address_families:
+              - afi: ipv4
+                safi: unicast
+                networks:
+                  - "10.2.0.0/16"
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                asn: 65001
+                peers:
+                  - "192.168.31.1"
+                route_maps:
+                  - name: allow-all
+                    direction: in
+                  - name: allow-all
+                    direction: out
+```
+
+Alternatively, with CLI, you need to apply below configurations to vtysh of lax1 and lax2, respectively:
+
+On vtysh of lax1:
+
+```vtysh
+lax1# configure terminal
+lax1(config)# route-map allow-all permit 10
+lax1(config-route-map)# exit
+lax1(config)# router bgp 65001
+lax1(config-router)# bgp router-id 0.0.0.1
+lax1(config-router)# neighbor group1 peer-group 
+lax1(config-router)# neighbor group1 remote-as 65001
+lax1(config-router)# neighbor 192.168.31.2 peer-group group1
+lax1(config-router)# address-family ipv4 unicast 
+lax1(config-router-af)# neighbor group1 activate 
+lax1(config-router-af)# neighbor group1 route-map allow-all in
+lax1(config-router-af)# neighbor group1 route-map allow-all out
+lax1(config-router-af)# network 10.1.0.0/16
+lax1(config-router-af)# exit-address-family 
+lax1(config-router)# exit
+lax1(config)# exit
+lax1# exit
+```
+
+On vtysh of lax2:
+
+```vtysh
+lax2# configure terminal
+lax2(config)# route-map allow-all permit 10
+lax2(config-route-map)# exit
+lax2(config)# router bgp 65002
+lax2(config-router)# bgp router-id 0.0.0.2
+lax2(config-router)# neighbor group1 peer-group 
+lax2(config-router)# neighbor group1 remote-as 65001
+lax2(config-router)# neighbor 192.168.31.1 peer-group group1
+lax2(config-router)# address-family ipv4 unicast 
+lax2(config-router-af)# neighbor group1 activate 
+lax2(config-router-af)# neighbor group1 route-map allow-all in
+lax2(config-router-af)# neighbor group1 route-map allow-all out
+lax2(config-router-af)# network 10.2.0.0/16
+lax2(config-router-af)# exit-address-family 
+lax2(config-router)# exit
+lax2(config)# exit
+lax2# exit
+```
+
+(More Example configuration YAMLs are coming ...)
 
 ## Others
 

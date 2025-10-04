@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -10,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/alecthomas/kong"
-	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"gopkg.in/yaml.v3"
 
@@ -30,25 +28,12 @@ func down(ctx context.Context) error {
 		return fmt.Errorf("failed to get container list from service name: %w", err)
 	}
 
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get docker cli from context: %w", err)
-	}
-
 	for _, cont := range containerList.GetContainers() {
-		if err := cli.ContainerStop(ctx, cont.ID, container.StopOptions{}); err != nil {
+		if err := pkgdocker.StopAndRemoveContainer(ctx, pkgutils.NormalizeContainerName(cont.Names[0])); err != nil {
 			fmt.Fprintf(os.Stderr, "failed to stop container %s: %v\n", cont.Names[0], err)
 			continue
 		}
-		labelsStr := ""
-		if cont.Labels != nil {
-			v, err := json.Marshal(cont.Labels)
-			if err != nil {
-				log.Fatalf("failed to marshal labels for %s: %v", cont.Names[0], err)
-			}
-			labelsStr = string(v)
-		}
-		log.Printf("Container %s %s is stopped", cont.Names[0], labelsStr)
+		log.Printf("Container %s is stopped", cont.Names[0])
 	}
 
 	return nil

@@ -228,6 +228,7 @@ func FindContainer(ctx context.Context, cli *client.Client, containerName string
 
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: filters,
+		All:     true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
