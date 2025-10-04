@@ -29,7 +29,7 @@ type ControlplaneConfig struct {
 	OSPFv2   []pkgprotocolospfv2.OSPFV2Config `yaml:"ospfv2,omitempty" json:"ospfv2,omitempty"`
 	BGP      []pkgprotocolbgp.BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`
 	RPKI     []pkgprotocolbgp.BGPRPKIConfig   `yaml:"rpki,omitempty" json:"rpki,omitempty"`
-	RouteMap []pkgprotocolbgp.RouteMapConfig  `yaml:"route_map,omitempty" json:"route_map,omitempty"`
+	RouteMap []pkgprotocolbgp.RouteMapConfig  `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
 }
 
 type NodeConfig struct {

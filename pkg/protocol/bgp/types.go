@@ -33,6 +33,8 @@ type MPBGPAddressFamilyConfig struct {
 
 	// Useful in BGP Route Reflector, treat peer as the client of BGP RR.
 	RouteReflectorClientNeighbors []string `yaml:"route_reflector_client,omitempty" json:"route_reflector_client,omitempty"`
+
+	RouteMaps []BGPNeighborRouteMapApply `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
 }
 
 type RouteMapDirection string
@@ -43,6 +45,8 @@ const (
 )
 
 type BGPNeighborRouteMapApply struct {
+	Peer string `yaml:"peer,omitempty" json:"peer,omitempty"`
+
 	// Name of the route-map to apply to the neighbor
 	Name string `yaml:"name" json:"name"`
 
@@ -51,14 +55,14 @@ type BGPNeighborRouteMapApply struct {
 }
 
 type BGPNeighborGroupConfig struct {
-	Capabilities []string                   `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
-	RouteMaps    []BGPNeighborRouteMapApply `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
+	Capabilities []string `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
 
 	// Addresses of the peers in the group
-	Peers        []string `yaml:"peers,omitempty" json:"peers,omitempty"`
-	ASN          int      `yaml:"asn,omitempty" json:"asn,omitempty"`
-	UpdateSource *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
-	ListenRange  *string  `yaml:"listen_range,omitempty" json:"listen_range,omitempty"`
+	Peers          []string `yaml:"peers,omitempty" json:"peers,omitempty"`
+	LinklocalPeers []string `yaml:"linklocal_peers,omitempty" json:"linklocal_peers,omitempty"`
+	ASN            int      `yaml:"asn,omitempty" json:"asn,omitempty"`
+	UpdateSource   *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
+	ListenRange    *string  `yaml:"listen_range,omitempty" json:"listen_range,omitempty"`
 }
 
 type BGPRPKIRTRConfig struct {
@@ -95,7 +99,7 @@ type BGPConfig struct {
 	Neighbors map[string]BGPNeighborGroupConfig `yaml:"neighbors" json:"neighbors"`
 
 	NeighborRPKIStrict []string `yaml:"neighbor_rpki_strict,omitempty" json:"neighbor_rpki_strict,omitempty"`
-	LogNeighborChanges *bool `yaml:"log_neighbor_changes,omitempty" json:"log_neighbor_changes,omitempty"`
+	LogNeighborChanges *bool    `yaml:"log_neighbor_changes,omitempty" json:"log_neighbor_changes,omitempty"`
 }
 
 type RouteMapPolicy string

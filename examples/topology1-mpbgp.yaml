@@ -20,23 +20,23 @@ nodes:
         - name: dummy0
           container_name: lax1
           addresses:
-            - cidr: "10.1.0.0/16"
+            - cidr: "fdda:8ca4:1556:a::1/64"
         - name: dummy0
           container_name: lax2
           addresses:
-            - cidr: "10.2.0.0/16"
+            - cidr: "fdda:8ca4:1556:b::1/64"
       veth:
         - name: v-lax1-a
           container_name: lax1
           addresses:
-            - cidr: "192.168.31.1/30"
+            - cidr: "fe80::a/64"
           peer:
             name: v-lax1-b
             container_name: ix
         - name: v-lax2-a
           container_name: lax2
           addresses:
-            - cidr: "192.168.31.2/30"
+            - cidr: "fe80::b/64"
           peer:
             name: v-lax2-b
             container_name: ix
@@ -49,59 +49,70 @@ nodes:
     controlplane:
       - container_name: lax1
         debug_bgp_updates: true
-        route_map:
+        route_maps:
           - name: allow-all
             policy: permit
             order: 10
         bgp:
           - vrf: default
+            log_neighbor_changes: true
+            no_ipv4_unicast: true
             asn: 65001
             router_id: "0.0.0.1"
             address_families:
-              - afi: ipv4
+              - afi: ipv6
                 safi: unicast
                 networks:
-                  - "10.1.0.0/16"
+                  - "fdda:8ca4:1556:a::/64"
                 activate:
                   - group1
+                route_maps:
+                  - peer: group1
+                    name: allow-all
+                    direction: in
+                  - peer: group1
+                    name: allow-all
+                    direction: out
             neighbors:
               group1:
                 asn: 65002
-                peers:
-                  - "192.168.31.2"
-                route_maps:
-                  ipv4:
-                    unicast:
-                      - name: allow-all
-                        direction: in
-                      - name: allow-all
-                        direction: out
+                capabilities:
+                  - extended-nexthop
+                linklocal_peers:
+                  - "fe80::b%v-lax1-a"
+                update_source: "fe80::a"
       - container_name: lax2
         debug_bgp_updates: true
-        route_map:
+        route_maps:
           - name: allow-all
             policy: permit
             order: 10
         bgp:
           - vrf: default
+            log_neighbor_changes: true
+            no_ipv4_unicast: true
             asn: 65002
             router_id: "0.0.0.2"
             address_families:
-              - afi: ipv4
+              - afi: ipv6
+                route_maps:
+                  - peer: group1
+                    name: allow-all
+                    direction: in
+                  - peer: group1
+                    name: allow-all
+                    direction: out
                 safi: unicast
                 networks:
-                  - "10.2.0.0/16"
+                  - "fdda:8ca4:1556:b::/64"
                 activate:
                   - group1
             neighbors:
               group1:
                 asn: 65001
-                peers:
-                  - "192.168.31.1"
-                route_maps:
-                  ipv4:
-                    unicast:
-                      - name: allow-all
-                        direction: in
-                      - name: allow-all
-                        direction: out
+                capabilities:
+                  - extended-nexthop
+                linklocal_peers:
+                  - "fe80::a%v-lax2-a"
+                update_source: "fe80::b"
+

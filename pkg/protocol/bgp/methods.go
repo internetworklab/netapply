@@ -1,6 +1,9 @@
 package bgp
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 func (afConf *MPBGPAddressFamilyConfig) ToCLICommands(bgpConf *BGPConfig) []string {
 	cmds := make([]string, 0)
@@ -29,6 +32,10 @@ func (afConf *MPBGPAddressFamilyConfig) ToCLICommands(bgpConf *BGPConfig) []stri
 		}
 	}
 
+	for _, routeMap := range afConf.RouteMaps {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s route-map %s %s", routeMap.Peer, routeMap.Name, routeMap.Direction))
+	}
+
 	cmds = append(cmds, "exit-address-family")
 
 	return cmds
@@ -51,11 +58,15 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 		cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group %s", peer, groupName))
 	}
 
-	for _, routeMap := range bgpNeighborGroupConfig.RouteMaps {
-		cmds = append(
-			cmds,
-			fmt.Sprintf("neighbor %s route-map %s %s", groupName, routeMap.Name, routeMap.Direction),
-		)
+	for _, linklocalPeer := range bgpNeighborGroupConfig.LinklocalPeers {
+		segs := strings.Split(strings.TrimSpace(linklocalPeer), "%")
+		if len(segs) != 2 {
+			continue
+		}
+		peeraddr := segs[0]
+		ifname := segs[1]
+		cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group %s", peeraddr, groupName))
+		cmds = append(cmds, fmt.Sprintf("neighbor %s interface %s", peeraddr, ifname))
 	}
 
 	if bgpNeighborGroupConfig.ListenRange != nil && *bgpNeighborGroupConfig.ListenRange != "" {
