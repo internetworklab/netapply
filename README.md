@@ -443,7 +443,7 @@ lax2# exit
 
 ### Experiment three: Simple WireGuard
 
-See [./examples/topology2-wg.yaml)](./examples/topology2-wg.yaml)
+See [./examples/topology2-wg.yaml](./examples/topology2-wg.yaml)
 
 ```yaml
 nodes:
@@ -510,7 +510,184 @@ However we use the interconnected L3 network as a underlay, to support a VxLAN o
 
 Where 'rr' means 'BGP Route Reflector'.
 
+See [./examples/topology3-wg-vxlan.yaml](./examples/topology3-wg-vxlan.yaml)
 
+```yaml
+nodes:
+  testnode:
+    frr_containers:
+      - container_name: lax1
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax1
+      - container_name: lax2
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax2
+      - container_name: rr
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax2
+    containers:
+      - lax1
+      - lax2
+      - rr
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      vxlan:
+        - name: vx101
+          container_name: lax1
+          vxlan_id: 101
+          local_ip: "10.1.0.1"
+          mtu: 1370
+          nolearning: true
+        - name: vx101
+          container_name: lax2
+          vxlan_id: 101
+          local_ip: "10.1.0.2"
+          mtu: 1370
+          nolearning: true
+      bridge:
+        - name: br101
+          container_name: lax1
+          slave_interfaces:
+            - vx101
+        - name: br101
+          container_name: lax2
+          slave_interfaces:
+            - vx101
+      wireguard:
+        - name: wg-lax1-1
+          listen_port: 14141
+          container_name: lax1
+          privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
+          peers:
+            - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
+              endpoint: "lax1.exploro.one:14142"
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+          addresses:
+            - local: "10.1.0.1"
+              peer: "10.1.0.2/24"
+          mtu: 1420
+        - name: wg-lax2-1
+          listen_port: 14142
+          container_name: lax2
+          privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
+          peers:
+            - publickey: "b9fucppbWxKLAWSxn8UJY5NlcnPF+Yz6s64XJwOdPAg="
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+              endpoint: "lax1.exploro.one:14141"
+          addresses:
+            - local: "10.1.0.2"
+              peer: "10.1.0.1/32"
+          mtu: 1420
+        - name: wg-lax2-2
+          listen_port: 14143
+          container_name: lax2
+          privatekey: "8I7sCBxyOuztvnjT711YQ8YfEeQTuDh/XPn386u1BEI="
+          peers:
+            - publickey: "1/CG4w+uLOgsk0G0Qiy9APyWsf8YJll7gExIQJb31h8="
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+              endpoint: "lax1.exploro.one:14144"
+          addresses:
+            - local: "10.1.0.2"
+              peer: "10.1.0.3/32"
+          mtu: 1420
+        - name: wg-rr-1
+          listen_port: 14144
+          container_name: rr
+          privatekey: "8IGasID81IKbxG9SfUAgYbKp/U8aVmq3Xl8dmMYeLl8="
+          peers:
+            - publickey: "G9Xs9qtDdk2a4HHcR0xkTjDTKMXOyqlquWXbZI+WPxU="
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+              endpoint: "lax1.exploro.one:14143"
+          addresses:
+            - local: "10.1.0.3"
+              peer: "10.1.0.2/24"
+          mtu: 1420
+    controlplane:
+      - container_name: rr
+        debug_bgp_updates: true
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            asn: 65001
+            router_id: "0.0.0.3"
+            cluster_id: "0.0.0.3"
+            no_ipv4_unicast: true
+            neighbors:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                listen_range: "10.1.0.0/16"
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                activate:
+                  - group1
+                route_reflector_client:
+                  - group1
+      - container_name: lax1
+        debug_bgp_updates: true
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            asn: 65001
+            router_id: "0.0.0.1"
+            no_ipv4_unicast: true
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                advertise_all_vni: true
+                advertise_svi_ip: true
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                peers:
+                  - "10.1.0.3"
+                update_source: "10.1.0.1"
+      - container_name: lax2
+        debug_bgp_updates: true
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            asn: 65001
+            router_id: "0.0.0.2"
+            no_ipv4_unicast: true
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                advertise_all_vni: true
+                advertise_svi_ip: true
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                peers:
+                  - "10.1.0.3"
+                update_source: "10.1.0.2"
+```
+
+To test effects:
+
+```shell
+docker exec -it rr vtysh -c 'show bgp summary'
+docker exec -it lax1 ping -c3 ff02::1%br101
+docker exec -it lax2 ping -c3 ff02::1%br101
+```
 
 (More Example configuration YAMLs are coming ...)
 

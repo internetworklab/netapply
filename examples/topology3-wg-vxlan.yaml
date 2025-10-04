@@ -16,6 +16,28 @@ nodes:
       - rr
     stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
     dataplane:
+      vxlan:
+        - name: vx101
+          container_name: lax1
+          vxlan_id: 101
+          local_ip: "10.1.0.1"
+          mtu: 1370
+          nolearning: true
+        - name: vx101
+          container_name: lax2
+          vxlan_id: 101
+          local_ip: "10.1.0.2"
+          mtu: 1370
+          nolearning: true
+      bridge:
+        - name: br101
+          container_name: lax1
+          slave_interfaces:
+            - vx101
+        - name: br101
+          container_name: lax2
+          slave_interfaces:
+            - vx101
       wireguard:
         - name: wg-lax1-1
           listen_port: 14141
@@ -76,10 +98,6 @@ nodes:
     controlplane:
       - container_name: rr
         debug_bgp_updates: true
-        route_map:
-          - name: allow-all
-            policy: permit
-            order: 10
         bgp:
           - vrf: default
             log_neighbor_changes: true
@@ -100,3 +118,49 @@ nodes:
                   - group1
                 route_reflector_client:
                   - group1
+      - container_name: lax1
+        debug_bgp_updates: true
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            asn: 65001
+            router_id: "0.0.0.1"
+            no_ipv4_unicast: true
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                advertise_all_vni: true
+                advertise_svi_ip: true
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                peers:
+                  - "10.1.0.3"
+                update_source: "10.1.0.1"
+      - container_name: lax2
+        debug_bgp_updates: true
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            asn: 65001
+            router_id: "0.0.0.2"
+            no_ipv4_unicast: true
+            address_families:
+              - afi: l2vpn
+                safi: evpn
+                advertise_all_vni: true
+                advertise_svi_ip: true
+                activate:
+                  - group1
+            neighbors:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                peers:
+                  - "10.1.0.3"
+                update_source: "10.1.0.2"
