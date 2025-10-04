@@ -209,6 +209,17 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to get veth link: %w", err)
 			}
+
+			for _, addr := range vethPairConfig.Addresses {
+				nlAddr, err := addr.ToNetlinkAddr()
+				if err != nil {
+					return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+				}
+				if err := handle.AddrAdd(link, nlAddr); err != nil {
+					return fmt.Errorf("failed to add address to veth link: %w", err)
+				}
+			}
+
 			return handle.LinkSetUp(link)
 		})
 		if err != nil {
@@ -220,6 +231,19 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to get veth link: %w", err)
 			}
+
+			if vethPairConfig.Peer != nil {
+				for _, addr := range vethPairConfig.Peer.Addresses {
+					nlAddr, err := addr.ToNetlinkAddr()
+					if err != nil {
+						return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+					}
+					if err := handle.AddrAdd(link, nlAddr); err != nil {
+						return fmt.Errorf("failed to add address to veth link: %w", err)
+					}
+				}
+			}
+
 			return handle.LinkSetUp(link)
 		})
 		if err != nil {
