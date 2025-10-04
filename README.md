@@ -383,7 +383,7 @@ nodes:
                     direction: out
 ```
 
-Alternatively, with CLI, you need to apply below configurations to vtysh of lax1 and lax2, respectively:
+Alternatively, with CLI, you might also apply below configurations to vtysh of lax1 and lax2 respectively, to achieve equivalent effect:
 
 On vtysh of lax1:
 
