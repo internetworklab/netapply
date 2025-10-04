@@ -264,7 +264,7 @@ done
 
 ### Experiment two: Simple BGP
 
-You will reuse the network topology from Case 1. However, the control plane in Case 2 differs, as it utilizes BGP instead of the OSPF used in Case 1.
+You will reuse the network topology from experiment one. However, the control plane in Case 2 differs, as it utilizes BGP instead of the OSPF used in experiment one.
 
 You need to perform the following configurations:
 
