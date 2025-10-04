@@ -259,4 +259,5 @@ type OpenVPN2ConfigurationList []OpenVPN2Instance
 
 type OpenVPN2InterfaceCanceller struct {
 	ContainerName string
+	InterfaceName string
 }

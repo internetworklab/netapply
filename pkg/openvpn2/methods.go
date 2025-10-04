@@ -3,10 +3,13 @@ package openvpn2
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
 
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkgopenvpnstructtag "github.com/internetworklab/netapply/pkg/openvpn2/structtag"
@@ -60,6 +63,9 @@ func (ovpInst *OpenVPN2Instance) Update(ctx context.Context) error {
 	return nil
 }
 
+const labelCategoryDataplane string = "dataplane"
+const labelIfaceTypeOpenVPN string = "openvpn"
+
 func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
 	if err != nil {
@@ -86,8 +92,10 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 		ContainerName: ovpInst.Name,
 		Hostname:      ovpInst.HostName,
 		Labels: map[string]string{
-			pkgdocker.LabelKeyService:  servicename,
-			pkgdocker.LabelKeyInstance: ovpInst.Name,
+			pkgdocker.LabelKeyService:   servicename,
+			pkgdocker.LabelKeyInstance:  ovpInst.Name,
+			pkgdocker.LabelKeyCategory:  labelCategoryDataplane,
+			pkgdocker.LabelKeyIfaceType: labelIfaceTypeOpenVPN,
 		},
 		Command:    cmd,
 		TTY:        ovpInst.TTY,
@@ -186,6 +194,53 @@ func (ovpInst *OpenVPN2Instance) IsLinkExists(ctx context.Context) bool {
 	return true
 }
 
+// By default, it scans all tun/tap virtual interfaces in the specified containers
+func getContainerAndIfaces(ctx context.Context, serviceName string, containerNames []string) (map[string]map[string]pkgreconcile.InterfaceCanceller, error) {
+	args := filters.NewArgs()
+	args.Add("label", fmt.Sprintf("%s=%s", pkgdocker.LabelKeyService, serviceName))
+	args.Add("label", fmt.Sprintf("%s=%s", pkgdocker.LabelKeyCategory, labelCategoryDataplane))
+	args.Add("label", fmt.Sprintf("%s=%s", pkgdocker.LabelKeyIfaceType, labelIfaceTypeOpenVPN))
+
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	conts, err := cli.ContainerList(ctx, container.ListOptions{
+		Filters: args,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	scanContNameSet := make(map[string]bool)
+	for _, contName := range containerNames {
+		scanContNameSet[contName] = true
+	}
+
+	result := make(map[string]map[string]pkgreconcile.InterfaceCanceller)
+	for _, cont := range conts {
+		contName := pkgutils.NormalizeContainerName(cont.Names[0])
+		if _, ok := scanContNameSet[contName]; !ok {
+			continue
+		}
+
+		ifaceMap, err := pkgreconcile.GetInterfaceFromContainer(ctx, &contName, "tun")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get interface from container: %w", err)
+		}
+		result[contName] = ifaceMap
+
+		ifaceMap, err = pkgreconcile.GetInterfaceFromContainer(ctx, &contName, "tap")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get interface from container: %w", err)
+		}
+		result[contName] = ifaceMap
+	}
+
+	return result, nil
+}
+
 func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
 	// Reconciliaton of container-based OpenVPN instances is quite simple, rules:
 	// 1. If the container is present on the system but not in the list, remove it.
@@ -200,36 +255,79 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 		return nil, fmt.Errorf("failed to get service name: %w", err)
 	}
 
-	containerList, err := pkgdocker.NewContainerListFromServiceName(ctx, serviceName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container list from service name: %w", err)
-	}
-
+	// key is the container name, value is the list of interfaces to be added/removed/updated
 	addedSet := make(map[string][]pkgreconcile.InterfaceProvisioner)
 	removedSet := make(map[string][]pkgreconcile.InterfaceCanceller)
 	updatedSet := make(map[string][]pkgreconcile.InterfaceChangeSet)
 
-	specMap := make(map[string]OpenVPN2Instance)
+	specMap := make(map[string]map[string]OpenVPN2Instance)
 	for _, c := range ovpList {
-		specMap[c.Name] = c
+		nsKey := string(pkgdocker.GetContainerKey(c.GetContainerName()))
+		if _, ok := specMap[nsKey]; !ok {
+			specMap[nsKey] = make(map[string]OpenVPN2Instance)
+		}
+		specMap[nsKey][c.GetInterfaceName()] = c
 	}
 
-	containersMap := make(map[string]interface{})
-	for _, container := range containerList.GetContainers() {
-		contName := pkgutils.NormalizeContainerName(container.Names[0])
-		containersMap[contName] = container
-		if _, ok := specMap[contName]; !ok {
-			removedSet[contName] = make([]pkgreconcile.InterfaceCanceller, 0)
-			removedSet[contName] = append(removedSet[contName], &OpenVPN2InterfaceCanceller{ContainerName: contName})
+	currentIfacesMap, err := getContainerAndIfaces(ctx, serviceName, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container and ifaces: %w", err)
+	}
+	log.Println("Debugging openvpn2 current ifaces map: ")
+	for nsKey, ifaceMap := range currentIfacesMap {
+		for ifaceName := range ifaceMap {
+			// Print it out to see what `getContainerAndIfaces` gets
+			log.Printf("%s: %s", pkgdocker.GetContainerDisplayName(&nsKey), ifaceName)
 		}
 	}
 
-	for _, c := range specMap {
-		if _, ok := containersMap[c.Name]; !ok {
-			contName := pkgutils.NormalizeContainerName(c.Name)
-			addedSet[contName] = make([]pkgreconcile.InterfaceProvisioner, 0)
-			addedSet[contName] = append(addedSet[contName], &c)
+	// todo: rewrite this
+	for _, nsKey := range containers {
+		if ifaceMap, ok := currentIfacesMap[nsKey]; ok && ifaceMap != nil {
+			for ifaceName := range ifaceMap {
+				if _, ok := specMap[nsKey]; !ok {
+					if _, hit := removedSet[nsKey]; !hit {
+						removedSet[nsKey] = make([]pkgreconcile.InterfaceCanceller, 0)
+					}
+					removedSet[nsKey] = append(removedSet[nsKey], &OpenVPN2InterfaceCanceller{ContainerName: nsKey, InterfaceName: ifaceName})
+				}
+			}
 		}
+
+		if specSubMap, ok := specMap[nsKey]; ok && specSubMap != nil {
+			for ifaceName, ifspec := range specSubMap {
+				if _, ok := currentIfacesMap[nsKey]; !ok {
+					if _, hit := addedSet[nsKey]; !hit {
+						addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
+					}
+					addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
+					continue
+				}
+				if _, ok := currentIfacesMap[nsKey][ifaceName]; !ok {
+					if _, hit := removedSet[nsKey]; !hit {
+						addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
+					}
+					addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
+					continue
+				}
+			}
+		}
+	}
+
+	log.Println("Debugging openvpn2 changeset:")
+	for nsKey, ifaces := range addedSet {
+		ifaceList := make([]string, 0)
+		for _, ifaceObj := range ifaces {
+			ifaceList = append(ifaceList, ifaceObj.GetInterfaceName())
+		}
+		log.Printf("added: %s: %v", nsKey, strings.Join(ifaceList, ", "))
+	}
+	for nsKey, ifaces := range removedSet {
+		ifaceList := make([]string, 0)
+		for _, canceller := range ifaces {
+			ifaceList = append(ifaceList, canceller.GetInterfaceName())
+		}
+		log.Printf("removed: %s: %v", nsKey, strings.Join(ifaceList, ", "))
 	}
 
 	changeSet.AddedInterfaces = addedSet
@@ -248,5 +346,5 @@ func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetContainerName() *str
 }
 
 func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetInterfaceName() string {
-	return "-"
+	return ovpInterfaceCanceller.InterfaceName
 }
