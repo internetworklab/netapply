@@ -1,0 +1,40 @@
+nodes:
+  testnode:
+    frr_containers:
+      - container_name: lax1
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax1
+      - container_name: lax2
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax2
+    containers:
+      - lax1
+      - lax2
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      wireguard:
+        - name: wg-lax1-1
+          listen_port: 14141
+          container_name: lax1
+          privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
+          peers:
+            - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
+              endpoint: "lax1.exploro.one:14142"
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+          addresses:
+            - cidr: "10.1.0.1/30"
+          mtu: 1420
+        - name: wg-lax2-1
+          listen_port: 14142
+          container_name: lax2
+          privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
+          peers:
+            - publickey: "b9fucppbWxKLAWSxn8UJY5NlcnPF+Yz6s64XJwOdPAg="
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+          addresses:
+            - cidr: "10.1.0.2/30"
+          mtu: 1420

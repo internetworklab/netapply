@@ -264,7 +264,7 @@ done
 
 ### Experiment two: Simple BGP
 
-You will reuse the network topology from experiment one. However, the control plane in Case 2 differs, as it utilizes BGP instead of the OSPF used in experiment one.
+You will reuse the network topology from experiment one. However, the control plane in experiment two differs, as it utilizes BGP instead of the OSPF used in experiment one.
 
 You need to perform the following configurations:
 
@@ -383,6 +383,18 @@ nodes:
                     direction: out
 ```
 
+You can apply above YAML manifest by:
+
+```shell
+./bin/netapply up --service-name exp2 --node testnode --config ./examples/topology1-bgp.yaml
+```
+
+You can clean up above test environment by:
+
+```shell
+./bin/netapply down --service-name exp2
+```
+
 Alternatively, with CLI, you might also apply below configurations to vtysh of lax1 and lax2 respectively, to achieve equivalent effect:
 
 On vtysh of lax1:
@@ -427,6 +439,53 @@ lax2(config-router-af)# exit-address-family
 lax2(config-router)# exit
 lax2(config)# exit
 lax2# exit
+```
+
+### Experiment three: Simple WireGuard
+
+See [./examples/topology2-wg.yaml)](./examples/topology2-wg.yaml)
+
+```yaml
+nodes:
+  testnode:
+    frr_containers:
+      - container_name: lax1
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax1
+      - container_name: lax2
+        image: quay.io/frrouting/frr:10.3.0
+        hostname: lax2
+    containers:
+      - lax1
+      - lax2
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      wireguard:
+        - name: wg-lax1-1
+          listen_port: 14141
+          container_name: lax1
+          privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
+          peers:
+            - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
+              endpoint: "lax1.exploro.one:14142"
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+          addresses:
+            - cidr: "10.1.0.1/30"
+          mtu: 1420
+        - name: wg-lax2-1
+          listen_port: 14142
+          container_name: lax2
+          privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
+          peers:
+            - publickey: "b9fucppbWxKLAWSxn8UJY5NlcnPF+Yz6s64XJwOdPAg="
+              allowedips:
+                - "0.0.0.0/0"
+                - "::/0"
+          addresses:
+            - cidr: "10.1.0.2/30"
+          mtu: 1420
 ```
 
 (More Example configuration YAMLs are coming ...)
