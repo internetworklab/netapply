@@ -3,11 +3,14 @@ package docker
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/strslice"
@@ -82,6 +85,37 @@ func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
 	return dockerConfig.Create(ctx)
 }
 
+func pullImageIfNeeded(ctx context.Context, cli *client.Client, img string) error {
+	imageList, err := cli.ImageList(ctx, image.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("failed to list images: %w", err)
+	}
+
+	imgRepoTag := strings.TrimSpace(img)
+
+	for _, image := range imageList {
+		for _, repoTag := range image.RepoTags {
+			if repoTag == imgRepoTag {
+				log.Printf("Found image %s with id %s", imgRepoTag, image.ID)
+				return nil
+			}
+		}
+	}
+
+	reader, err := cli.ImagePull(ctx, imgRepoTag, image.PullOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	defer reader.Close()
+
+	log.Printf("Pulling image %s", imgRepoTag)
+
+	io.Copy(os.Stdout, reader)
+
+	return nil
+}
+
 func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 	containerConfig := &container.Config{}
 	hostConfig := &container.HostConfig{}
@@ -113,6 +147,10 @@ func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	if err := pullImageIfNeeded(ctx, cli, dockerConfig.Image); err != nil {
+		return fmt.Errorf("failed to pull image: %w", err)
 	}
 
 	log.Printf("Creating container %s", containerName)
