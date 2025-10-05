@@ -377,7 +377,7 @@ func GetContainerNSPid(ctx context.Context, cli *client.Client, containerName st
 }
 
 func WithNsHandle(ctx context.Context, containerName *string, f func(h *netlink.Handle) error) error {
-	if containerName == nil {
+	if containerName == nil || !IsRegularContainerName(*containerName) {
 		handle, err := netlink.NewHandle()
 		if err != nil {
 			return fmt.Errorf("failed to create netlink handle: %w", err)
@@ -403,6 +403,22 @@ func WithNsHandle(ctx context.Context, containerName *string, f func(h *netlink.
 	defer handle.Close()
 
 	return f(handle)
+}
+
+func WithNsHandleSafe(ctx context.Context, containerName *string, f func(h *netlink.Handle) error) error {
+	if containerName != nil && IsRegularContainerName(*containerName) {
+		cli, err := pkgutils.DockerCliFromCtx(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get docker cli from context: %w", err)
+		}
+
+		contSummary, err := FindContainer(ctx, cli, *containerName)
+		if err != nil || contSummary == nil {
+			// if the container does not exist, simply skip it and reports no error
+			return nil
+		}
+	}
+	return WithNsHandle(ctx, containerName, f)
 }
 
 func WithNetnsWGCli(ctx context.Context, containerName *string, hook func(wgCtrlCli *wgctrl.Client) error) error {
@@ -573,4 +589,8 @@ func checkIfRecreateNeeded(containerSpec *DockerContainerConfig, containerSummar
 	}
 
 	return false
+}
+
+func IsRegularContainerName(containerName string) bool {
+	return containerName != "" && containerName != string(ContainerKeyHost)
 }

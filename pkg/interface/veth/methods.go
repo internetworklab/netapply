@@ -162,7 +162,7 @@ func (vethPairConfig *VethPairConfig) GetInterfaceName() string {
 
 func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 
-	return pkgdocker.WithNsHandle(ctx, nil, func(handle *netlink.Handle) error {
+	return pkgdocker.WithNsHandleSafe(ctx, nil, func(handle *netlink.Handle) error {
 		cli, err := pkgutils.DockerCliFromCtx(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to get docker cli from context: %w", err)
@@ -257,7 +257,7 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*VethPairPlacementStatus, error) {
 	res := new(VethPairPlacementStatus)
 
-	pkgdocker.WithNsHandle(ctx, vethPairConfig.GetContainerName(), func(handle *netlink.Handle) error {
+	pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.GetContainerName(), func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vethPairConfig.GetInterfaceName())
 		if err == nil && link != nil {
 			res.FoundInPrimaryNetns = true
@@ -265,7 +265,7 @@ func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*
 		return nil
 	})
 
-	pkgdocker.WithNsHandle(ctx, vethPairConfig.Peer.GetContainerName(), func(handle *netlink.Handle) error {
+	pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.Peer.GetContainerName(), func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vethPairConfig.Peer.GetInterfaceName())
 		if err == nil && link != nil {
 			res.FoundInSecondaryNetns = true
@@ -328,7 +328,7 @@ func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context,
 
 	vethTy := new(netlink.Veth).Type()
 	for _, cont := range containers {
-		err := pkgdocker.WithNsHandle(ctx, &cont, func(handle *netlink.Handle) error {
+		err := pkgdocker.WithNsHandleSafe(ctx, &cont, func(handle *netlink.Handle) error {
 			links, err := handle.LinkList()
 			if err != nil {
 				return fmt.Errorf("failed to list links: %w", err)
