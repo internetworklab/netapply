@@ -6,13 +6,8 @@ import (
 )
 
 func IsUDPAddrNotEqu(spec, curr *net.UDPAddr) bool {
-	if spec == nil {
-		// when spec is nil, always consider them as equal
+	if spec == nil || curr == nil {
 		return false
-	}
-
-	if curr == nil {
-		return true
 	}
 
 	return spec.String() != curr.String()

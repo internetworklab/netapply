@@ -40,12 +40,12 @@ nodes:
             - vx101
       wireguard:
         - name: wg-lax1-1
-          listen_port: 14141
+          listen_port: 15141
           container_name: lax1
           privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
           peers:
             - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
-              endpoint: "lax1.exploro.one:14142"
+              endpoint: "wien1.exploro.one:15142"
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
@@ -54,7 +54,7 @@ nodes:
               peer: "10.1.0.2/24"
           mtu: 1420
         - name: wg-lax2-1
-          listen_port: 14142
+          listen_port: 15142
           container_name: lax2
           privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
           peers:
@@ -62,13 +62,13 @@ nodes:
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
-              endpoint: "lax1.exploro.one:14141"
+              endpoint: "wien1.exploro.one:15141"
           addresses:
             - local: "10.1.0.2"
               peer: "10.1.0.1/32"
           mtu: 1420
         - name: wg-lax2-2
-          listen_port: 14143
+          listen_port: 15143
           container_name: lax2
           privatekey: "8I7sCBxyOuztvnjT711YQ8YfEeQTuDh/XPn386u1BEI="
           peers:
@@ -76,13 +76,13 @@ nodes:
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
-              endpoint: "lax1.exploro.one:14144"
+              endpoint: "wien1.exploro.one:15144"
           addresses:
             - local: "10.1.0.2"
               peer: "10.1.0.3/32"
           mtu: 1420
         - name: wg-rr-1
-          listen_port: 14144
+          listen_port: 15144
           container_name: rr
           privatekey: "8IGasID81IKbxG9SfUAgYbKp/U8aVmq3Xl8dmMYeLl8="
           peers:
@@ -90,7 +90,7 @@ nodes:
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
-              endpoint: "lax1.exploro.one:14143"
+              endpoint: "wien1.exploro.one:15143"
           addresses:
             - local: "10.1.0.3"
               peer: "10.1.0.2/24"

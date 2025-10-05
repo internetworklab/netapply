@@ -32,9 +32,13 @@ type WireGuardInterfaceChangeSet struct {
 }
 
 type WireGuardPeerConfig struct {
-	PublicKey  string   `yaml:"publickey" json:"publickey"`
-	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
-	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
+	PublicKey            string   `yaml:"publickey" json:"publickey"`
+	Endpoint             *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+	AllowedIPs           []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
+
+	// When deploy in intranet, the endpoint might not successfully converge to the endpoint specified in the spec,
+	// Enabling this flag might result in the reconciliation failed to converge.
+	ForceRecheckEndpoint *bool    `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty"`
 }
 
 type WireGuardConfigurationList []WireGuardConfig
