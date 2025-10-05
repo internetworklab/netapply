@@ -31,7 +31,7 @@ Here's the main steps the program takes:
 
 ## Example configurations
 
-### Experiment one: Simple OSPF
+### Experiment 1: Simple OSPF
 
 ![topology1](./docs/imgs/topology1.drawio.png)
 
@@ -47,87 +47,13 @@ You will create two containers, 'lax1' and 'lax2', to simulate two nodes respect
 
 This is how you would do it in a declarative way, describing by YAML manifest:
 
+See [./examples/topology1.yaml](./examples/topology1.yaml)
+
 ```yaml
-nodes:
-  testnode:
-    frr_containers:
-      - container_name: lax1
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax1
-      - container_name: lax2
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax2
-      - container_name: ix
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: ix
-    containers:
-      - lax1
-      - lax2
-      - ix
-    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
-    dataplane:
-      dummy:
-        - name: dummy0
-          container_name: lax1
-          addresses:
-            - cidr: "10.1.0.0/16"
-        - name: dummy0
-          container_name: lax2
-          addresses:
-            - cidr: "10.2.0.0/16"
-      veth:
-        - name: v-lax1-a
-          container_name: lax1
-          addresses:
-            - cidr: "192.168.31.1/30"
-          peer:
-            name: v-lax1-b
-            container_name: ix
-        - name: v-lax2-a
-          container_name: lax2
-          addresses:
-            - cidr: "192.168.31.2/30"
-          peer:
-            name: v-lax2-b
-            container_name: ix
-      bridge:
-        - name: br0
-          container_name: ix
-          slave_interfaces:
-            - v-lax1-b
-            - v-lax2-b
-    controlplane:
-      - container_name: lax1
-        debug_ospf_updates: true
-        ospfv2:
-          - vrf: default
-            router_id: "0.0.0.1"
-            interfaces:
-              - name: dummy0
-                area: "0.0.0.0"
-                passive: true
-              - name: v-lax1-a
-                area: "0.0.0.0"
-                network: point-to-multipoint
-            nbma_neighbors:
-              - "192.168.31.2"
-      - container_name: lax2
-        debug_ospf_updates: true
-        ospfv2:
-          - vrf: default
-            router_id: "0.0.0.2"
-            interfaces:
-              - name: dummy0
-                area: "0.0.0.0"
-                passive: true
-              - name: v-lax2-a
-                area: "0.0.0.0"
-                network: point-to-multipoint
-            nbma_neighbors:
-              - "192.168.31.1"
+
 ```
 
-Save above YAML manifest to [examples/topology1.yaml](./examples/topology1.yaml) and run
+To apply above YAML manifest, simply run:
 
 ```shell
 # (in project's root)
@@ -262,9 +188,9 @@ for name in lax1 lax2 ix; do
 done
 ```
 
-### Experiment two: Simple BGP
+### Experiment 2: Simple BGP
 
-You will reuse the network topology from experiment one. However, the control plane in experiment two differs, as it utilizes BGP instead of the OSPF used in experiment one.
+You will reuse the network topology from experiment 1. However, the control plane in experiment 2 differs, as it utilizes BGP instead of the OSPF used in experiment 1.
 
 You need to perform the following configurations:
 
@@ -273,9 +199,11 @@ You need to perform the following configurations:
 3. Verify that lax1 receives the route for 10.2.0.0/16 advertised by lax2 via BGP.
 4. Verify that lax2 receives the route for 10.1.0.0/16 advertised by lax1 via BGP.
 
-Before proceed to experiment two, make sure that you have clean up the environment setup by experiment one.
+Before proceed to experiment 2, make sure that you have clean up the environment setup by experiment 1.
 
 In YAML, you can delcare it in this way:
+
+See [./examples/topology1-bgp.yaml](./examples/topology1-bgp.yaml)
 
 ```yaml
 nodes:
@@ -329,7 +257,7 @@ nodes:
     controlplane:
       - container_name: lax1
         debug_bgp_updates: true
-        route_map:
+        route_maps:
           - name: allow-all
             policy: permit
             order: 10
@@ -344,19 +272,21 @@ nodes:
                   - "10.1.0.0/16"
                 activate:
                   - group1
-            neighbors:
+                route_maps:
+                  - name: allow-all
+                    direction: in
+                    peer: "group1"
+                  - name: allow-all
+                    direction: out
+                    peer: "group1"
+            peer_groups:
               group1:
                 asn: 65002
                 peers:
                   - "192.168.31.2"
-                route_maps:
-                  - name: allow-all
-                    direction: in
-                  - name: allow-all
-                    direction: out
       - container_name: lax2
         debug_bgp_updates: true
-        route_map:
+        route_maps:
           - name: allow-all
             policy: permit
             order: 10
@@ -371,16 +301,18 @@ nodes:
                   - "10.2.0.0/16"
                 activate:
                   - group1
-            neighbors:
+                route_maps:
+                  - name: allow-all
+                    peer: "group1"
+                    direction: in
+                  - name: allow-all
+                    direction: out
+                    peer: "group1"
+            peer_groups:
               group1:
                 asn: 65001
                 peers:
                   - "192.168.31.1"
-                route_maps:
-                  - name: allow-all
-                    direction: in
-                  - name: allow-all
-                    direction: out
 ```
 
 You can apply above YAML manifest by:
@@ -441,7 +373,7 @@ lax2(config)# exit
 lax2# exit
 ```
 
-### Experiment three: Simple WireGuard
+### Experiment 3: Simple WireGuard
 
 See [./examples/topology2-wg.yaml](./examples/topology2-wg.yaml)
 
@@ -495,7 +427,7 @@ docker exec -it lax1 ping -c3 10.1.0.2
 docker exec -it lax2 ping -c3 10.1.0.1
 ```
 
-### Experiment four: VxLAN over WireGuard
+### Experiment 4: VxLAN over WireGuard
 
 The network topology will looks like this
 
@@ -555,12 +487,12 @@ nodes:
             - vx101
       wireguard:
         - name: wg-lax1-1
-          listen_port: 14141
+          listen_port: 15141
           container_name: lax1
           privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
           peers:
             - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
-              endpoint: "lax1.exploro.one:14142"
+              endpoint: "wien1.exploro.one:15142"
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
@@ -569,7 +501,7 @@ nodes:
               peer: "10.1.0.2/24"
           mtu: 1420
         - name: wg-lax2-1
-          listen_port: 14142
+          listen_port: 15142
           container_name: lax2
           privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
           peers:
@@ -577,13 +509,13 @@ nodes:
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
-              endpoint: "lax1.exploro.one:14141"
+              endpoint: "wien1.exploro.one:15141"
           addresses:
             - local: "10.1.0.2"
               peer: "10.1.0.1/32"
           mtu: 1420
         - name: wg-lax2-2
-          listen_port: 14143
+          listen_port: 15143
           container_name: lax2
           privatekey: "8I7sCBxyOuztvnjT711YQ8YfEeQTuDh/XPn386u1BEI="
           peers:
@@ -591,13 +523,13 @@ nodes:
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
-              endpoint: "lax1.exploro.one:14144"
+              endpoint: "wien1.exploro.one:15144"
           addresses:
             - local: "10.1.0.2"
               peer: "10.1.0.3/32"
           mtu: 1420
         - name: wg-rr-1
-          listen_port: 14144
+          listen_port: 15144
           container_name: rr
           privatekey: "8IGasID81IKbxG9SfUAgYbKp/U8aVmq3Xl8dmMYeLl8="
           peers:
@@ -605,7 +537,7 @@ nodes:
               allowedips:
                 - "0.0.0.0/0"
                 - "::/0"
-              endpoint: "lax1.exploro.one:14143"
+              endpoint: "wien1.exploro.one:15143"
           addresses:
             - local: "10.1.0.3"
               peer: "10.1.0.2/24"
@@ -620,7 +552,7 @@ nodes:
             router_id: "0.0.0.3"
             cluster_id: "0.0.0.3"
             no_ipv4_unicast: true
-            neighbors:
+            peer_groups:
               group1:
                 capabilities:
                   - extended-nexthop
@@ -648,7 +580,7 @@ nodes:
                 advertise_svi_ip: true
                 activate:
                   - group1
-            neighbors:
+            peer_groups:
               group1:
                 capabilities:
                   - extended-nexthop
@@ -671,7 +603,7 @@ nodes:
                 advertise_svi_ip: true
                 activate:
                   - group1
-            neighbors:
+            peer_groups:
               group1:
                 capabilities:
                   - extended-nexthop
@@ -679,6 +611,7 @@ nodes:
                 peers:
                   - "10.1.0.3"
                 update_source: "10.1.0.2"
+
 ```
 
 To test effects:
@@ -695,6 +628,176 @@ docker exec -it lax2 ip a show br101
 # check l2 connectivity
 docker exec -it lax1 ping -c3 ff02::1%br101
 docker exec -it lax2 ping -c3 ff02::1%br101
+```
+
+### Experiment 5: MP-BGP
+
+See [./examples/topology1-mpbgp.yaml](./examples/topology1-mpbgp.yaml)
+
+```yaml
+nodes:
+  testnode:
+    frr_containers:
+      - container_name: lax1
+        image: quay.io/frrouting/frr:10.4.0
+        hostname: lax1
+      - container_name: lax2
+        image: quay.io/frrouting/frr:10.4.0
+        hostname: lax2
+      - container_name: ix
+        image: quay.io/frrouting/frr:10.4.0
+        hostname: ix
+    containers:
+      - lax1
+      - lax2
+      - ix
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      dummy:
+        - name: dummy0
+          container_name: lax1
+          addresses:
+            - cidr: "10.1.0.1/24"
+            - cidr: "10.1.0.2/24"
+            - cidr: "10.1.0.3/24"
+            - cidr: "2001:db8::/64"
+            - cidr: "2001:db8::1/64"
+            - cidr: "2001:db8::2/64"
+        - name: dummy0
+          container_name: lax2
+          addresses:
+            - cidr: "10.1.1.1/24"
+            - cidr: "10.1.1.2/24"
+            - cidr: "10.1.1.3/24"
+            - cidr: "2001:db8:1::/64"
+            - cidr: "2001:db8:1::1/64"
+            - cidr: "2001:db8:1::2/64"
+      veth:
+        - name: v-lax1-a
+          container_name: lax1
+          addresses:
+            - local: "2001:db8::1:1"
+              peer: "2001:db8:1::1:1/128"
+          peer:
+            name: v-lax1-b
+            container_name: ix
+        - name: v-lax2-a
+          container_name: lax2
+          addresses:
+            - local: "2001:db8:1::1:1"
+              peer: "2001:db8::1:1/128"
+          peer:
+            name: v-lax2-b
+            container_name: ix
+      bridge:
+        - name: br0
+          container_name: ix
+          slave_interfaces:
+            - v-lax1-b
+            - v-lax2-b
+    controlplane:
+      - container_name: lax1
+        log_level: debugging
+        debug_bgp_updates: true
+        debug_zebra_events: true
+        debug_zebra_dplane: true
+        debug_zebra_kernel: true
+        route_maps:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            no_ipv6_auto_ra: true
+            disable_ebgp_connected_route_check: true
+            asn: 65001
+            router_id: "0.0.0.1"
+            address_families:
+              - afi: ipv4
+                safi: unicast
+                networks:
+                  - "10.1.0.0/24"
+                activate:
+                  - "group1"
+                route_maps:
+                  - peer: "group1"
+                    name: allow-all
+                    direction: in
+                  - peer: "group1"
+                    name: allow-all
+                    direction: out
+              - afi: ipv6
+                safi: unicast
+                networks:
+                  - "2001:db8::/64"
+                activate:
+                  - "group1"
+                route_maps:
+                  - peer: "group1"
+                    name: allow-all
+                    direction: in
+                  - peer: "group1"
+                    name: allow-all
+                    direction: out
+            peer_groups:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65002
+                peers:
+                  - "2001:db8:1::1:1"
+      - container_name: lax2
+        log_level: debugging
+        debug_bgp_updates: true
+        debug_zebra_events: true
+        debug_zebra_dplane: true
+        debug_zebra_kernel: true
+        route_maps:
+          - name: allow-all
+            policy: permit
+            order: 10
+        bgp:
+          - vrf: default
+            log_neighbor_changes: true
+            no_ipv6_auto_ra: true
+            disable_ebgp_connected_route_check: true
+            asn: 65002
+            router_id: "0.0.0.2"
+            address_families:
+              - afi: ipv4
+                safi: unicast
+                networks:
+                  - "10.1.1.0/24"
+                activate:
+                  - "group1"
+                route_maps:
+                  - peer: "group1"
+                    name: allow-all
+                    direction: in
+                  - peer: "group1"
+                    name: allow-all
+                    direction: out
+              - afi: ipv6
+                safi: unicast
+                route_maps:
+                  - peer: "group1"
+                    name: allow-all
+                    direction: in
+                  - peer: "group1"
+                    name: allow-all
+                    direction: out
+                networks:
+                  - "2001:db8:1::/64"
+                activate:
+                  - "group1"
+            peer_groups:
+              group1:
+                capabilities:
+                  - extended-nexthop
+                asn: 65001
+                peers:
+                  - "2001:db8::1:1"
 ```
 
 (More Example configuration YAMLs are coming ...)
