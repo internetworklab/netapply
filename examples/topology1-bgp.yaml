@@ -49,7 +49,7 @@ nodes:
     controlplane:
       - container_name: lax1
         debug_bgp_updates: true
-        route_map:
+        route_maps:
           - name: allow-all
             policy: permit
             order: 10
@@ -64,21 +64,21 @@ nodes:
                   - "10.1.0.0/16"
                 activate:
                   - group1
+                route_maps:
+                  - name: allow-all
+                    direction: in
+                    peer: "group1"
+                  - name: allow-all
+                    direction: out
+                    peer: "group1"
             peer_groups:
               group1:
                 asn: 65002
                 peers:
                   - "192.168.31.2"
-                route_maps:
-                  ipv4:
-                    unicast:
-                      - name: allow-all
-                        direction: in
-                      - name: allow-all
-                        direction: out
       - container_name: lax2
         debug_bgp_updates: true
-        route_map:
+        route_maps:
           - name: allow-all
             policy: permit
             order: 10
@@ -93,15 +93,16 @@ nodes:
                   - "10.2.0.0/16"
                 activate:
                   - group1
+                route_maps:
+                  - name: allow-all
+                    peer: "group1"
+                    direction: in
+                  - name: allow-all
+                    direction: out
+                    peer: "group1"
             peer_groups:
               group1:
                 asn: 65001
                 peers:
                   - "192.168.31.1"
-                route_maps:
-                  ipv4:
-                    unicast:
-                      - name: allow-all
-                        direction: in
-                      - name: allow-all
-                        direction: out
+                
