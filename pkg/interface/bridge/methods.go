@@ -21,7 +21,7 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetChangedItems() map[string]bo
 }
 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) Apply(ctx context.Context) error {
-	return pkgdocker.WithNsHandle(ctx, bridgeChangeSet.ContainerName, func(handle *netlink.Handle) error {
+	return pkgdocker.WithNsHandleSafe(ctx, bridgeChangeSet.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -68,7 +68,7 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 	changeSet.InterfaceToEnslave = make(map[string]interface{})
 	changeSet.InterfaceToUnslave = make(map[string]interface{})
 
-	err := pkgdocker.WithNsHandle(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	err := pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -148,7 +148,7 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 	actuallyAdded := make(map[string]interface{})
 	actuallyRemoved := make(map[string]interface{})
 
-	err := pkgdocker.WithNsHandle(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	err := pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -196,7 +196,7 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 }
 
 func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
-	return pkgdocker.WithNsHandle(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	return pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
 		link := &netlink.Bridge{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: bridgeConfig.Name,

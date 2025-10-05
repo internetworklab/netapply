@@ -65,7 +65,7 @@ func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
 		return nil
 	}
 
-	return pkgdocker.WithNsHandle(ctx, vethPeer.ContainerName, func(handle *netlink.Handle) error {
+	return pkgdocker.WithNsHandleSafe(ctx, vethPeer.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vethPeer.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get veth link: %w", err)
@@ -124,7 +124,7 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 	changeSet := new(VethPairChangeSet)
 
 	// Detecting local changeset
-	err := pkgdocker.WithNsHandle(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
+	err := pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
 		localChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.ContainerName, vethPairConfig.Name, vethPairConfig, handle)
 		if err != nil {
 			return fmt.Errorf("failed to detect local changeset: %w", err)
@@ -137,7 +137,7 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 	}
 
 	// Detecting peer changeset
-	err = pkgdocker.WithNsHandle(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
+	err = pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
 		peerChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.Peer.ContainerName, vethPairConfig.Peer.Name, vethPairConfig.Peer, handle)
 		if err != nil {
 			return fmt.Errorf("failed to detect peer changeset: %w", err)

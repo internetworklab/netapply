@@ -8,6 +8,7 @@ import (
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -186,12 +187,22 @@ func IndexSpecIfaces(provisionerList []InterfaceProvisioner) (SpecIfaceIndex, er
 	return specInterfaceListMap, nil
 }
 
-func DetectChangesInContainer(
+func detectChangesInContainer(
 	ctx context.Context,
 	provisionerList map[string]InterfaceProvisioner,
 	currentInterfacesInContainer map[string]InterfaceCanceller,
 	container string,
 ) (*DataplaneChangeSet, error) {
+
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+	if pkgdocker.IsRegularContainerName(container) {
+		if contSummary, err := pkgdocker.FindContainer(ctx, cli, container); err != nil || contSummary == nil {
+			return nil, nil
+		}
+	}
 
 	addedSet := make(map[string]InterfaceProvisioner)
 	removedSet := make(map[string]InterfaceCanceller)
@@ -252,9 +263,26 @@ func DetectChangesInContainer(
 
 func DetectChangesFromProvisionerList(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
 
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+
+	containersToScan := make([]string, 0)
+	for _, contName := range containers {
+		if pkgdocker.IsRegularContainerName(contName) {
+			if contSummary, err := pkgdocker.FindContainer(ctx, cli, contName); err != nil || contSummary == nil {
+				// if a container in the scan list is not present during the moment of reconciliation, simply skip it
+				// and this is intentional rather than ad-hoc
+				continue
+			}
+		}
+		containersToScan = append(containersToScan, contName)
+	}
+
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
 	// for now, skip the host netns, so includeHostNetns is set to false
-	currentInterfaceListMap, err := IndexCurrentIfaces(ctx, containers, netlinkIfType, false)
+	currentInterfaceListMap, err := IndexCurrentIfaces(ctx, containersToScan, netlinkIfType, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to index current interface: %w", err)
 	}
@@ -286,7 +314,7 @@ func DetectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 			currentInterfacesInContainer = v
 		}
 
-		changes, err := DetectChangesInContainer(ctx, provisionersInContainer, currentInterfacesInContainer, nsKey)
+		changes, err := detectChangesInContainer(ctx, provisionersInContainer, currentInterfacesInContainer, nsKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect changes in container %s: %w", nsKey, err)
 		}
