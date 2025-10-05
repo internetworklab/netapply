@@ -61,6 +61,10 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 		cmds = append(cmds, fmt.Sprintf("bgp listen range %s peer-group %s", *bgpNeighborGroupConfig.ListenRange, groupName))
 	}
 
+	if bgpNeighborGroupConfig.EBGPMultihop != nil && *bgpNeighborGroupConfig.EBGPMultihop {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s ebgp-multihop", groupName))
+	}
+
 	return cmds
 }
 
@@ -106,18 +110,38 @@ func (bgpConf *BGPConfig) ToCLICommands() []string {
 		cmds = append(cmds, "no bgp ipv6-auto-ra")
 	}
 
+	if bgpConf.NoNetworkImportCheck != nil && *bgpConf.NoNetworkImportCheck {
+		cmds = append(cmds, "bgp network import-check")
+	}
+
+	if bgpConf.DisableEBGPConnectedRouteCheck != nil && *bgpConf.DisableEBGPConnectedRouteCheck {
+		cmds = append(cmds, "bgp disable-ebgp-connected-route-check")
+	}
+
 	if bgpConf.LogNeighborChanges != nil && *bgpConf.LogNeighborChanges {
 		cmds = append(cmds, "bgp log-neighbor-changes")
 	}
 
 	for _, linklocalPeer := range bgpConf.LinkLocalPeers {
-		cmds = append(cmds, fmt.Sprintf("neighbor %s remote-as %d", linklocalPeer.PeerLinkLocalAddress, linklocalPeer.PeerASN))
-		cmds = append(cmds, fmt.Sprintf("neighbor %s interface %s", linklocalPeer.PeerLinkLocalAddress, linklocalPeer.InterfaceName))
+		nb := linklocalPeer.PeerLinkLocalAddress
+
+		if linklocalPeer.Unnumbered != nil && *linklocalPeer.Unnumbered {
+			nb = linklocalPeer.InterfaceName
+			cmds = append(cmds, fmt.Sprintf("neighbor %s interface remote-as %d", nb, linklocalPeer.PeerASN))
+		} else {
+			cmds = append(cmds, fmt.Sprintf("neighbor %s remote-as %d", linklocalPeer.PeerLinkLocalAddress, linklocalPeer.PeerASN))
+			cmds = append(cmds, fmt.Sprintf("neighbor %s interface %s", linklocalPeer.PeerLinkLocalAddress, linklocalPeer.InterfaceName))
+		}
+
 		for _, capability := range linklocalPeer.Capabilities {
-			cmds = append(cmds, fmt.Sprintf("neighbor %s capability %s", linklocalPeer.PeerLinkLocalAddress, capability))
+			cmds = append(cmds, fmt.Sprintf("neighbor %s capability %s", nb, capability))
 		}
 		if linklocalPeer.UpdateSource != nil && *linklocalPeer.UpdateSource != "" {
-			cmds = append(cmds, fmt.Sprintf("neighbor %s update-source %s", linklocalPeer.PeerLinkLocalAddress, *linklocalPeer.UpdateSource))
+			cmds = append(cmds, fmt.Sprintf("neighbor %s update-source %s", nb, *linklocalPeer.UpdateSource))
+		}
+
+		if linklocalPeer.EBGPMultihop != nil && *linklocalPeer.EBGPMultihop {
+			cmds = append(cmds, fmt.Sprintf("neighbor %s ebgp-multihop", nb))
 		}
 	}
 

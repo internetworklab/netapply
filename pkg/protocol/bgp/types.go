@@ -62,6 +62,7 @@ type BGPNeighborGroupConfig struct {
 	ASN          int      `yaml:"asn,omitempty" json:"asn,omitempty"`
 	UpdateSource *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
 	ListenRange  *string  `yaml:"listen_range,omitempty" json:"listen_range,omitempty"`
+	EBGPMultihop *bool    `yaml:"ebgp_multihop,omitempty" json:"ebgp_multihop,omitempty"`
 }
 
 type BGPRPKIRTRConfig struct {
@@ -86,22 +87,26 @@ type BGPRPKIConfig struct {
 }
 
 type LinkLocalPeerConfig struct {
+	Unnumbered           *bool    `yaml:"unnumbered,omitempty" json:"unnumbered,omitempty"`
 	PeerASN              int      `yaml:"peer_asn" json:"peer_asn"`
 	PeerLinkLocalAddress string   `yaml:"peer_linklocal_address" json:"peer_linklocal_address"`
 	InterfaceName        string   `yaml:"interface_name" json:"interface_name"`
 	Capabilities         []string `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
 	UpdateSource         *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
+	EBGPMultihop         *bool    `yaml:"ebgp_multihop,omitempty" json:"ebgp_multihop,omitempty"`
 }
 
 type BGPConfig struct {
 	// Currently only 'default' vrf is supported
-	VRF             string                     `yaml:"vrf" json:"vrf"`
-	ASN             int                        `yaml:"asn" json:"asn"`
-	RouterID        string                     `yaml:"router_id" json:"router_id"`
-	ClusterID       *string                    `yaml:"cluster_id,omitempty" json:"cluster_id,omitempty"`
-	NoIPv4Unicast   bool                       `yaml:"no_ipv4_unicast" json:"no_ipv4_unicast"`
-	NoIPv6AutoRA    *bool                      `yaml:"no_ipv6_auto_ra,omitempty" json:"no_ipv6_auto_ra,omitempty"`
-	AddressFamilies []MPBGPAddressFamilyConfig `yaml:"address_families" json:"address_families"`
+	VRF                            string                     `yaml:"vrf" json:"vrf"`
+	ASN                            int                        `yaml:"asn" json:"asn"`
+	RouterID                       string                     `yaml:"router_id" json:"router_id"`
+	ClusterID                      *string                    `yaml:"cluster_id,omitempty" json:"cluster_id,omitempty"`
+	NoIPv4Unicast                  bool                       `yaml:"no_ipv4_unicast" json:"no_ipv4_unicast"`
+	NoIPv6AutoRA                   *bool                      `yaml:"no_ipv6_auto_ra,omitempty" json:"no_ipv6_auto_ra,omitempty"`
+	DisableEBGPConnectedRouteCheck *bool                      `yaml:"disable_ebgp_connected_route_check,omitempty" json:"disable_ebgp_connected_route_check,omitempty"`
+	NoNetworkImportCheck           *bool                      `yaml:"no_network_import_check,omitempty" json:"no_network_import_check,omitempty"`
+	AddressFamilies                []MPBGPAddressFamilyConfig `yaml:"address_families" json:"address_families"`
 
 	// key is the group name
 	PeerGroups map[string]BGPNeighborGroupConfig `yaml:"peer_groups" json:"peer_groups"`

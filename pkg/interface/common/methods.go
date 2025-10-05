@@ -9,7 +9,7 @@ import (
 
 func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 	if addrConfig.Peer != nil && addrConfig.Local != nil {
-		_, peerIPNet, err := net.ParseCIDR(*addrConfig.Peer)
+		peerIPObj, peerIPNet, err := net.ParseCIDR(*addrConfig.Peer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse peer ip: %w", err)
 		}
@@ -20,7 +20,9 @@ func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 		}
 
 		nlAddr := new(netlink.Addr)
+		nlAddr.Peer = new(net.IPNet)
 		nlAddr.Peer = peerIPNet
+		nlAddr.Peer.IP = peerIPObj
 		nlAddr.IPNet = new(net.IPNet)
 		nlAddr.IP = localIp
 
