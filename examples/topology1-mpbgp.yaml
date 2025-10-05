@@ -20,18 +20,18 @@ nodes:
         - name: v-lax1-a
           container_name: lax1
           addresses:
-            - cidr: "2001:db8:0:1::/64"
-            - local: "2001:db8:0:1::1"
-              peer: "2001:db8:1:1::1/64"
+            - cidr: "2001:db8::1/64"
+            - local: "fe80::a"
+              peer: "fe80::b/64"
           peer:
             name: v-lax1-b
             container_name: ix
         - name: v-lax2-a
           container_name: lax2
           addresses:
-            - cidr: "2001:db8:1:1::/64"
-            - local: "2001:db8:1:1::1"
-              peer: "2001:db8:0:1::1/64"
+            - cidr: "2001:db8:1::1/64"
+            - local: "fe80::b"
+              peer: "fe80::a/64"
           peer:
             name: v-lax2-b
             container_name: ix
@@ -64,24 +64,21 @@ nodes:
               - afi: ipv6
                 safi: unicast
                 networks:
-                  - "2001:db8:0:1::/64"
+                  - "2001:db8::/64"
                 activate:
-                  - "group1"
+                  - "fe80::b"
                 route_maps:
-                  - peer: "group1"
+                  - peer: "fe80::b"
                     name: allow-all
                     direction: in
-                  - peer: "group1"
+                  - peer: "fe80::b"
                     name: allow-all
                     direction: out
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                peers:
-                  - "2001:db8:1:1::1"
-                asn: 65002
-                update_source: "2001:db8:0:1::1"
+            linklocal_peers:
+              - peer_asn: 65002
+                peer_linklocal_address: "fe80::b"
+                interface_name: "v-lax1-a"
+                update_source: "fe80::a"
       - container_name: lax2
         log_level: debugging
         debug_bgp_updates: true
@@ -104,21 +101,18 @@ nodes:
               - afi: ipv6
                 safi: unicast
                 route_maps:
-                  - peer: "group1"
+                  - peer: "fe80::a"
                     name: allow-all
                     direction: in
-                  - peer: "group1"
+                  - peer: "fe80::a"
                     name: allow-all
                     direction: out
                 networks:
-                  - "2001:db8:1:1::/64"
+                  - "2001:db8:1::/64"
                 activate:
-                  - "group1"
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                peers:
-                  - "2001:db8:0:1::1"
-                asn: 65002
-                update_source: "2001:db8:1:1::1"
+                  - "fe80::a"
+            linklocal_peers:
+              - peer_asn: 65001
+                peer_linklocal_address: "fe80::a"
+                interface_name: "v-lax2-a"
+                update_source: "fe80::b"
