@@ -26,9 +26,10 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 
 	if nodeConfig.Dataplane != nil {
 		log.Println("Setting up dataplane ...")
-		if err := nodeConfig.Dataplane.Apply(ctx, nodeConfig.Containers); err != nil {
-			return fmt.Errorf("failed to create dataplane: %w", err)
+		if err := nodeConfig.Dataplane.Reconcile(ctx, nodeConfig.Containers); err != nil {
+			return fmt.Errorf("failed to reconcile dataplane: %w", err)
 		}
+
 	}
 
 	if nodeConfig.Controlplane != nil {
@@ -117,19 +118,35 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	return changeSet, nil
 }
 
-func (dpConfig *DataplaneConfig) Apply(ctx context.Context, containers []string) error {
+func (dpConfig *DataplaneConfig) Reconcile(ctx context.Context, containers []string) error {
 	log.Println("Detecting changes for dataplane config ...")
 	changeSet, err := dpConfig.DetectChanges(ctx, containers)
 	if err != nil {
 		return fmt.Errorf("failed to detect changes: %w", err)
 	}
-	if changeSet.HasChanges() {
-		log.Println("Found changes for dataplane config")
+
+	maxLoop := 10
+	iterId := 0
+
+	for changeSet != nil && changeSet.HasChanges() && maxLoop > 0 {
+		log.Printf("Iteration %d: Found changeset, applying changes for dataplane config ...", iterId)
 		changeSet.Log()
+
 		log.Println("Applying changes for dataplane config ...")
 		if err := changeSet.Apply(ctx); err != nil {
 			return fmt.Errorf("failed to apply changes: %w", err)
 		}
+
+		log.Println("Changeset is applied to dataplane config, detecting changes again ...")
+		changeSet, err = dpConfig.DetectChanges(ctx, containers)
+		if err != nil {
+			return fmt.Errorf("failed to detect changes: %w", err)
+		}
+		maxLoop--
+	}
+
+	if maxLoop == 0 && changeSet != nil && changeSet.HasChanges() {
+		return fmt.Errorf("failed to reconcile dataplane config, max loop reached")
 	}
 
 	return nil
