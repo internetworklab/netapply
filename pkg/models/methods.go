@@ -135,6 +135,10 @@ func (dpConfig *DataplaneConfig) Apply(ctx context.Context, containers []string)
 	return nil
 }
 
+func appendExit(cmds []string) []string {
+	return append(cmds, "exit")
+}
+
 func prependConfigure(cmds []string) []string {
 	return append([]string{"configure terminal"}, cmds...)
 }
@@ -145,7 +149,7 @@ func writeCommands(ctx context.Context, containerName *string, cmds []string) er
 		return fmt.Errorf("failed to get vtysh config writer: %w", err)
 	}
 	defer configWriter.Close()
-	return configWriter.WriteCommands(ctx, prependConfigure(cmds))
+	return configWriter.WriteCommands(ctx, appendExit(prependConfigure(cmds)))
 
 }
 
