@@ -33,13 +33,39 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetInterfaceName() stri
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
-	return wgInterfaceChangeSet != nil && (wgInterfaceChangeSet.PrivateKeyToSet != nil ||
-		wgInterfaceChangeSet.MTUToSet != nil ||
-		wgInterfaceChangeSet.ListenPortToSet != nil ||
-		wgInterfaceChangeSet.PeersToRemove != nil ||
-		wgInterfaceChangeSet.PeersToAdd != nil ||
-		wgInterfaceChangeSet.AddressesToAdd != nil ||
-		wgInterfaceChangeSet.AddressesToRemove != nil)
+	if wgInterfaceChangeSet == nil {
+		return false
+	}
+
+	if wgInterfaceChangeSet.PrivateKeyToSet != nil {
+		return true
+	}
+
+	if wgInterfaceChangeSet.MTUToSet != nil {
+		return true
+	}
+
+	if wgInterfaceChangeSet.ListenPortToSet != nil {
+		return true
+	}
+
+	if len(wgInterfaceChangeSet.PeersToRemove) > 0 {
+		return true
+	}
+
+	if len(wgInterfaceChangeSet.PeersToAdd) > 0 {
+		return true
+	}
+
+	if len(wgInterfaceChangeSet.AddressesToAdd) > 0 {
+		return true
+	}
+
+	if len(wgInterfaceChangeSet.AddressesToRemove) > 0 {
+		return true
+	}
+
+	return false
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Context) error {
