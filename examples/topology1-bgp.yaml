@@ -64,7 +64,7 @@ nodes:
                   - "10.1.0.0/16"
                 activate:
                   - group1
-            neighbors:
+            peer_groups:
               group1:
                 asn: 65002
                 peers:
@@ -93,7 +93,7 @@ nodes:
                   - "10.2.0.0/16"
                 activate:
                   - group1
-            neighbors:
+            peer_groups:
               group1:
                 asn: 65001
                 peers:

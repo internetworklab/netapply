@@ -58,11 +58,10 @@ type BGPNeighborGroupConfig struct {
 	Capabilities []string `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
 
 	// Addresses of the peers in the group
-	Peers          []string `yaml:"peers,omitempty" json:"peers,omitempty"`
-	LinklocalPeers []string `yaml:"linklocal_peers,omitempty" json:"linklocal_peers,omitempty"`
-	ASN            int      `yaml:"asn,omitempty" json:"asn,omitempty"`
-	UpdateSource   *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
-	ListenRange    *string  `yaml:"listen_range,omitempty" json:"listen_range,omitempty"`
+	Peers        []string `yaml:"peers,omitempty" json:"peers,omitempty"`
+	ASN          int      `yaml:"asn,omitempty" json:"asn,omitempty"`
+	UpdateSource *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
+	ListenRange  *string  `yaml:"listen_range,omitempty" json:"listen_range,omitempty"`
 }
 
 type BGPRPKIRTRConfig struct {
@@ -86,6 +85,14 @@ type BGPRPKIConfig struct {
 	RTRServers []BGPRPKIRTRConfig `yaml:"rtr_servers,omitempty" json:"rtr_servers,omitempty"`
 }
 
+type LinkLocalPeerConfig struct {
+	PeerASN              int      `yaml:"peer_asn" json:"peer_asn"`
+	PeerLinkLocalAddress string   `yaml:"peer_linklocal_address" json:"peer_linklocal_address"`
+	InterfaceName        string   `yaml:"interface_name" json:"interface_name"`
+	Capabilities         []string `yaml:"capabilities,omitempty" json:"capabilities,omitempty"`
+	UpdateSource         *string  `yaml:"update_source,omitempty" json:"update_source,omitempty"`
+}
+
 type BGPConfig struct {
 	// Currently only 'default' vrf is supported
 	VRF             string                     `yaml:"vrf" json:"vrf"`
@@ -93,10 +100,13 @@ type BGPConfig struct {
 	RouterID        string                     `yaml:"router_id" json:"router_id"`
 	ClusterID       *string                    `yaml:"cluster_id,omitempty" json:"cluster_id,omitempty"`
 	NoIPv4Unicast   bool                       `yaml:"no_ipv4_unicast" json:"no_ipv4_unicast"`
+	NoIPv6AutoRA    *bool                      `yaml:"no_ipv6_auto_ra,omitempty" json:"no_ipv6_auto_ra,omitempty"`
 	AddressFamilies []MPBGPAddressFamilyConfig `yaml:"address_families" json:"address_families"`
 
 	// key is the group name
-	Neighbors map[string]BGPNeighborGroupConfig `yaml:"neighbors" json:"neighbors"`
+	PeerGroups map[string]BGPNeighborGroupConfig `yaml:"peer_groups" json:"peer_groups"`
+
+	LinkLocalPeers []LinkLocalPeerConfig `yaml:"linklocal_peers,omitempty" json:"linklocal_peers,omitempty"`
 
 	NeighborRPKIStrict []string `yaml:"neighbor_rpki_strict,omitempty" json:"neighbor_rpki_strict,omitempty"`
 	LogNeighborChanges *bool    `yaml:"log_neighbor_changes,omitempty" json:"log_neighbor_changes,omitempty"`

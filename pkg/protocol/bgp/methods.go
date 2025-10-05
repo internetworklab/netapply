@@ -2,7 +2,6 @@ package bgp
 
 import (
 	"fmt"
-	"strings"
 )
 
 func (afConf *MPBGPAddressFamilyConfig) ToCLICommands(bgpConf *BGPConfig) []string {
@@ -58,17 +57,6 @@ func (bgpNeighborGroupConfig *BGPNeighborGroupConfig) ToCLICommands(groupName st
 		cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group %s", peer, groupName))
 	}
 
-	for _, linklocalPeer := range bgpNeighborGroupConfig.LinklocalPeers {
-		segs := strings.Split(strings.TrimSpace(linklocalPeer), "%")
-		if len(segs) != 2 {
-			continue
-		}
-		peeraddr := segs[0]
-		ifname := segs[1]
-		cmds = append(cmds, fmt.Sprintf("neighbor %s peer-group %s", peeraddr, groupName))
-		cmds = append(cmds, fmt.Sprintf("neighbor %s interface %s", peeraddr, ifname))
-	}
-
 	if bgpNeighborGroupConfig.ListenRange != nil && *bgpNeighborGroupConfig.ListenRange != "" {
 		cmds = append(cmds, fmt.Sprintf("bgp listen range %s peer-group %s", *bgpNeighborGroupConfig.ListenRange, groupName))
 	}
@@ -114,12 +102,27 @@ func (bgpConf *BGPConfig) ToCLICommands() []string {
 		cmds = append(cmds, "no bgp default ipv4-unicast")
 	}
 
+	if bgpConf.NoIPv6AutoRA != nil && *bgpConf.NoIPv6AutoRA {
+		cmds = append(cmds, "no bgp ipv6-auto-ra")
+	}
+
 	if bgpConf.LogNeighborChanges != nil && *bgpConf.LogNeighborChanges {
 		cmds = append(cmds, "bgp log-neighbor-changes")
 	}
 
-	if bgpConf.Neighbors != nil {
-		for groupName, groupConfig := range bgpConf.Neighbors {
+	for _, linklocalPeer := range bgpConf.LinkLocalPeers {
+		cmds = append(cmds, fmt.Sprintf("neighbor %s remote-as %d", linklocalPeer.PeerLinkLocalAddress, linklocalPeer.PeerASN))
+		cmds = append(cmds, fmt.Sprintf("neighbor %s interface %s", linklocalPeer.PeerLinkLocalAddress, linklocalPeer.InterfaceName))
+		for _, capability := range linklocalPeer.Capabilities {
+			cmds = append(cmds, fmt.Sprintf("neighbor %s capability %s", linklocalPeer.PeerLinkLocalAddress, capability))
+		}
+		if linklocalPeer.UpdateSource != nil && *linklocalPeer.UpdateSource != "" {
+			cmds = append(cmds, fmt.Sprintf("neighbor %s update-source %s", linklocalPeer.PeerLinkLocalAddress, *linklocalPeer.UpdateSource))
+		}
+	}
+
+	if bgpConf.PeerGroups != nil {
+		for groupName, groupConfig := range bgpConf.PeerGroups {
 			cmds = append(cmds, groupConfig.ToCLICommands(groupName)...)
 		}
 	}

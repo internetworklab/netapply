@@ -22,9 +22,14 @@ type ControlplaneConfig struct {
 	// However, there would be one host netns is allowed at most.
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 
+	LogLevel *string `yaml:"log_level,omitempty" json:"log_level,omitempty"`
+
 	DebugBGPUpdates  *bool `yaml:"debug_bgp_updates,omitempty" json:"debug_bgp_updates,omitempty"`
 	DebugOSPFUpdates *bool `yaml:"debug_ospf_updates,omitempty" json:"debug_ospf_updates,omitempty"`
 	DebugRPKI        *bool `yaml:"debug_rpki,omitempty" json:"debug_rpki,omitempty"`
+	DebugZebraEvents *bool `yaml:"debug_zebra_events,omitempty" json:"debug_zebra_events,omitempty"`
+	DebugZebraDplane *bool `yaml:"debug_zebra_dplane,omitempty" json:"debug_zebra_dplane,omitempty"`
+	DebugZebraKernel *bool `yaml:"debug_zebra_kernel,omitempty" json:"debug_zebra_kernel,omitempty"`
 
 	OSPFv2   []pkgprotocolospfv2.OSPFV2Config `yaml:"ospfv2,omitempty" json:"ospfv2,omitempty"`
 	BGP      []pkgprotocolbgp.BGPConfig       `yaml:"bgp,omitempty" json:"bgp,omitempty"`

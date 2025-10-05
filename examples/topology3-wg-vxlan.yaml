@@ -105,7 +105,7 @@ nodes:
             router_id: "0.0.0.3"
             cluster_id: "0.0.0.3"
             no_ipv4_unicast: true
-            neighbors:
+            peer_groups:
               group1:
                 capabilities:
                   - extended-nexthop
@@ -133,7 +133,7 @@ nodes:
                 advertise_svi_ip: true
                 activate:
                   - group1
-            neighbors:
+            peer_groups:
               group1:
                 capabilities:
                   - extended-nexthop
@@ -156,7 +156,7 @@ nodes:
                 advertise_svi_ip: true
                 activate:
                   - group1
-            neighbors:
+            peer_groups:
               group1:
                 capabilities:
                   - extended-nexthop

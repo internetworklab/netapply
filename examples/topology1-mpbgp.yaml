@@ -29,14 +29,16 @@ nodes:
         - name: v-lax1-a
           container_name: lax1
           addresses:
-            - cidr: "fe80::a/64"
+            - local: "fe80::a"
+              peer: "fe80::b/128"
           peer:
             name: v-lax1-b
             container_name: ix
         - name: v-lax2-a
           container_name: lax2
           addresses:
-            - cidr: "fe80::b/64"
+            - local: "fe80::b"
+              peer: "fe80::a/128"
           peer:
             name: v-lax2-b
             container_name: ix
@@ -48,7 +50,11 @@ nodes:
             - v-lax2-b
     controlplane:
       - container_name: lax1
+        log_level: debugging
         debug_bgp_updates: true
+        debug_zebra_events: true
+        debug_zebra_dplane: true
+        debug_zebra_kernel: true
         route_maps:
           - name: allow-all
             policy: permit
@@ -57,6 +63,7 @@ nodes:
           - vrf: default
             log_neighbor_changes: true
             no_ipv4_unicast: true
+            no_ipv6_auto_ra: true
             asn: 65001
             router_id: "0.0.0.1"
             address_families:
@@ -65,24 +72,27 @@ nodes:
                 networks:
                   - "fdda:8ca4:1556:a::/64"
                 activate:
-                  - group1
+                  - "fe80::b"
                 route_maps:
-                  - peer: group1
+                  - peer: "fe80::b"
                     name: allow-all
                     direction: in
-                  - peer: group1
+                  - peer: "fe80::b"
                     name: allow-all
                     direction: out
-            neighbors:
-              group1:
-                asn: 65002
+            linklocal_peers:
+              - peer_linklocal_address: "fe80::b"
+                interface_name: "v-lax1-a"
+                peer_asn: 65002
                 capabilities:
                   - extended-nexthop
-                linklocal_peers:
-                  - "fe80::b%v-lax1-a"
                 update_source: "fe80::a"
       - container_name: lax2
+        log_level: debugging
         debug_bgp_updates: true
+        debug_zebra_events: true
+        debug_zebra_dplane: true
+        debug_zebra_kernel: true
         route_maps:
           - name: allow-all
             policy: permit
@@ -91,28 +101,27 @@ nodes:
           - vrf: default
             log_neighbor_changes: true
             no_ipv4_unicast: true
+            no_ipv6_auto_ra: true
             asn: 65002
             router_id: "0.0.0.2"
             address_families:
               - afi: ipv6
+                safi: unicast
                 route_maps:
-                  - peer: group1
+                  - peer: "fe80::a"
                     name: allow-all
                     direction: in
-                  - peer: group1
+                  - peer: "fe80::a"
                     name: allow-all
                     direction: out
-                safi: unicast
                 networks:
                   - "fdda:8ca4:1556:b::/64"
                 activate:
-                  - group1
-            neighbors:
-              group1:
-                asn: 65001
+                  - "fe80::a"
+            linklocal_peers:
+              - peer_linklocal_address: "fe80::a"
+                interface_name: "v-lax2-a"
+                peer_asn: 65001
                 capabilities:
                   - extended-nexthop
-                linklocal_peers:
-                  - "fe80::a%v-lax2-a"
                 update_source: "fe80::b"
-

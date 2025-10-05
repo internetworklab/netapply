@@ -152,6 +152,9 @@ func writeCommands(ctx context.Context, containerName *string, cmds []string) er
 func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 
 	globalCommands := make([]string, 0)
+	if controlPlaneConfig.LogLevel != nil && *controlPlaneConfig.LogLevel != "" {
+		globalCommands = append(globalCommands, fmt.Sprintf("log stdout %s", *controlPlaneConfig.LogLevel))
+	}
 	if controlPlaneConfig.DebugBGPUpdates != nil && *controlPlaneConfig.DebugBGPUpdates {
 		globalCommands = append(globalCommands, "debug bgp updates")
 	}
@@ -161,6 +164,16 @@ func (controlPlaneConfig *ControlplaneConfig) Apply(ctx context.Context) error {
 	if controlPlaneConfig.DebugRPKI != nil && *controlPlaneConfig.DebugRPKI {
 		globalCommands = append(globalCommands, "debug rpki")
 	}
+	if controlPlaneConfig.DebugZebraEvents != nil && *controlPlaneConfig.DebugZebraEvents {
+		globalCommands = append(globalCommands, "debug zebra events")
+	}
+	if controlPlaneConfig.DebugZebraDplane != nil && *controlPlaneConfig.DebugZebraDplane {
+		globalCommands = append(globalCommands, "debug zebra dplane")
+	}
+	if controlPlaneConfig.DebugZebraKernel != nil && *controlPlaneConfig.DebugZebraKernel {
+		globalCommands = append(globalCommands, "debug zebra kernel")
+	}
+
 	if len(globalCommands) > 0 {
 		log.Println("Applying global debugging commands ...")
 		if err := writeCommands(ctx, controlPlaneConfig.ContainerName, globalCommands); err != nil {
