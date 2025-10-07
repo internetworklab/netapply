@@ -180,6 +180,22 @@ func (dockerConfig *DockerContainerConfig) Create(ctx context.Context) error {
 	return nil
 }
 
+func toPortMappings(spec map[string][]DockerPortMapping) nat.PortMap {
+	portMaps := make(nat.PortMap, 0)
+	for containerPort, hostPortMappings := range spec {
+		portbindings := make([]nat.PortBinding, 0)
+		for _, hostPortMapping := range hostPortMappings {
+			portbindings = append(portbindings, nat.PortBinding{
+				HostIP:   hostPortMapping.HostIP,
+				HostPort: fmt.Sprintf("%d", hostPortMapping.HostPort),
+			})
+		}
+		portMaps[nat.Port(containerPort)] = portbindings
+	}
+
+	return portMaps
+}
+
 func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
 	containerConfig *container.Config,
 	hostConfig *container.HostConfig,
@@ -206,7 +222,8 @@ func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
 		if dockerConfig.Networks != nil {
 			networkConfig.EndpointsConfig = make(map[string]*network.EndpointSettings)
 			for _, networkName := range dockerConfig.Networks {
-				networkConfig.EndpointsConfig[networkName] = &network.EndpointSettings{}
+				endpointSettings := &network.EndpointSettings{}
+				networkConfig.EndpointsConfig[networkName] = endpointSettings
 			}
 		}
 	}
@@ -221,18 +238,14 @@ func (dockerConfig *DockerContainerConfig) ApplyToContainerCreateConfig(
 		}
 
 		if dockerConfig.Ports != nil {
-			portMaps := make(nat.PortMap, 0)
-			for containerPort, hostPortMappings := range dockerConfig.Ports {
-				portbindings := make([]nat.PortBinding, 0)
-				for _, hostPortMapping := range hostPortMappings {
-					portbindings = append(portbindings, nat.PortBinding{
-						HostIP:   hostPortMapping.HostIP,
-						HostPort: fmt.Sprintf("%d", hostPortMapping.HostPort),
-					})
+			hostConfig.PortBindings = toPortMappings(dockerConfig.Ports)
+			if containerConfig != nil {
+				portSet := make(nat.PortSet)
+				for p := range hostConfig.PortBindings {
+					portSet[p] = struct{}{}
 				}
-				portMaps[nat.Port(containerPort)] = portbindings
+				containerConfig.ExposedPorts = portSet
 			}
-			hostConfig.PortBindings = portMaps
 		}
 
 		if dockerConfig.Volumes != nil {
