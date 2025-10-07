@@ -11,8 +11,9 @@ import (
 // A object of struct type URLReader is an implementation of io.ReadCloser,
 // it is the responsibility of the caller to close the reader
 type URLReader struct {
-	url    string
-	reader io.ReadCloser
+	url     string
+	reader  io.ReadCloser
+	isStdin bool
 }
 
 type URLReaderTransportOptions struct {
@@ -29,8 +30,9 @@ func NewURLReader(url string, options *URLReaderTransportOptions) (io.ReadCloser
 
 	if url == FilePathPresumedToBeStdin || url == FilePathThatIsStdin {
 		return &URLReader{
-			url:    url,
-			reader: os.Stdin,
+			url:     url,
+			reader:  os.Stdin,
+			isStdin: true,
 		}, nil
 	}
 
@@ -50,5 +52,8 @@ func (reader *URLReader) Read(p []byte) (n int, err error) {
 }
 
 func (reader *URLReader) Close() error {
+	if reader.isStdin {
+		return nil
+	}
 	return reader.reader.Close()
 }

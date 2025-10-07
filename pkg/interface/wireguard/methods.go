@@ -2,8 +2,11 @@ package wireguard
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
+	"io"
 	"net"
+	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
@@ -275,7 +278,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		changeSet.PeersToAdd = addedPeers
 		changeSet.PeersToRemove = removedPeers
 
-		wgtypesConf, err := wgConf.ToWGTypesConfig()
+		wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 		}
@@ -356,20 +359,56 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer() (*wgtypes.PeerConfig, e
 	return peercfg, nil
 }
 
-func (wgConf *WireGuardConfig) ToWGTypesConfig() (*wgtypes.Config, error) {
-	wgtypesConf := new(wgtypes.Config)
-
-	if wgConf.ListenPort != nil {
-		wgtypesConf.ListenPort = wgConf.ListenPort
-	}
-
-	if wgConf.PrivateKey != "" {
-		pk, err := wgtypes.ParseKey(wgConf.PrivateKey)
+func getPrivKey(ctx context.Context, pkB64 string, pkURL *string) (*wgtypes.Key, error) {
+	if pkB64 != "" {
+		pkobj, err := wgtypes.ParseKey(strings.TrimSpace(pkB64))
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
-		wgtypesConf.PrivateKey = &pk
+		return &pkobj, nil
 	}
+	if pkURL != nil && *pkURL != "" {
+		var tlsConfig *tls.Config
+		clientAuth, err := pkgutils.ClientAuthFromCtx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get client auth from context: %w", err)
+		}
+
+		if strings.HasPrefix(*pkURL, "https://") {
+			tlsConfig, err = pkgutils.GetTLSConfig(clientAuth.TLSTrustedCACertFile, clientAuth.TLSClientCertFile, clientAuth.TLSClientKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get TLS config: %w", err)
+			}
+		}
+
+		reader, err := pkgutils.NewURLReader(*pkURL, &pkgutils.URLReaderTransportOptions{
+			TLSConfig: tlsConfig,
+			Username:  clientAuth.HTTPBasicAuthUsername,
+			Password:  clientAuth.HTTPBasicAuthPassword,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to create URL reader: %w", err)
+		}
+		defer reader.Close()
+		pkContent, err := io.ReadAll(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read private key: %w", err)
+		}
+		return getPrivKey(ctx, string(pkContent), nil)
+	}
+	return nil, fmt.Errorf("private key is not set")
+}
+
+func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Config, error) {
+	wgtypesConf := new(wgtypes.Config)
+
+	wgtypesConf.ListenPort = wgConf.ListenPort
+
+	pk, err := getPrivKey(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse private key: %w", err)
+	}
+	wgtypesConf.PrivateKey = pk
 
 	for _, peer := range wgConf.Peers {
 		peercfg, err := peer.ToWGTypesPeer()
@@ -404,7 +443,7 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 		}
 		defer wgCtrl.Close()
 
-		wgtypesConf, err := wgConf.ToWGTypesConfig()
+		wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 		}

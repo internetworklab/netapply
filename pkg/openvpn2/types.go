@@ -238,14 +238,17 @@ type OpenVPN2Instance struct {
 
 	// Path to the TLS cert file in the host
 	// By default, it would be bind mount to /etc/openvpn/certs/cert.pem in the container
+	// Note that HostTLSCertFile can also be a URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
 	HostTLSCertFile string `openvpn2:"-" yaml:"host_tls_cert_file" json:"host_tls_cert_file"`
 
 	// Path to the TLS cert key file in the host
 	// By default, it would be bind mount to /etc/openvpn/certs/key.pem in the container
+	// Note that HostTLSKeyFile can also be a URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
 	HostTLSKeyFile string `openvpn2:"-" yaml:"host_tls_key_file" json:"host_tls_key_file"`
 
 	// Path to the DH PEM file in the host, only needed when in server mode
 	// By default, it would be bind mount to /etc/openvpn/certs/dh.pem in the container (when provided)
+	// Note that HostDHPEMFile can also be a URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
 	HostDHPEMFile *string `openvpn2:"-" yaml:"host_dh_pem_file,omitempty" json:"host_dh_pem_file,omitempty"`
 
 	AutoRemove *bool `openvpn2:"-" yaml:"autoremove,omitempty" json:"autoremove,omitempty"`
