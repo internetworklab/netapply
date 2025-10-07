@@ -22,3 +22,10 @@ type BridgeInterfaceChangeSet struct {
 }
 
 type BridgeConfigurationList []BridgeConfig
+
+type BridgingConnectionConfig struct {
+	Name          string  `yaml:"name" json:"name"`
+	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	VethName      string  `yaml:"veth_name" json:"veth_name"`
+	BridgeName    string  `yaml:"bridge_name" json:"bridge_name"`
+}

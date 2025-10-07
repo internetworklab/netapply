@@ -37,12 +37,26 @@ type ControlplaneConfig struct {
 	RouteMap []pkgprotocolbgp.RouteMapConfig  `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
 }
 
+type StaticConfig struct {
+	VethPairs []pkginterfaceveth.VethPairConfig `yaml:"veth_pairs,omitempty" json:"veth_pairs,omitempty"`
+	Bridges   []pkginterfacebridge.BridgeConfig `yaml:"bridges,omitempty" json:"bridges,omitempty"`
+
+	// A BridgingConnection simply trys to enslave a veth interface to a bridge interface and no more than that.
+	// E.g. we want to connect one end of a veth pair to a bridge interface which is not controlled by netapply.
+	Connections []pkginterfacebridge.BridgingConnectionConfig `yaml:"connections,omitempty" json:"connections,omitempty"`
+}
+
 type NodeConfig struct {
 	FRRContainers []pkgfrrcontainer.FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
 
 	// Currently, the implementation of the controlplane are largely outsourced to (maybe containerized) FRR instance.
 	Controlplane []ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane    *DataplaneConfig     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+
+	// Static configs are those append-only and do not participate in a reconciliation loop.
+	// Often use for linking containers/netns that are not managed by netapply.
+	// Interfaces/Resources must have a `TrySetup` method before they are qualified to put into this `Static` section.
+	Static *StaticConfig `yaml:"static,omitempty" json:"static,omitempty"`
 
 	// The list of containers to scan when doing a reconciliation loop
 	Containers []string `yaml:"containers,omitempty" json:"containers,omitempty"`

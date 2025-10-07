@@ -213,6 +213,17 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to set bridge link up: %w", err)
 		}
 
+		for _, addr := range bridgeConfig.Addresses {
+			nlAddr, err := addr.ToNetlinkAddr()
+			if err != nil {
+				return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+			}
+			err = handle.AddrAdd(link, nlAddr)
+			if err != nil {
+				return fmt.Errorf("failed to add address to bridge link: %w", err)
+			}
+		}
+
 		_, _, err = bridgeConfig.ReconcileEnclaves(ctx)
 		return err
 	})
@@ -225,4 +236,53 @@ func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, con
 		provisionerList = append(provisionerList, &bridge)
 	}
 	return pkgreconcile.DetectChangesFromProvisionerList(ctx, provisionerList, bridgeTy, containers)
+}
+
+func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {
+	return pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(bridgeConfig.Name)
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); !ok {
+				return fmt.Errorf("failed to get bridge link: %w", err)
+			}
+			return bridgeConfig.Create(ctx)
+		}
+
+		err = handle.LinkSetUp(link)
+		if err != nil {
+			return fmt.Errorf("failed to set bridge link up: %w", err)
+		}
+
+		changeSet, err := bridgeConfig.DetectChanges(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to detect changes: %w", err)
+		}
+		if changeSet.HasUpdates() {
+			return changeSet.Apply(ctx)
+		}
+
+		return nil
+	})
+}
+
+func (bridgingConnectionConfig *BridgingConnectionConfig) TrySetup(ctx context.Context) error {
+	return pkgdocker.WithNsHandleSafe(ctx, bridgingConnectionConfig.ContainerName, func(handle *netlink.Handle) error {
+		vethLink, err := handle.LinkByName(bridgingConnectionConfig.VethName)
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); !ok {
+				return fmt.Errorf("failed to get veth link: %w", err)
+			}
+			return fmt.Errorf("veth link %s not found", bridgingConnectionConfig.VethName)
+		}
+
+		bridgeLink, err := handle.LinkByName(bridgingConnectionConfig.BridgeName)
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); !ok {
+				return fmt.Errorf("failed to get bridge link: %w", err)
+			}
+			return fmt.Errorf("bridge link %s not found", bridgingConnectionConfig.BridgeName)
+		}
+
+		return handle.LinkSetMaster(vethLink, bridgeLink)
+	})
 }

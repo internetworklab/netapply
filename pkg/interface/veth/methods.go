@@ -211,6 +211,12 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 				return fmt.Errorf("failed to get veth link: %w", err)
 			}
 
+			if vethPairConfig.MTU != nil {
+				if err := handle.LinkSetMTU(link, *vethPairConfig.MTU); err != nil {
+					return fmt.Errorf("failed to set veth link mtu: %w", err)
+				}
+			}
+
 			for _, addr := range vethPairConfig.Addresses {
 				nlAddr, err := addr.ToNetlinkAddr()
 				if err != nil {
@@ -234,6 +240,12 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			}
 
 			if vethPairConfig.Peer != nil {
+				if vethPairConfig.Peer.MTU != nil {
+					if err := handle.LinkSetMTU(link, *vethPairConfig.Peer.MTU); err != nil {
+						return fmt.Errorf("failed to set veth link mtu: %w", err)
+					}
+				}
+
 				for _, addr := range vethPairConfig.Peer.Addresses {
 					nlAddr, err := addr.ToNetlinkAddr()
 					if err != nil {
@@ -380,4 +392,54 @@ func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context,
 	}
 
 	return changeSet, nil
+}
+
+func (vethPairSpec *VethPairConfig) TrySetup(ctx context.Context) error {
+	placementStatus, err := vethPairSpec.GetPlacementStatus(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get placement status for veth pair %s: %w", vethPairSpec.Name, err)
+	}
+
+	if placementStatus.FoundInPrimaryNetns && placementStatus.FoundInSecondaryNetns {
+		changeSet, err := vethPairSpec.DetectChanges(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to detect changes for veth pair %s: %w", vethPairSpec.Name, err)
+		}
+		if changeSet.HasUpdates() {
+			return changeSet.Apply(ctx)
+		}
+		return nil
+	}
+
+	if placementStatus.FoundInPrimaryNetns {
+		err := pkgdocker.WithNsHandleSafe(ctx, vethPairSpec.GetContainerName(), func(handle *netlink.Handle) error {
+			link, err := handle.LinkByName(vethPairSpec.GetInterfaceName())
+			if err != nil {
+				return fmt.Errorf("failed to get veth link: %w", err)
+			}
+			return handle.LinkDel(link)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete veth link: %w", err)
+		}
+
+		return vethPairSpec.Create(ctx)
+	}
+
+	if placementStatus.FoundInSecondaryNetns {
+		err := pkgdocker.WithNsHandleSafe(ctx, vethPairSpec.Peer.GetContainerName(), func(handle *netlink.Handle) error {
+			link, err := handle.LinkByName(vethPairSpec.Peer.GetInterfaceName())
+			if err != nil {
+				return fmt.Errorf("failed to get veth link: %w", err)
+			}
+			return handle.LinkDel(link)
+		})
+		if err != nil {
+			return fmt.Errorf("failed to delete veth link: %w", err)
+		}
+
+		return vethPairSpec.Create(ctx)
+	}
+
+	return vethPairSpec.Create(ctx)
 }

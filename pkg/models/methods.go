@@ -32,6 +32,25 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 
 	}
 
+	if nodeConfig.Static != nil {
+		log.Println("Setting up static (append-only) dataplane ...")
+		for _, vethpair := range nodeConfig.Static.VethPairs {
+			if err := vethpair.TrySetup(ctx); err != nil {
+				return fmt.Errorf("failed to setup veth pair %s: %w", vethpair.Name, err)
+			}
+		}
+		for _, bridge := range nodeConfig.Static.Bridges {
+			if err := bridge.TrySetup(ctx); err != nil {
+				return fmt.Errorf("failed to setup bridge %s: %w", bridge.Name, err)
+			}
+		}
+		for _, connection := range nodeConfig.Static.Connections {
+			if err := connection.TrySetup(ctx); err != nil {
+				return fmt.Errorf("failed to setup connection %s: %w", connection.Name, err)
+			}
+		}
+	}
+
 	if nodeConfig.Controlplane != nil {
 		log.Println("Setting up controlplane ...")
 		for _, controlPlaneConfig := range nodeConfig.Controlplane {
