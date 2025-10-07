@@ -889,7 +889,46 @@ You can create a WireGuard network from cloud config:
   --http-basic-auth-password 123456
 ```
 
+And you can easily tear down the test containers that just created:
+
+```shell
+./bin/netapply down --service-name exp1
+```
+
 Where the YAML manifest file, the private key and public key of WireGuard tunnels, (and possibly the TLS x509v2 certs), can all be placed at cloud and can be fetched via HTTPs.
+
+## Experiment 7: Setup a multi-nodes WireGuard Cluster
+
+Once configs and private keys are uploaded to the cloud and in-positioned, you can easily setup a multi-nodes WireGuard cluster using cloud-hosted configuration:
+
+Execute following command in node vie1:
+
+```shell
+./bin/netapply up \
+  --config https://demofiles.imsb.me/demo/configs/vie1.yaml \
+  --service-name exp1 \
+  --node vie1 \
+  --http-basic-auth-username admin \
+  --http-basic-auth-password 123456
+```
+
+Then execute following command in node lax1:
+
+```shell
+./bin/netapply up \
+  --config https://demofiles.imsb.me/demo/configs/lax1.yaml \
+  --service-name exp1 \
+  --node lax1 \
+  --http-basic-auth-username admin \
+  --http-basic-auth-password 123456
+```
+
+And you can easily tear down the test containers that just created:
+
+```shell
+# both in node lax1 and node vie1
+./bin/netapply down --service-name exp1
+```
 
 (More Example configuration YAMLs are coming ...)
 
