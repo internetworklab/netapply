@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -346,15 +345,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 	if err != nil {
 		return nil, fmt.Errorf("failed to get container and ifaces: %w", err)
 	}
-	log.Println("Debugging openvpn2 current ifaces map: ")
-	for nsKey, ifaceMap := range currentIfacesMap {
-		for ifaceName := range ifaceMap {
-			// Print it out to see what `getContainerAndIfaces` gets
-			log.Printf("%s: %s", pkgdocker.GetContainerDisplayName(&nsKey), ifaceName)
-		}
-	}
 
-	// todo: rewrite this
 	for _, nsKey := range containers {
 		if ifaceMap, ok := currentIfacesMap[nsKey]; ok && ifaceMap != nil {
 			for ifaceName := range ifaceMap {
@@ -368,7 +359,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 		}
 
 		if specSubMap, ok := specMap[nsKey]; ok && specSubMap != nil {
-			for ifaceName, ifspec := range specSubMap {
+			for _, ifspec := range specSubMap {
 				if _, ok := currentIfacesMap[nsKey]; !ok {
 					if _, hit := addedSet[nsKey]; !hit {
 						addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
@@ -376,31 +367,17 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 					addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
 					continue
 				}
-				if _, ok := currentIfacesMap[nsKey][ifaceName]; !ok {
-					if _, hit := removedSet[nsKey]; !hit {
-						addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
-					}
-					addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
-					continue
-				}
+
+				// for openvpn2, don't look into interface name inside the container, in client mode, tap interface is not guaranteed to be present
+				// if _, ok := currentIfacesMap[nsKey][ifaceName]; !ok {
+				// 	if _, hit := removedSet[nsKey]; !hit {
+				// 		addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
+				// 	}
+				// 	addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
+				// 	continue
+				// }
 			}
 		}
-	}
-
-	log.Println("Debugging openvpn2 changeset:")
-	for nsKey, ifaces := range addedSet {
-		ifaceList := make([]string, 0)
-		for _, ifaceObj := range ifaces {
-			ifaceList = append(ifaceList, ifaceObj.GetInterfaceName())
-		}
-		log.Printf("added: %s: %v", nsKey, strings.Join(ifaceList, ", "))
-	}
-	for nsKey, ifaces := range removedSet {
-		ifaceList := make([]string, 0)
-		for _, canceller := range ifaces {
-			ifaceList = append(ifaceList, canceller.GetInterfaceName())
-		}
-		log.Printf("removed: %s: %v", nsKey, strings.Join(ifaceList, ", "))
 	}
 
 	changeSet.AddedInterfaces = addedSet

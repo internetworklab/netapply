@@ -100,7 +100,7 @@ type OpenVPN2Instance struct {
 
 	// Do not bind to local address and port. The IP stack will allocate a dynamic port for returning packets. Since the value of the dynamic port could not be known in advance by a peer, this option is only suitable
 	// for peers which will be initiating connections by using the --remote option.
-	NoBind bool `openvpn2:"no-bind" yaml:"no_bind"`
+	NoBind bool `openvpn2:"nobind" yaml:"no_bind"`
 
 	// Don't close and reopen TUN/TAP device or run up/down scripts across SIGUSR1 or --ping-restart restarts.
 	PersistTun bool `openvpn2:"persist-tun" yaml:"persist_tun"`
@@ -213,7 +213,7 @@ type OpenVPN2Instance struct {
 	ScriptSecurityLevel *int `openvpn2:"script-security" yaml:"script_security_level,omitempty"`
 
 	// If hostname resolve fails for --remote, retry resolve for n seconds before failing.
-	ResolvRetry *int `openvpn2:"resolv-retry" yaml:"resolv_retry,omitempty"`
+	ResolvRetry *string `openvpn2:"resolv-retry" yaml:"resolv_retry,omitempty"`
 
 	// Specify the link layer address, more commonly known as the MAC address.
 	// Only applied to TAP devices.

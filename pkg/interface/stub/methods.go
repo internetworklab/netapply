@@ -3,6 +3,7 @@ package stub
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	"github.com/vishvananda/netlink"
@@ -19,6 +20,10 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) GetContainerName() *string
 func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
 	if stubInterfaceCanceller.InterfaceName == "lo" {
 		// skip special interfaces such as "lo"
+		return nil
+	}
+
+	if strings.HasPrefix(stubInterfaceCanceller.InterfaceName, "eth") || strings.HasPrefix(stubInterfaceCanceller.InterfaceName, "lo") {
 		return nil
 	}
 

@@ -137,6 +137,14 @@ func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 		}
 
 		for _, link := range links {
+			if strings.HasPrefix(link.Attrs().Name, "eth") {
+				continue
+			}
+
+			if strings.HasPrefix(link.Attrs().Name, "lo") {
+				continue
+			}
+
 			if link.Type() == linkType {
 				res.ifaces[link.Attrs().Name] = &pkginterfacestub.StubInterfaceCanceller{ContainerName: containerName, InterfaceName: link.Attrs().Name}
 			}

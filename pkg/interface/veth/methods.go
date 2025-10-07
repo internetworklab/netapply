@@ -3,6 +3,7 @@ package veth
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
@@ -335,6 +336,10 @@ func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context,
 			}
 
 			for _, link := range links {
+				if strings.HasPrefix(link.Attrs().Name, "eth") || strings.HasPrefix(link.Attrs().Name, "lo") {
+					continue
+				}
+
 				if link.Type() != vethTy {
 					continue
 				}
