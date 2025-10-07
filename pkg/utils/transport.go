@@ -13,7 +13,7 @@ import (
 )
 
 // FetchHTTPConfig fetches configuration from an HTTP(S) endpoint
-func FetchHTTPConfig(url string, tlsConfig *tls.Config, username, password string) (io.Reader, error) {
+func FetchHTTPConfigReadCloser(url string, tlsConfig *tls.Config, username, password string) (io.ReadCloser, error) {
 	// Create HTTP client with timeout
 	client := &http.Client{
 		Timeout: 30 * time.Second,
@@ -42,20 +42,32 @@ func FetchHTTPConfig(url string, tlsConfig *tls.Config, username, password strin
 	if err != nil {
 		return nil, fmt.Errorf("HTTP request failed: %w", err)
 	}
-	defer resp.Body.Close()
 
 	// Check HTTP status code
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("HTTP request failed with status %d: %s", resp.StatusCode, resp.Status)
 	}
 
+	return resp.Body, nil
+}
+
+// FetchHTTPConfig fetches configuration from an HTTP(S) endpoint
+func FetchHTTPConfig(url string, tlsConfig *tls.Config, username, password string) (io.Reader, error) {
+
+	body, err := FetchHTTPConfigReadCloser(url, tlsConfig, username, password)
+	if err != nil {
+		return nil, err
+	}
+
+	defer body.Close()
+
 	// Read response body into memory
-	body, err := io.ReadAll(resp.Body)
+	bodyContent, err := io.ReadAll(body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	return strings.NewReader(string(body)), nil
+	return strings.NewReader(string(bodyContent)), nil
 }
 
 // GetTLSConfig creates a TLS configuration from the provided certificate files

@@ -3,6 +3,7 @@ package openvpn2
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -16,6 +17,87 @@ import (
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
+
+func getFileVolume(ctx context.Context, containerName, hostPath, containerPath, volName string) (*pkgdocker.DockerMountConfig, error) {
+	hostPath = strings.TrimSpace(hostPath)
+	if hostPath == pkgutils.FilePathPresumedToBeStdin || hostPath == pkgutils.FilePathThatIsStdin {
+		return nil, fmt.Errorf("invalid host path: %s", hostPath)
+	}
+
+	if strings.HasPrefix(hostPath, "https://") || strings.HasPrefix(hostPath, "http://") {
+
+		clientAuth, err := pkgutils.ClientAuthFromCtx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get client auth from context: %w", err)
+		}
+
+		readerConfig := &pkgutils.URLReaderTransportOptions{
+			Username: clientAuth.HTTPBasicAuthUsername,
+			Password: clientAuth.HTTPBasicAuthPassword,
+		}
+
+		if strings.HasPrefix(hostPath, "https://") {
+			readerConfig.TLSConfig, err = pkgutils.GetTLSConfig(clientAuth.TLSTrustedCACertFile, clientAuth.TLSClientCertFile, clientAuth.TLSClientKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get TLS config: %w", err)
+			}
+		}
+
+		reader, err := pkgutils.NewURLReader(hostPath, readerConfig)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create URL reader: %w", err)
+		}
+		defer reader.Close()
+
+		stateDir := pkgutils.GetStatefulDir(ctx)
+		actualHostPath := path.Join(stateDir, "openvpn", "containers", containerName, "tmpvols", volName)
+		actualHostFile, err := os.OpenFile(actualHostPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open actual host file: %w", err)
+		}
+		defer actualHostFile.Close()
+		_, err = io.Copy(actualHostFile, reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to copy file: %w", err)
+		}
+
+		return &pkgdocker.DockerMountConfig{
+			Type:   mount.TypeBind,
+			Source: actualHostPath,
+			Target: containerPath,
+		}, nil
+	}
+
+	return &pkgdocker.DockerMountConfig{
+		Type:   mount.TypeBind,
+		Source: hostPath,
+		Target: containerPath,
+	}, nil
+}
+
+func getCertVolumes(ctx context.Context, ovpInst *OpenVPN2Instance) ([]pkgdocker.DockerMountConfig, error) {
+	volumes := make([]pkgdocker.DockerMountConfig, 0)
+	certVol, err := getFileVolume(ctx, ovpInst.Name, ovpInst.HostTLSCertFile, "/etc/openvpn/certs/cert.pem", "openvpnclientcert.pem")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cert volume: %w", err)
+	}
+	volumes = append(volumes, *certVol)
+	keyVol, err := getFileVolume(ctx, ovpInst.Name, ovpInst.HostTLSKeyFile, "/etc/openvpn/certs/key.pem", "openvpnclientkey.pem")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get key volume: %w", err)
+	}
+	volumes = append(volumes, *keyVol)
+
+	if ovpInst.DHPEMFile != nil {
+		dhVol, err := getFileVolume(ctx, ovpInst.Name, *ovpInst.HostDHPEMFile, "/etc/openvpn/certs/dh.pem", "openvpnclientdh.pem")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get dh volume: %w", err)
+		}
+		volumes = append(volumes, *dhVol)
+	}
+
+	return volumes, nil
+}
 
 func (ovp *OpenVPN2RemoteTLSCertType) ToCLIArgs() ([]string, error) {
 	res := make([]string, 0)
@@ -153,24 +235,13 @@ func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 			Source: pkgutils.ResolvePath(upWrapperScriptPath),
 			Target: "/up-wrapper.sh",
 		},
-		{
-			Type:   mount.TypeBind,
-			Source: pkgutils.ResolvePath(ovpInst.HostTLSCertFile),
-			Target: "/etc/openvpn/certs/cert.pem",
-		},
-		{
-			Type:   mount.TypeBind,
-			Source: pkgutils.ResolvePath(ovpInst.HostTLSKeyFile),
-			Target: "/etc/openvpn/certs/key.pem",
-		},
 	}
-	if ovpInst.DHPEMFile != nil {
-		volumes = append(volumes, pkgdocker.DockerMountConfig{
-			Type:   mount.TypeBind,
-			Source: pkgutils.ResolvePath(*ovpInst.HostDHPEMFile),
-			Target: "/etc/openvpn/certs/dh.pem",
-		})
+
+	certVols, err := getCertVolumes(ctx, ovpInst)
+	if err != nil {
+		return fmt.Errorf("failed to get TLS volumes: %w", err)
 	}
+	volumes = append(volumes, certVols...)
 
 	containerConfig.Volumes = volumes
 	return containerConfig.Apply(ctx)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -43,50 +44,33 @@ func down(ctx context.Context) error {
 // path: file path, "-" for stdin, or HTTP(S) URL
 // config: pointer to GlobalConfig struct to populate
 // tlsConfig: TLS configuration for HTTPS requests (can be nil for default)
-func getGlobalConfig(cmd *UpCmd, config *pkgmodels.GlobalConfig) error {
-	var reader io.Reader
+func getGlobalConfig(configPath string, clientAuth *pkgutils.ClientAuth) error {
+	var reader io.ReadCloser
 	var err error
 
-	path := cmd.Config
-
-	if path == "-" {
-		log.Println("Reading configuration from stdin ...")
-		// Read from stdin
-		reader = os.Stdin
-	} else if strings.HasPrefix(path, "https://") {
-		log.Printf("Reading configuration from HTTPS endpoint %s ...", path)
-
-		tlsConfig, err := pkgutils.GetTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
+	var tlsConfig *tls.Config
+	if strings.HasPrefix(configPath, "https://") {
+		tlsConfig, err = pkgutils.GetTLSConfig(clientAuth.TLSTrustedCACertFile, clientAuth.TLSClientCertFile, clientAuth.TLSClientKeyFile)
 		if err != nil {
 			return fmt.Errorf("failed to create TLS config: %w", err)
 		}
-
-		// Read from HTTPS endpoint
-		reader, err = pkgutils.FetchHTTPConfig(path, tlsConfig, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
-		if err != nil {
-			return fmt.Errorf("failed to fetch HTTPS config from '%s': %w", path, err)
-		}
-	} else if strings.HasPrefix(path, "http://") {
-		log.Printf("Reading configuration from HTTP endpoint %s ...", path)
-
-		// Read from HTTP endpoint
-		reader, err = pkgutils.FetchHTTPConfig(path, nil, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
-		if err != nil {
-			return fmt.Errorf("failed to fetch HTTP config from '%s': %w", path, err)
-		}
-	} else {
-		log.Printf("Reading configuration from file %s ...", path)
-
-		// Read from file
-		file, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("failed to open config file '%s': %w", path, err)
-		}
-		defer file.Close()
-		reader = file
 	}
 
+	readerConfig := &pkgutils.URLReaderTransportOptions{
+		TLSConfig: tlsConfig,
+		Username:  clientAuth.HTTPBasicAuthUsername,
+		Password:  clientAuth.HTTPBasicAuthPassword,
+	}
+
+	reader, err = pkgutils.NewURLReader(configPath, readerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create URL reader: %w", err)
+	}
+
+	defer reader.Close()
+
 	// Parse YAML configuration
+	config := new(pkgmodels.GlobalConfig)
 	if err := yaml.NewDecoder(reader).Decode(config); err != nil {
 		return fmt.Errorf("failed to parse config: %w", err)
 	}
@@ -126,13 +110,22 @@ func (cmd *UpCmd) Run() error {
 	}
 	defer cli.Close()
 
+	clientAuth := &pkgutils.ClientAuth{
+		TLSClientCertFile:     cmd.TLSClientCert,
+		TLSClientKeyFile:      cmd.TLSClientKey,
+		TLSTrustedCACertFile:  cmd.TLSTrustedCACert,
+		HTTPBasicAuthUsername: cmd.HTTPBasicAuthUsername,
+		HTTPBasicAuthPassword: cmd.HTTPBasicAuthPassword,
+	}
+
 	// Set up context with service name and docker client
 	ctx = pkgutils.SetServiceNameInCtx(ctx, cmd.ServiceName)
 	ctx = pkgutils.SetDockerCliInCtx(ctx, cli)
+	ctx = pkgutils.SetClientAuthInCtx(ctx, clientAuth)
 
 	// Read and parse the configuration
 	globalConfig := new(pkgmodels.GlobalConfig)
-	if err := getGlobalConfig(cmd, globalConfig); err != nil {
+	if err := getGlobalConfig(cmd.Config, clientAuth); err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 

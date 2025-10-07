@@ -7,13 +7,17 @@ import (
 )
 
 type WireGuardConfig struct {
-	Name          string                             `yaml:"name" json:"name"`
-	PrivateKey    string                             `yaml:"privatekey" json:"privatekey"`
-	Peers         []WireGuardPeerConfig              `yaml:"peers,omitempty" json:"peers,omitempty"`
-	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
-	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	ListenPort    *int                               `yaml:"listen_port,omitempty" json:"listen_port,omitempty"`
-	MTU           *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	Name       string `yaml:"name" json:"name"`
+	PrivateKey string `yaml:"privatekey" json:"privatekey"`
+
+	// If privatekey is not set, privatekey_from will be checked, if privatekey_from is not nil and not empty,
+	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
+	PrivateKeyFrom *string                            `yaml:"privatekey_from,omitempty" json:"privatekey_from,omitempty"`
+	Peers          []WireGuardPeerConfig              `yaml:"peers,omitempty" json:"peers,omitempty"`
+	Addresses      []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	ContainerName  *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
+	ListenPort     *int                               `yaml:"listen_port,omitempty" json:"listen_port,omitempty"`
+	MTU            *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 }
 
 type WireGuardInterfaceChangeSet struct {
@@ -32,13 +36,13 @@ type WireGuardInterfaceChangeSet struct {
 }
 
 type WireGuardPeerConfig struct {
-	PublicKey            string   `yaml:"publickey" json:"publickey"`
-	Endpoint             *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
-	AllowedIPs           []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
+	PublicKey  string   `yaml:"publickey" json:"publickey"`
+	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
+	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
 
 	// When deploy in intranet, the endpoint might not successfully converge to the endpoint specified in the spec,
 	// Enabling this flag might result in the reconciliation failed to converge.
-	ForceRecheckEndpoint *bool    `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty"`
+	ForceRecheckEndpoint *bool `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty"`
 }
 
 type WireGuardConfigurationList []WireGuardConfig
