@@ -258,9 +258,9 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		endpointCheckingMask := make(map[string]bool)
 		specPeerConfigs := make([]wgtypes.PeerConfig, 0)
 		for _, peer := range wgConf.Peers {
-			peercfg, err := peer.ToWGTypesPeer()
+			peercfg, err := peer.ToWGTypesPeer(ctx)
 			if peer.ForceRecheckEndpoint != nil && *peer.ForceRecheckEndpoint {
-				endpointCheckingMask[peer.PublicKey] = true
+				endpointCheckingMask[peercfg.PublicKey.String()] = true
 			}
 
 			if err != nil {
@@ -331,14 +331,14 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 	return changeSet, nil
 }
 
-func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer() (*wgtypes.PeerConfig, error) {
+func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wgtypes.PeerConfig, error) {
 	peercfg := new(wgtypes.PeerConfig)
 
-	pk, err := wgtypes.ParseKey(wgPeerConfig.PublicKey)
+	pkObj, err := getKeyObj(ctx, wgPeerConfig.PublicKey, wgPeerConfig.PublicKeyFrom)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse public key: %w", err)
+		return nil, fmt.Errorf("failed to get key object: %w", err)
 	}
-	peercfg.PublicKey = pk
+	peercfg.PublicKey = *pkObj
 
 	if wgPeerConfig.Endpoint != nil {
 		udpAddr, err := net.ResolveUDPAddr("udp", *wgPeerConfig.Endpoint)
@@ -359,7 +359,7 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer() (*wgtypes.PeerConfig, e
 	return peercfg, nil
 }
 
-func getPrivKey(ctx context.Context, pkB64 string, pkURL *string) (*wgtypes.Key, error) {
+func getKeyObj(ctx context.Context, pkB64 string, pkURL *string) (*wgtypes.Key, error) {
 	if pkB64 != "" {
 		pkobj, err := wgtypes.ParseKey(strings.TrimSpace(pkB64))
 		if err != nil {
@@ -394,7 +394,7 @@ func getPrivKey(ctx context.Context, pkB64 string, pkURL *string) (*wgtypes.Key,
 		if err != nil {
 			return nil, fmt.Errorf("failed to read private key: %w", err)
 		}
-		return getPrivKey(ctx, string(pkContent), nil)
+		return getKeyObj(ctx, string(pkContent), nil)
 	}
 	return nil, fmt.Errorf("private key is not set")
 }
@@ -404,14 +404,14 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 
 	wgtypesConf.ListenPort = wgConf.ListenPort
 
-	pk, err := getPrivKey(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
+	pk, err := getKeyObj(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse private key: %w", err)
 	}
 	wgtypesConf.PrivateKey = pk
 
 	for _, peer := range wgConf.Peers {
-		peercfg, err := peer.ToWGTypesPeer()
+		peercfg, err := peer.ToWGTypesPeer(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
 		}

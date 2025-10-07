@@ -8,7 +8,7 @@ import (
 
 type WireGuardConfig struct {
 	Name       string `yaml:"name" json:"name"`
-	PrivateKey string `yaml:"privatekey" json:"privatekey"`
+	PrivateKey string `yaml:"privatekey,omitempty" json:"privatekey,omitempty"`
 
 	// If privatekey is not set, privatekey_from will be checked, if privatekey_from is not nil and not empty,
 	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
@@ -36,7 +36,12 @@ type WireGuardInterfaceChangeSet struct {
 }
 
 type WireGuardPeerConfig struct {
-	PublicKey  string   `yaml:"publickey" json:"publickey"`
+	PublicKey string `yaml:"publickey,omitempty" json:"publickey,omitempty"`
+
+	// If PublicKey is not set, PublicKeyFrom will be checked, if PublicKeyFrom is not nil and not empty,
+	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
+	PublicKeyFrom *string `yaml:"publickey_from,omitempty" json:"publickey_from,omitempty"`
+
 	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
 	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
 
