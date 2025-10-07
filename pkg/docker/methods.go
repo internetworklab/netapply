@@ -62,7 +62,13 @@ func (dockerConfig *DockerContainerConfig) Apply(ctx context.Context) error {
 		log.Printf("Container %s found: %s\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.ID)
 		switch cont.State {
 		case container.StateRunning, container.StateRestarting:
-			if checkIfRecreateNeeded(dockerConfig, cont) {
+
+			details, err := cli.ContainerInspect(ctx, cont.ID)
+			if err != nil {
+				return fmt.Errorf("failed to inspect container: %w", err)
+			}
+
+			if checkIfRecreateNeeded(dockerConfig, cont, details) {
 				log.Printf("Container %s is %s, recreating...\n", GetContainerDisplayName(&dockerConfig.ContainerName), cont.State)
 				return dockerConfig.ReCreate(ctx)
 			}
@@ -497,6 +503,7 @@ func NewContainerListFromServiceName(ctx context.Context, serviceName string) (*
 	dockerArgs.Add("label", fmt.Sprintf("%s=%s", LabelKeyService, serviceName))
 	containers, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: dockerArgs,
+		All:     true,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
@@ -533,20 +540,24 @@ func portSpecToKeys(spec map[string][]DockerPortMapping) map[string]string {
 	return keys
 }
 
-func portStatusToKeys(status []container.Port) map[string]string {
+func portStatusToKeys(status nat.PortMap) map[string]string {
 	keys := make(map[string]string)
 
-	for _, port := range status {
-		key := fmt.Sprintf("%s:%d -> %d/%s", port.IP, port.PublicPort, port.PrivatePort, port.Type)
-		keys[key] = fmt.Sprintf("%d/%s", port.PrivatePort, port.Type)
+	for containerPortAndType, hostPortMappings := range status {
+		for _, hostPortMapping := range hostPortMappings {
+			// might looks like 0.0.0.0:8080 -> 8080/tcp
+			key := fmt.Sprintf("%s:%s -> %s", hostPortMapping.HostIP, hostPortMapping.HostPort, string(containerPortAndType))
+			keys[key] = string(containerPortAndType)
+		}
 	}
 
 	return keys
 }
 
-func checkPortsDiffer(lhs map[string][]DockerPortMapping, rhs []container.Port) bool {
+func checkPortsDiffer(lhs map[string][]DockerPortMapping, rhs nat.PortMap) bool {
 	specKeys := portSpecToKeys(lhs)
 	statusKeys := portStatusToKeys(rhs)
+
 	return checkLabelsMapDiffer(specKeys, statusKeys)
 }
 
@@ -567,7 +578,7 @@ func checkVolumesDiffer(lhs []DockerMountConfig, rhs []container.MountPoint) boo
 	return checkLabelsMapDiffer(lhsKeys, rhsKeys)
 }
 
-func checkIfRecreateNeeded(containerSpec *DockerContainerConfig, containerSummary *container.Summary) bool {
+func checkIfRecreateNeeded(containerSpec *DockerContainerConfig, containerSummary *container.Summary, details container.InspectResponse) bool {
 	if containerSpec.Image != containerSummary.Image {
 		log.Printf("Container %s image is %s, but expected is %s", containerSummary.Names[0], containerSummary.Image, containerSpec.Image)
 		return true
@@ -578,9 +589,11 @@ func checkIfRecreateNeeded(containerSpec *DockerContainerConfig, containerSummar
 		return true
 	}
 
-	if checkPortsDiffer(containerSpec.Ports, containerSummary.Ports) {
-		log.Printf("Container %s ports are %v, but expected are %v", containerSummary.Names[0], containerSummary.Ports, containerSpec.Ports)
-		return true
+	if details.HostConfig != nil {
+		if checkPortsDiffer(containerSpec.Ports, details.HostConfig.PortBindings) {
+			log.Printf("Ports mismatch: %v, %v", containerSpec.Ports, details.HostConfig.PortBindings)
+			return true
+		}
 	}
 
 	if checkVolumesDiffer(containerSpec.Volumes, containerSummary.Mounts) {

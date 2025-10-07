@@ -51,7 +51,14 @@ func getFileVolume(ctx context.Context, containerName, hostPath, containerPath, 
 
 		stateDir := pkgutils.GetStatefulDir(ctx)
 		actualHostPath := path.Join(stateDir, "openvpn", "containers", containerName, "tmpvols", volName)
+		err = os.MkdirAll(path.Dir(actualHostPath), 0755)
+		if err != nil {
+			if !os.IsExist(err) {
+				return nil, fmt.Errorf("failed to create actual host file dir: %w", err)
+			}
+		}
 		actualHostFile, err := os.OpenFile(actualHostPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to open actual host file: %w", err)
 		}
@@ -280,6 +287,7 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 	conts, err := cli.ContainerList(ctx, container.ListOptions{
 		Filters: args,
 	})
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to list containers: %w", err)
 	}
@@ -296,13 +304,7 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 			continue
 		}
 
-		ifaceMap, err := pkgreconcile.GetInterfaceFromContainer(ctx, &contName, "tun")
-		if err != nil {
-			return nil, fmt.Errorf("failed to get interface from container: %w", err)
-		}
-		result[contName] = ifaceMap
-
-		ifaceMap, err = pkgreconcile.GetInterfaceFromContainer(ctx, &contName, "tap")
+		ifaceMap, err := pkgreconcile.GetInterfaceFromContainer(ctx, &contName, "tuntap")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get interface from container: %w", err)
 		}
