@@ -876,6 +876,21 @@ nodes:
                   - "2001:db8::1:1"
 ```
 
+## Experiment 6: WireGuard Cloud Config
+
+You can create a WireGuard network from cloud config:
+
+```shell
+./bin/netapply up \
+  --config https://demofiles.imsb.me/demo/configs/lax1-lax2.yaml \
+  --service-name exp1 \
+  --node testnode \
+  --http-basic-auth-username admin \
+  --http-basic-auth-password 123456
+```
+
+Where the YAML manifest file, the private key and public key of WireGuard tunnels, (and possibly the TLS x509v2 certs), can all be placed at cloud and can be fetched via HTTPs.
+
 (More Example configuration YAMLs are coming ...)
 
 ## Others

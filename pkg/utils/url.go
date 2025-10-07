@@ -40,7 +40,7 @@ func NewURLReader(url string, options *URLReaderTransportOptions) (io.ReadCloser
 		return FetchHTTPConfigReadCloser(url, options.TLSConfig, options.Username, options.Password)
 	}
 
-	f, err := os.Open(url)
+	f, err := os.Open(ResolvePath(url))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}

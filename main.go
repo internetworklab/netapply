@@ -44,7 +44,8 @@ func down(ctx context.Context) error {
 // path: file path, "-" for stdin, or HTTP(S) URL
 // config: pointer to GlobalConfig struct to populate
 // tlsConfig: TLS configuration for HTTPS requests (can be nil for default)
-func getGlobalConfig(configPath string, clientAuth *pkgutils.ClientAuth) error {
+func getGlobalConfig(configPath string, clientAuth *pkgutils.ClientAuth) (*pkgmodels.GlobalConfig, error) {
+
 	var reader io.ReadCloser
 	var err error
 
@@ -52,7 +53,7 @@ func getGlobalConfig(configPath string, clientAuth *pkgutils.ClientAuth) error {
 	if strings.HasPrefix(configPath, "https://") {
 		tlsConfig, err = pkgutils.GetTLSConfig(clientAuth.TLSTrustedCACertFile, clientAuth.TLSClientCertFile, clientAuth.TLSClientKeyFile)
 		if err != nil {
-			return fmt.Errorf("failed to create TLS config: %w", err)
+			return nil, fmt.Errorf("failed to create TLS config: %w", err)
 		}
 	}
 
@@ -64,7 +65,7 @@ func getGlobalConfig(configPath string, clientAuth *pkgutils.ClientAuth) error {
 
 	reader, err = pkgutils.NewURLReader(configPath, readerConfig)
 	if err != nil {
-		return fmt.Errorf("failed to create URL reader: %w", err)
+		return nil, fmt.Errorf("failed to create URL reader: %w", err)
 	}
 
 	defer reader.Close()
@@ -72,10 +73,10 @@ func getGlobalConfig(configPath string, clientAuth *pkgutils.ClientAuth) error {
 	// Parse YAML configuration
 	config := new(pkgmodels.GlobalConfig)
 	if err := yaml.NewDecoder(reader).Decode(config); err != nil {
-		return fmt.Errorf("failed to parse config: %w", err)
+		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
-	return nil
+	return config, nil
 }
 
 // CLI structure for Kong
@@ -85,7 +86,7 @@ type CLI struct {
 }
 
 type UpCmd struct {
-	Config                string `required:"" help:"Path to the configuration file" type:"path"`
+	Config                string `required:"" help:"Path to the configuration file"`
 	ServiceName           string `required:"" help:"Name of the service" short:"s"`
 	Node                  string `required:"" help:"Name of the node to start" short:"n"`
 	TLSTrustedCACert      string `help:"Path to trusted CA certificate file for TLS" type:"path"`
@@ -124,8 +125,8 @@ func (cmd *UpCmd) Run() error {
 	ctx = pkgutils.SetClientAuthInCtx(ctx, clientAuth)
 
 	// Read and parse the configuration
-	globalConfig := new(pkgmodels.GlobalConfig)
-	if err := getGlobalConfig(cmd.Config, clientAuth); err != nil {
+	var globalConfig *pkgmodels.GlobalConfig
+	if globalConfig, err = getGlobalConfig(cmd.Config, clientAuth); err != nil || globalConfig == nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
