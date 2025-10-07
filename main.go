@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
@@ -44,47 +45,30 @@ func down(ctx context.Context) error {
 // config: pointer to GlobalConfig struct to populate
 // tlsConfig: TLS configuration for HTTPS requests (can be nil for default)
 func getGlobalConfig(cmd *UpCmd, config *pkgmodels.GlobalConfig) error {
-	var reader io.Reader
+	var reader io.ReadCloser
 	var err error
-
 	path := cmd.Config
 
-	if path == "-" {
-		log.Println("Reading configuration from stdin ...")
-		// Read from stdin
-		reader = os.Stdin
-	} else if strings.HasPrefix(path, "https://") {
-		log.Printf("Reading configuration from HTTPS endpoint %s ...", path)
-
-		tlsConfig, err := pkgutils.GetTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
+	var tlsConfig *tls.Config
+	if strings.HasPrefix(path, "https://") {
+		tlsConfig, err = pkgutils.GetTLSConfig(cmd.TLSTrustedCACert, cmd.TLSClientCert, cmd.TLSClientKey)
 		if err != nil {
 			return fmt.Errorf("failed to create TLS config: %w", err)
 		}
-
-		// Read from HTTPS endpoint
-		reader, err = pkgutils.FetchHTTPConfig(path, tlsConfig, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
-		if err != nil {
-			return fmt.Errorf("failed to fetch HTTPS config from '%s': %w", path, err)
-		}
-	} else if strings.HasPrefix(path, "http://") {
-		log.Printf("Reading configuration from HTTP endpoint %s ...", path)
-
-		// Read from HTTP endpoint
-		reader, err = pkgutils.FetchHTTPConfig(path, nil, cmd.HTTPBasicAuthUsername, cmd.HTTPBasicAuthPassword)
-		if err != nil {
-			return fmt.Errorf("failed to fetch HTTP config from '%s': %w", path, err)
-		}
-	} else {
-		log.Printf("Reading configuration from file %s ...", path)
-
-		// Read from file
-		file, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("failed to open config file '%s': %w", path, err)
-		}
-		defer file.Close()
-		reader = file
 	}
+
+	readerConfig := &pkgutils.URLReaderTransportOptions{
+		TLSConfig: tlsConfig,
+		Username:  cmd.HTTPBasicAuthUsername,
+		Password:  cmd.HTTPBasicAuthPassword,
+	}
+
+	reader, err = pkgutils.NewURLReader(path, readerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create URL reader: %w", err)
+	}
+
+	defer reader.Close()
 
 	// Parse YAML configuration
 	if err := yaml.NewDecoder(reader).Decode(config); err != nil {
