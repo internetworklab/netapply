@@ -4,7 +4,9 @@ import (
 	pkgfrrcontainer "github.com/internetworklab/netapply/pkg/frr/container"
 	pkginterfacebridge "github.com/internetworklab/netapply/pkg/interface/bridge"
 	pkginterfacedummy "github.com/internetworklab/netapply/pkg/interface/dummy"
+	pkginterfaceroute "github.com/internetworklab/netapply/pkg/interface/route"
 	pkginterfaceveth "github.com/internetworklab/netapply/pkg/interface/veth"
+	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkginterfacevxlan "github.com/internetworklab/netapply/pkg/interface/vxlan"
 	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
 	pkgopenvpn2 "github.com/internetworklab/netapply/pkg/openvpn2"
@@ -38,8 +40,27 @@ type ControlplaneConfig struct {
 }
 
 type StaticConfig struct {
-	VethPairs []pkginterfaceveth.VethPairConfig `yaml:"veth_pairs,omitempty" json:"veth_pairs,omitempty"`
-	Bridges   []pkginterfacebridge.BridgeConfig `yaml:"bridges,omitempty" json:"bridges,omitempty"`
+
+	// Todo: implement
+	VRFs pkginterfacevrf.VRFConfigurationList `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+
+	// Todo: implement
+	Routes pkginterfaceroute.RouteConfigurationList `yaml:"route,omitempty" json:"route,omitempty"`
+
+	// Todo: implement
+	WireGuards pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
+
+	// Todo: implement
+	VXLANs pkginterfacevxlan.VXLANConfigurationList `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
+
+	// Todo: implement
+	VethPairs pkginterfaceveth.VethPairConfigurationList `yaml:"veth,omitempty" json:"veth,omitempty"`
+
+	// Todo: implement
+	Bridges pkginterfacebridge.BridgeConfigurationList `yaml:"bridge,omitempty" json:"bridge,omitempty"`
+
+	// Todo: implement
+	Dummys pkginterfacedummy.DummyConfigurationList `yaml:"dummy,omitempty" json:"dummy,omitempty"`
 
 	// A BridgingConnection simply trys to enslave a veth interface to a bridge interface and no more than that.
 	// E.g. we want to connect one end of a veth pair to a bridge interface which is not controlled by netapply.
@@ -69,6 +90,8 @@ type NodeConfig struct {
 const DefaultStatefulDirRel = ".go-reconciler-state"
 
 type DataplaneConfig struct {
+	VRF       pkginterfacevrf.VRFConfigurationList             `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+	Route     pkginterfaceroute.RouteConfigurationList         `yaml:"route,omitempty" json:"route,omitempty"`
 	OpenVPN   pkgopenvpn2.OpenVPN2ConfigurationList            `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
 	WireGuard pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
 	VXLAN     pkginterfacevxlan.VXLANConfigurationList         `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
