@@ -7,6 +7,7 @@ import (
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 )
@@ -151,4 +152,12 @@ func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, conta
 		provisionerList = append(provisionerList, &vxlan)
 	}
 	return pkgreconcile.DetectChangesFromProvisionerList(ctx, provisionerList, vxlanty, containers)
+}
+
+func (vxlanConfig *VXLANConfig) GetType() string {
+	return new(netlink.Vxlan).Type()
+}
+
+func (vxlanConfig *VXLANConfig) CheckExist(ctx context.Context) (bool, error) {
+	return pkginterfacestub.CheckExist(ctx, vxlanConfig)
 }

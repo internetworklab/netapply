@@ -9,6 +9,7 @@ type DummyConfig struct {
 	Name          string                             `yaml:"name" json:"name"`
 	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	VRF           *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
 }
 
 type DummyInterfaceChangeSet struct {
@@ -16,6 +17,7 @@ type DummyInterfaceChangeSet struct {
 	InterfaceName     string
 	AddressesToRemove []*netlink.Addr
 	AddressesToAdd    []*netlink.Addr
+	VRFToSet          *string
 }
 
 type DummyConfigurationList []DummyConfig

@@ -10,6 +10,7 @@ type BridgeConfig struct {
 	SlaveInterfaces []string                           `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
 	ContainerName   *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses       []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	VRF             *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
 }
 
 type BridgeInterfaceChangeSet struct {

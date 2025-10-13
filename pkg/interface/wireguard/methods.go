@@ -10,6 +10,7 @@ import (
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -178,6 +179,14 @@ func (wgConf *WireGuardConfig) GetInterfaceName() string {
 
 func (wgConf *WireGuardConfig) GetContainerName() *string {
 	return wgConf.ContainerName
+}
+
+func (wgConf *WireGuardConfig) GetType() string {
+	return new(netlink.Wireguard).Type()
+}
+
+func (wgConf *WireGuardConfig) CheckExist(ctx context.Context) (bool, error) {
+	return pkginterfacestub.CheckExist(ctx, wgConf)
 }
 
 // returns: (added, removed)

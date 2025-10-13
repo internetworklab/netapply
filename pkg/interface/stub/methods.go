@@ -40,3 +40,26 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context
 		return nil
 	})
 }
+
+func CheckExist(ctx context.Context, nlIf StubNetlinkInterface) (bool, error) {
+	type result struct {
+		Exist bool
+	}
+	res := new(result)
+
+	err := pkgdocker.WithNsHandleSafe(ctx, nlIf.GetContainerName(), func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(nlIf.GetInterfaceName())
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); ok {
+				return nil
+			}
+			return fmt.Errorf("failed to get link: %w", err)
+		}
+		if link != nil {
+			res.Exist = true
+		}
+		return nil
+	})
+
+	return res.Exist, err
+}

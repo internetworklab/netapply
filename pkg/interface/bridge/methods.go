@@ -8,6 +8,7 @@ import (
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -285,4 +286,12 @@ func (bridgingConnectionConfig *BridgingConnectionConfig) TrySetup(ctx context.C
 
 		return handle.LinkSetMaster(vethLink, bridgeLink)
 	})
+}
+
+func (bridgeConfig *BridgeConfig) GetType() string {
+	return new(netlink.Bridge).Type()
+}
+
+func (bridgeConfig *BridgeConfig) CheckExist(ctx context.Context) (bool, error) {
+	return pkginterfacestub.CheckExist(ctx, bridgeConfig)
 }

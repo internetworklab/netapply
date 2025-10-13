@@ -18,6 +18,8 @@ type WireGuardConfig struct {
 	ContainerName  *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	ListenPort     *int                               `yaml:"listen_port,omitempty" json:"listen_port,omitempty"`
 	MTU            *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+
+	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty"`
 }
 
 type WireGuardInterfaceChangeSet struct {

@@ -13,6 +13,7 @@ type VXLANConfig struct {
 	Nolearning    *bool                              `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
 	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	Dev           *string                            `yaml:"dev,omitempty" json:"dev,omitempty"`
 }
 
 type VXLANInterfaceChangeSet struct {

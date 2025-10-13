@@ -12,9 +12,11 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgopenvpnstructtag "github.com/internetworklab/netapply/pkg/openvpn2/structtag"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
+	"github.com/vishvananda/netlink"
 )
 
 func getFileVolume(ctx context.Context, containerName, hostPath, containerPath, volName string) (*pkgdocker.DockerMountConfig, error) {
@@ -153,6 +155,14 @@ func (ovpInst *OpenVPN2Instance) Update(ctx context.Context) error {
 
 const labelCategoryDataplane string = "dataplane"
 const labelIfaceTypeOpenVPN string = "openvpn"
+
+func (ovpInst *OpenVPN2Instance) GetType() string {
+	return new(netlink.Tuntap).Type()
+}
+
+func (ovpInst *OpenVPN2Instance) CheckExist(ctx context.Context) (bool, error) {
+	return pkginterfacestub.CheckExist(ctx, ovpInst)
+}
 
 func (ovpInst *OpenVPN2Instance) Create(ctx context.Context) error {
 	servicename, err := pkgutils.ServiceNameFromCtx(ctx)

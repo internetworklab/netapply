@@ -443,3 +443,11 @@ func (vethPairSpec *VethPairConfig) TrySetup(ctx context.Context) error {
 
 	return vethPairSpec.Create(ctx)
 }
+
+func (vethPairSpec *VethPairConfig) GetType() string {
+	return new(netlink.Veth).Type()
+}
+
+func (vethPairSpec *VethPairConfig) CheckExist(ctx context.Context) (bool, error) {
+	return pkginterfacestub.CheckExist(ctx, vethPairSpec)
+}
