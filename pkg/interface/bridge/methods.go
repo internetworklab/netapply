@@ -236,7 +236,7 @@ func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, con
 	for _, bridge := range bridgeList {
 		provisionerList = append(provisionerList, &bridge)
 	}
-	return pkgreconcile.DetectChangesFromProvisionerList(ctx, provisionerList, bridgeTy, containers)
+	return pkgreconcile.DetectChanges(ctx, provisionerList, bridgeTy, containers)
 }
 
 func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {

@@ -515,5 +515,5 @@ func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, cont
 	for _, wg := range wgList {
 		provisionerList = append(provisionerList, &wg)
 	}
-	return pkgreconcile.DetectChangesFromProvisionerList(ctx, provisionerList, wgty, containers)
+	return pkgreconcile.DetectChanges(ctx, provisionerList, wgty, containers)
 }

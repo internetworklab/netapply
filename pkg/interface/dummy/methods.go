@@ -156,7 +156,7 @@ func (dummyList DummyConfigurationList) DetectChanges(ctx context.Context, conta
 	for _, dummy := range dummyList {
 		provisionerList = append(provisionerList, &dummy)
 	}
-	return pkgreconcile.DetectChangesFromProvisionerList(ctx, provisionerList, dummyTy, containers)
+	return pkgreconcile.DetectChanges(ctx, provisionerList, dummyTy, containers)
 }
 
 func (dummyConfig *DummyConfig) GetType() string {

@@ -151,7 +151,7 @@ func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, conta
 	for _, vxlan := range vxlanList {
 		provisionerList = append(provisionerList, &vxlan)
 	}
-	return pkgreconcile.DetectChangesFromProvisionerList(ctx, provisionerList, vxlanty, containers)
+	return pkgreconcile.DetectChanges(ctx, provisionerList, vxlanty, containers)
 }
 
 func (vxlanConfig *VXLANConfig) GetType() string {

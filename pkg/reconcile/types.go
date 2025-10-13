@@ -31,16 +31,6 @@ type InterfaceProvisioner interface {
 	CheckExist(ctx context.Context) (bool, error)
 }
 
-type InterfaceProvisionerList interface {
-	// Returns a map that maps container key to a map that maps interface name to the interface provisioner
-	// map is of type: containerKey -> interfaceName -> InterfaceProvisioner
-	IndexSpec() (map[string]map[string]InterfaceProvisioner, error)
-
-	// Returns a map that maps container key to a map that maps interface name to the interface canceller
-	// map is of type: containerKey -> interfaceName -> InterfaceCanceller
-	IndexCurrent(ctx context.Context) (map[string]map[string]InterfaceCanceller, error)
-}
-
 type InterfaceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string

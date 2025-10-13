@@ -160,7 +160,7 @@ func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	return res.ifaces, nil
 }
 
-func IndexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType string, includeHostNetns bool) (CurrentIfaceIndex, error) {
+func indexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType string, includeHostNetns bool) (CurrentIfaceIndex, error) {
 	currentInterfaceListMap := make(map[string]map[string]InterfaceCanceller)
 	for _, name := range containers {
 		ifaces, err := GetInterfaceFromContainer(ctx, &name, netlinkIfType)
@@ -181,7 +181,7 @@ func IndexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType 
 	return currentInterfaceListMap, nil
 }
 
-func IndexSpecIfaces(provisionerList []InterfaceProvisioner) (SpecIfaceIndex, error) {
+func indexSpecIfaces(provisionerList []InterfaceProvisioner) (SpecIfaceIndex, error) {
 	specInterfaceListMap := make(map[string]map[string]InterfaceProvisioner)
 	for _, c := range provisionerList {
 		contName := string(pkgdocker.GetContainerKey(c.GetContainerName()))
@@ -269,7 +269,7 @@ func detectChangesInContainer(
 	return changeSet, nil
 }
 
-func DetectChangesFromProvisionerList(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
+func DetectChanges(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
 
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
@@ -290,13 +290,13 @@ func DetectChangesFromProvisionerList(ctx context.Context, provisionerList []Int
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
 	// for now, skip the host netns, so includeHostNetns is set to false
-	currentInterfaceListMap, err := IndexCurrentIfaces(ctx, containersToScan, netlinkIfType, false)
+	currentInterfaceListMap, err := indexCurrentIfaces(ctx, containersToScan, netlinkIfType, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to index current interface: %w", err)
 	}
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
-	specInterfaceListMap, err := IndexSpecIfaces(provisionerList)
+	specInterfaceListMap, err := indexSpecIfaces(provisionerList)
 	if err != nil {
 		return nil, fmt.Errorf("failed to index spec interface: %w", err)
 	}
