@@ -88,6 +88,26 @@ func (dpChangeSet *DataplaneChangeSet) HasChanges() bool {
 	return false
 }
 
+func reOrderAddedInterfaces(provisioners map[string][]InterfaceProvisioner) []InterfaceProvisioner {
+	results := make([]InterfaceProvisioner, 0)
+	for _, provisioner := range provisioners {
+		results = append(results, provisioner...)
+	}
+
+	// todo: sort the provisioners
+	// order:
+	// 1. vrf
+	// 2. dummy
+	// 3. veth
+	// 4. others
+	// ...
+	// N-2. bridge
+	// N-1. route
+	// N. others
+
+	return results
+}
+
 func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 	if dpChangeSet.HasChanges() {
 		for _, removedInterface := range dpChangeSet.RemovedInterfaces {
@@ -110,12 +130,10 @@ func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 			}
 		}
 
-		for _, addedInterface := range dpChangeSet.AddedInterfaces {
-			for _, provisioner := range addedInterface {
-				log.Printf("Creating interface %s in %s ...", provisioner.GetInterfaceName(), pkgdocker.GetContainerDisplayName(provisioner.GetContainerName()))
-				if err := provisioner.Create(ctx); err != nil {
-					return fmt.Errorf("failed to create interface: %w", err)
-				}
+		for _, provisioner := range reOrderAddedInterfaces(dpChangeSet.AddedInterfaces) {
+			log.Printf("Creating interface %s in %s ...", provisioner.GetInterfaceName(), pkgdocker.GetContainerDisplayName(provisioner.GetContainerName()))
+			if err := provisioner.Create(ctx); err != nil {
+				return fmt.Errorf("failed to create interface: %w", err)
 			}
 		}
 	}
