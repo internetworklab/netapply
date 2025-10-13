@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
@@ -88,22 +89,37 @@ func (dpChangeSet *DataplaneChangeSet) HasChanges() bool {
 	return false
 }
 
+func getOrderByType(ty string) int16 {
+	// the lower is the number, the higher is the priority
+	orderMap := make(map[string]int16)
+	orderMap[new(netlink.Vrf).Type()] = 0
+	orderMap[new(netlink.Dummy).Type()] = 1
+	orderMap[new(netlink.Veth).Type()] = 2
+	orderMap[new(netlink.Tuntap).Type()] = 3
+	orderMap[new(netlink.Vxlan).Type()] = 4
+	orderMap[new(netlink.Wireguard).Type()] = 5
+	orderMap["route"] = 254
+	orderMap[new(netlink.Bridge).Type()] = 255
+	const defaultOrder int16 = 128
+
+	if order, ok := orderMap[ty]; ok {
+		return order
+	}
+
+	// todo: maybe complete more types here
+
+	return defaultOrder
+}
+
 func reOrderAddedInterfaces(provisioners map[string][]InterfaceProvisioner) []InterfaceProvisioner {
 	results := make([]InterfaceProvisioner, 0)
 	for _, provisioner := range provisioners {
 		results = append(results, provisioner...)
 	}
 
-	// todo: sort the provisioners
-	// order:
-	// 1. vrf
-	// 2. dummy
-	// 3. veth
-	// 4. others
-	// ...
-	// N-2. bridge
-	// N-1. route
-	// N. others
+	sort.Slice(results, func(i, j int) bool {
+		return getOrderByType(results[i].GetType()) < getOrderByType(results[j].GetType())
+	})
 
 	return results
 }

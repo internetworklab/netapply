@@ -29,6 +29,9 @@ type InterfaceProvisioner interface {
 	// Check if the interface is exist
 	// If it's not exist, should return (false, nil), error is non-nil only when there is error (and resource-doesnt exist is not an error)
 	CheckExist(ctx context.Context) (bool, error)
+
+	// Get type of the interface(resource), so that it can be compared for priority of creation
+	GetType() string
 }
 
 type InterfaceCanceller interface {

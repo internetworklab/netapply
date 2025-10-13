@@ -162,3 +162,7 @@ func (protocol RouteProtocol) ToInt() netlink.RouteProtocol {
 	// In most cases, 0 means unspecified or default value
 	return netlink.RouteProtocol(0)
 }
+
+func (r *RouteConfig) GetType() string {
+	return "route"
+}
