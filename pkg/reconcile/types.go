@@ -9,7 +9,6 @@ type InterfaceChangeSet interface {
 	HasUpdates() bool
 	GetInterfaceName() string
 	GetContainerName() *string
-	GetChangedItems() map[string]bool
 }
 
 type InterfaceProvisioner interface {

@@ -64,7 +64,8 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetInterfaceName() string {
 }
 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) HasUpdates() bool {
-	return bridgeChangeSet != nil && (len(bridgeChangeSet.InterfaceToEnslave)+len(bridgeChangeSet.InterfaceToUnslave) > 0)
+	return bridgeChangeSet != nil && (len(bridgeChangeSet.InterfaceToEnslave)+len(bridgeChangeSet.InterfaceToUnslave) > 0 ||
+		bridgeChangeSet.VRFToSet != nil)
 }
 
 func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {

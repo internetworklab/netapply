@@ -92,10 +92,12 @@ func (dpChangeSet *DataplaneChangeSet) HasChanges() bool {
 func getOrderByType(ty string) int16 {
 	// the lower is the number, the higher is the priority
 	orderMap := make(map[string]int16)
-	orderMap[new(netlink.Vrf).Type()] = 0
-	orderMap[new(netlink.Dummy).Type()] = 1
-	orderMap[new(netlink.Veth).Type()] = 2
-	orderMap[new(netlink.Tuntap).Type()] = 3
+	// We use tuntap type for openvpn container-based interface, so it have to be created earlier,
+	// since other interfaces might depend on it.
+	orderMap[new(netlink.Tuntap).Type()] = 0
+	orderMap[new(netlink.Vrf).Type()] = 1
+	orderMap[new(netlink.Dummy).Type()] = 2
+	orderMap[new(netlink.Veth).Type()] = 3
 	orderMap[new(netlink.Vxlan).Type()] = 4
 	orderMap[new(netlink.Wireguard).Type()] = 5
 	orderMap["route"] = 254
@@ -271,7 +273,6 @@ func detectChangesInContainer(
 			return nil, fmt.Errorf("failed to detect changes in container %s for interface %s: %w", container, ifaceName, err)
 		}
 		if changes != nil && changes.HasUpdates() {
-			log.Printf("Found updates for interface %s in container %s: %v", ifaceName, container, changes.GetChangedItems())
 			updatedSet[ifaceName] = changes
 		}
 	}

@@ -8,21 +8,11 @@ import (
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
-
-func (vethPair *VethPairChangeSet) GetChangedItems() map[string]bool {
-	changedItems := make(map[string]bool)
-	for k, v := range vethPair.Local.GetChangedItems() {
-		changedItems["local."+k] = v
-	}
-	for k, v := range vethPair.Peer.GetChangedItems() {
-		changedItems["peer."+k] = v
-	}
-	return changedItems
-}
 
 func (vethPair *VethPairChangeSet) GetContainerName() *string {
 	return vethPair.Local.ContainerName
@@ -50,15 +40,8 @@ func (vethPair *VethPairChangeSet) Apply(ctx context.Context) error {
 	return nil
 }
 
-func (vethPeer *VethPairPeerChangeSet) GetChangedItems() map[string]bool {
-	changedItems := make(map[string]bool)
-	changedItems["Addresses"] = len(vethPeer.AddressesToAdd)+len(vethPeer.AddressesToDel) > 0
-	changedItems["MTU"] = vethPeer.MTUToSet != nil
-	return changedItems
-}
-
 func (vethPeer *VethPairPeerChangeSet) HasUpdates() bool {
-	return vethPeer != nil && (len(vethPeer.AddressesToAdd) > 0 || len(vethPeer.AddressesToDel) > 0 || vethPeer.MTUToSet != nil)
+	return vethPeer != nil && (len(vethPeer.AddressesToAdd) > 0 || len(vethPeer.AddressesToDel) > 0 || vethPeer.MTUToSet != nil || vethPeer.VRFToSet != nil)
 }
 
 func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
@@ -70,6 +53,12 @@ func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
 		link, err := handle.LinkByName(vethPeer.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get veth link: %w", err)
+		}
+
+		if vethPeer.VRFToSet != nil {
+			if err := pkginterfacevrf.TrySetVRF(handle, link, vethPeer.VRFToSet); err != nil {
+				return fmt.Errorf("failed to set vrf for veth link: %w", err)
+			}
 		}
 
 		for _, addr := range vethPeer.AddressesToDel {
@@ -103,6 +92,12 @@ func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec 
 	link, err := handle.LinkByName(interfaceName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get veth link: %w", err)
+	}
+
+	if spec.VRF != nil {
+		if changeSet.VRFToSet, err = pkginterfacevrf.CheckVRFDiff(handle, link, spec.VRF); err != nil {
+			return nil, fmt.Errorf("failed to check vrf diff: %w", err)
+		}
 	}
 
 	if spec.MTU != nil {
@@ -211,6 +206,12 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 				return fmt.Errorf("failed to get veth link: %w", err)
 			}
 
+			if vethPairConfig.VRF != nil {
+				if err := pkginterfacevrf.TrySetVRF(handle, link, vethPairConfig.VRF); err != nil {
+					return fmt.Errorf("failed to set vrf for veth link: %w", err)
+				}
+			}
+
 			if vethPairConfig.MTU != nil {
 				if err := handle.LinkSetMTU(link, *vethPairConfig.MTU); err != nil {
 					return fmt.Errorf("failed to set veth link mtu: %w", err)
@@ -240,6 +241,13 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			}
 
 			if vethPairConfig.Peer != nil {
+
+				if vethPairConfig.Peer.VRF != nil {
+					if err := pkginterfacevrf.TrySetVRF(handle, link, vethPairConfig.Peer.VRF); err != nil {
+						return fmt.Errorf("failed to set vrf for veth link: %w", err)
+					}
+				}
+
 				if vethPairConfig.Peer.MTU != nil {
 					if err := handle.LinkSetMTU(link, *vethPairConfig.Peer.MTU); err != nil {
 						return fmt.Errorf("failed to set veth link mtu: %w", err)

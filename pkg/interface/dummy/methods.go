@@ -12,12 +12,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetChangedItems() map[string]bool {
-	changedItems := make(map[string]bool)
-	changedItems["Addresses"] = len(dummyInterfaceChangeSet.AddressesToAdd)+len(dummyInterfaceChangeSet.AddressesToRemove) > 0
-	return changedItems
-}
-
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetContainerName() *string {
 	return dummyInterfaceChangeSet.ContainerName
 }
@@ -27,7 +21,11 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetInterfaceName() strin
 }
 
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) HasUpdates() bool {
-	return len(dummyInterfaceChangeSet.AddressesToRemove)+len(dummyInterfaceChangeSet.AddressesToAdd) > 0
+	if dummyInterfaceChangeSet == nil {
+		return false
+	}
+
+	return len(dummyInterfaceChangeSet.AddressesToRemove)+len(dummyInterfaceChangeSet.AddressesToAdd) > 0 || dummyInterfaceChangeSet.VRFToSet != nil
 }
 
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) Apply(ctx context.Context) error {

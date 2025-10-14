@@ -11,6 +11,7 @@ type VethPairConfig struct {
 	Peer          *VethPairConfig                    `yaml:"peer,omitempty" json:"peer,omitempty"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 	MTU           *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	VRF           *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
 }
 
 type VethPairPeerChangeSet struct {
@@ -19,6 +20,7 @@ type VethPairPeerChangeSet struct {
 	AddressesToAdd []*netlink.Addr
 	AddressesToDel []*netlink.Addr
 	MTUToSet       *int
+	VRFToSet       *string
 }
 
 type VethPairChangeSet struct {
