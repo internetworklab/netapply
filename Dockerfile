@@ -1,11 +1,15 @@
+FROM golang:1.23.5-bookworm AS builder
+
+WORKDIR /app/netapply
+
+COPY . .
+
+RUN go build -o bin/netapply ./main.go
+
+ENTRYPOINT ["/app/netapply/bin/netapply"]
+
 FROM debian:bookworm
 
-# Update package list, install openvpn without suggested packages, and clean up
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends openvpn iproute2 iputils-ping bind9-dnsutils && \
-    apt-get autoremove -y && \
-    apt-get autoclean && \
-    rm -rf /var/lib/apt/lists/* && \
-    rm -rf /var/cache/apt/archives/* && \
-    rm -rf /tmp/* && \
-    rm -rf /var/tmp/*
+COPY --from=builder /app/netapply/bin/netapply /usr/local/bin/netapply
+
+ENTRYPOINT ["/usr/local/bin/netapply"]
