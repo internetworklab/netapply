@@ -1,0 +1,12 @@
+nodes:
+  testnode:
+    containers:
+      - test-nginx-vrf
+    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
+    dataplane:
+      vrf:
+        - name: vrftest
+          table_id: 14140
+          container_name: test-nginx-vrf
+          addresses:
+            - cidr: "1.2.3.0/24"
