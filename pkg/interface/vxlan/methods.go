@@ -112,7 +112,7 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 			LinkAttrs: netlink.LinkAttrs{
 				Name: vxlanConfig.Name,
 			},
-			VxlanId: vxlanConfig.VXLANID,
+			VxlanId: int(vxlanConfig.VXLANID & uint32(0x00FFFFFF)),
 		}
 
 		if vxlanConfig.LocalIP != nil {
@@ -129,6 +129,19 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 
 		if vxlanConfig.Nolearning != nil {
 			link.Learning = !*vxlanConfig.Nolearning
+		}
+
+		if vxlanConfig.Dev != nil {
+			underlayLink, err := handle.LinkByName(*vxlanConfig.Dev)
+			if err != nil {
+				return fmt.Errorf("failed to get underlay link: %w", err)
+			}
+
+			link.VtepDevIndex = underlayLink.Attrs().Index
+		}
+
+		if vxlanConfig.DestPort != nil {
+			link.Port = int(*vxlanConfig.DestPort)
 		}
 
 		err = handle.LinkAdd(link)

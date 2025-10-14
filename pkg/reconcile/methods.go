@@ -98,8 +98,11 @@ func getOrderByType(ty string) int16 {
 	orderMap[new(netlink.Vrf).Type()] = 1
 	orderMap[new(netlink.Dummy).Type()] = 2
 	orderMap[new(netlink.Veth).Type()] = 3
-	orderMap[new(netlink.Vxlan).Type()] = 4
-	orderMap[new(netlink.Wireguard).Type()] = 5
+	orderMap[new(netlink.Wireguard).Type()] = 4
+
+	// VxLAN might relys on other interface as underlay, so it should be created later than that.
+	// For example, VxLAN over WireGuard.
+	orderMap[new(netlink.Vxlan).Type()] = 5
 	orderMap["route"] = 254
 	orderMap[new(netlink.Bridge).Type()] = 255
 	const defaultOrder int16 = 128

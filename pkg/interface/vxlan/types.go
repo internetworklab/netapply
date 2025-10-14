@@ -6,14 +6,20 @@ import (
 )
 
 type VXLANConfig struct {
-	Name          string                             `yaml:"name" json:"name"`
-	VXLANID       int                                `yaml:"vxlan_id" json:"vxlan_id"`
+	Name string `yaml:"name" json:"name"`
+
+	// This is VNI, 24-bits integer, stored in low 24 bits in a uint32
+	VXLANID uint32 `yaml:"vxlan_id" json:"vxlan_id"`
+
 	LocalIP       *string                            `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
 	MTU           *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 	Nolearning    *bool                              `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
 	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
-	Dev           *string                            `yaml:"dev,omitempty" json:"dev,omitempty"`
+
+	// To explicitly specify the underlay interface, also to automatically calculate appropriate MTU.
+	Dev      *string `yaml:"dev,omitempty" json:"dev,omitempty"`
+	DestPort *uint16
 }
 
 type VXLANInterfaceChangeSet struct {
