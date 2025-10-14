@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	"github.com/vishvananda/netlink"
 )
@@ -86,4 +87,35 @@ func (vrfConfig *VRFConfig) GetType() string {
 
 func (vrfConfig *VRFConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, vrfConfig)
+}
+
+func (vrfConfig *VRFConfig) Create(ctx context.Context) error {
+	return pkgdocker.WithNsHandle(ctx, vrfConfig.ContainerName, func(handle *netlink.Handle) error {
+		link := &netlink.Vrf{
+			LinkAttrs: netlink.LinkAttrs{
+				Name: vrfConfig.Name,
+			},
+			Table: vrfConfig.TableId,
+		}
+
+		if err := handle.LinkAdd(link); err != nil {
+			return fmt.Errorf("failed to add vrf link: %w", err)
+		}
+
+		for _, addr := range vrfConfig.Addresses {
+			nlAddr, err := addr.ToNetlinkAddr()
+			if err != nil {
+				return fmt.Errorf("failed to convert address to netlink addr: %w", err)
+			}
+			if err := handle.AddrAdd(link, nlAddr); err != nil {
+				return fmt.Errorf("failed to add address to vrf link: %w", err)
+			}
+		}
+
+		if err := handle.LinkSetUp(link); err != nil {
+			return fmt.Errorf("failed to set vrf link up: %w", err)
+		}
+
+		return nil
+	})
 }
