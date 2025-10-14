@@ -20,6 +20,7 @@ type BridgeInterfaceChangeSet struct {
 	InterfaceName      string
 	AddressesToAdd     []*netlink.Addr
 	AddressesToRemove  []*netlink.Addr
+	VRFToSet           *string
 }
 
 type BridgeConfigurationList []BridgeConfig

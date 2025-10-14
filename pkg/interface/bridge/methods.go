@@ -3,12 +3,11 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"log"
-	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -26,6 +25,12 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) Apply(ctx context.Context) erro
 		link, err := handle.LinkByName(bridgeChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
+		}
+
+		if bridgeChangeSet.VRFToSet != nil {
+			if err := pkginterfacevrf.TrySetVRF(handle, link, bridgeChangeSet.VRFToSet); err != nil {
+				return fmt.Errorf("failed to set vrf for bridge link: %w", err)
+			}
 		}
 
 		for slaveInterface := range bridgeChangeSet.InterfaceToUnslave {
@@ -69,10 +74,21 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 	changeSet.InterfaceToEnslave = make(map[string]interface{})
 	changeSet.InterfaceToUnslave = make(map[string]interface{})
 
+	// Since here we use 'WithNsHandleSafe' instead of 'WithNsHandle',
+	// the result might be incorrect if the container is not yet running
+	// during the detection process.
 	err := pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
+		}
+
+		if bridgeConfig.VRF != nil {
+			diff, err := pkginterfacevrf.CheckVRFDiff(handle, link, bridgeConfig.VRF)
+			if err != nil {
+				return fmt.Errorf("failed to check vrf diff: %w", err)
+			}
+			changeSet.VRFToSet = diff
 		}
 
 		enslavedLinks, err := getEnslavedLinks(handle, link)
@@ -93,18 +109,6 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 				changeSet.InterfaceToUnslave[slif.Attrs().Name] = true
 			}
 		}
-
-		log.Println("Debugging bridge changeset for ", bridgeConfig.Name, "ns", pkgdocker.GetContainerDisplayName(bridgeConfig.ContainerName))
-		ifaceList := make([]string, 0)
-		for iface := range changeSet.InterfaceToEnslave {
-			ifaceList = append(ifaceList, iface)
-		}
-		log.Println("interface to enslave:", strings.Join(ifaceList, ", "))
-		ifaceList = make([]string, 0)
-		for iface := range changeSet.InterfaceToUnslave {
-			ifaceList = append(ifaceList, iface)
-		}
-		log.Println("interface to unenslave:", strings.Join(ifaceList, ", "))
 
 		addrsChangeSet, err := pkginterfacecommon.CompareSpecAddrsAgainstActualAddrs(bridgeConfig.Addresses, link, handle)
 		if err != nil {
@@ -207,6 +211,12 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 		err := handle.LinkAdd(link)
 		if err != nil {
 			return fmt.Errorf("failed to add bridge link: %w", err)
+		}
+
+		if bridgeConfig.VRF != nil && *bridgeConfig.VRF != pkginterfacevrf.VRFNameDefault && *bridgeConfig.VRF != pkginterfacevrf.VRFNameEmpty {
+			if err := pkginterfacevrf.TrySetVRF(handle, link, bridgeConfig.VRF); err != nil {
+				return fmt.Errorf("failed to set vrf for bridge link: %w", err)
+			}
 		}
 
 		err = handle.LinkSetUp(link)
