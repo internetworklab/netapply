@@ -88,7 +88,7 @@ type CLI struct {
 	Down                  DownCmd       `cmd:"" help:"Stop all containers associated with the service"`
 	ServeLocal            ServeLocalCmd `cmd:"" help:"Serving as a local configurator"`
 	ServiceName           string        `required:"" help:"Name of the service" short:"s"`
-	Node                  string        `required:"" help:"Name of the node to start" short:"n"`
+	Node                  string        `help:"Name of the node to start" short:"n"`
 	TLSTrustedCACert      string        `help:"Path to trusted CA certificate file for TLS" type:"path"`
 	TLSClientCert         string        `help:"Path to client certificate file for TLS" type:"path"`
 	TLSClientKey          string        `help:"Path to client private key file for TLS" type:"path"`
