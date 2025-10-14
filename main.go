@@ -7,13 +7,16 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/alecthomas/kong"
 	"github.com/docker/docker/client"
 	"gopkg.in/yaml.v3"
 
 	"encoding/json"
+	"net"
 	"net/http"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
@@ -131,9 +134,8 @@ func initCtx(ctx context.Context, globalCLIConfig *CLI) (context.Context, error)
 }
 
 // Run method for UpCmd
-func (cmd *UpCmd) Run(globalCliConfigAny interface{}) error {
+func (cmd *UpCmd) Run(globalCLIConfig *CLI) error {
 	ctx := context.Background()
-	globalCLIConfig := globalCliConfigAny.(*CLI)
 	ctx, err := initCtx(ctx, globalCLIConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize context: %w", err)
@@ -162,8 +164,8 @@ func (cmd *UpCmd) Run(globalCliConfigAny interface{}) error {
 }
 
 // Run method for DownCmd
-func (cmd *DownCmd) Run(globalConfig interface{}) error {
-	globalCLIConfig := globalConfig.(*CLI)
+func (cmd *DownCmd) Run(globalCLIConfig *CLI) error {
+
 	serviceName := globalCLIConfig.ServiceName
 
 	ctx := context.Background()
@@ -197,32 +199,45 @@ func respondError(w http.ResponseWriter, err error, code int) {
 	json.NewEncoder(w).Encode(ErrorResponse{Error: err.Error()})
 }
 
-func (cmd *ServeLocalCmd) Run(globalConfig interface{}) error {
-
-	globalCLIConfig := globalConfig.(*CLI)
+func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 	ctx, err := initCtx(context.Background(), globalCLIConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize context: %w", err)
 	}
 
 	log.Printf("Serving as a local configurator on %s\n", cmd.BindUnixSocket)
-	return nil
+
+	listener, err := net.Listen("unix", cmd.BindUnixSocket)
+	if err != nil {
+		return fmt.Errorf("failed to create listener on %s: %w", cmd.BindUnixSocket, err)
+	}
+	defer func() {
+		_, err := os.Stat(cmd.BindUnixSocket)
+		if err == nil {
+			log.Printf("unix socket %s is still exists, removing it\n", cmd.BindUnixSocket)
+			log.Printf("Cleaning up unix socket %s\n", cmd.BindUnixSocket)
+			if err := os.Remove(cmd.BindUnixSocket); err != nil {
+				log.Printf("failed to remove unix socket %s: %v", cmd.BindUnixSocket, err)
+			}
+			log.Printf("removed unix socket %s\n", cmd.BindUnixSocket)
+		}
+	}()
 
 	server := &http.Server{
-		Addr: cmd.BindUnixSocket,
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			log.Printf("Received request: %s %s", r.Method, r.URL.Path)
-
 			nodeConfig := new(pkgmodels.NodeConfig)
 
 			contentType := r.Header.Get("Content-Type")
 			var err error
 
 			if strings.HasPrefix(contentType, "application/yaml") {
+				log.Printf("decoding yaml\n")
 				err = yaml.NewDecoder(r.Body).Decode(nodeConfig)
 			} else if strings.HasPrefix(contentType, "application/json") {
+				log.Printf("decoding json\n")
 				err = json.NewDecoder(r.Body).Decode(nodeConfig)
 			} else {
+				log.Printf("decoding json\n")
 				err = json.NewDecoder(r.Body).Decode(nodeConfig)
 			}
 
@@ -240,9 +255,38 @@ func (cmd *ServeLocalCmd) Run(globalConfig interface{}) error {
 		}),
 	}
 
-	if err := server.ListenAndServe(); err != nil {
-		return fmt.Errorf("failed to listen and serve: %w", err)
+	serverErrCh := make(chan error)
+	go func() {
+		log.Printf("Starting server on %s\n", cmd.BindUnixSocket)
+		serverErrCh <- server.Serve(listener)
+	}()
+
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	clearingCh := make(chan interface{})
+	go func() {
+		log.Println("Exiting signal handler is in-position")
+		<-sigs
+		log.Println("Exiting...")
+
+		log.Println("Shutting down server...")
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Printf("failed to shutdown server: %v", err)
+		}
+
+		close(clearingCh)
+	}()
+
+	<-clearingCh
+
+	err = <-serverErrCh
+	if err != nil {
+		if err != http.ErrServerClosed {
+			return fmt.Errorf("server error: %w", err)
+		}
 	}
+
+	log.Println("Server is shut down")
 
 	return nil
 }
@@ -250,7 +294,7 @@ func (cmd *ServeLocalCmd) Run(globalConfig interface{}) error {
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
-	err := ctx.Run(&cli)
+	err := ctx.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
