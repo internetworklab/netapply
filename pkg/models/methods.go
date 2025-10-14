@@ -79,6 +79,17 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		changeSet = changeSet.Merge(openVPNChangeSet)
 	}
 
+	log.Println("Detecting changes for VRF ...")
+	vrfChangeSet, err := dpConfig.VRF.DetectChanges(ctx, containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for VRF: %w", err)
+	}
+	if vrfChangeSet != nil && vrfChangeSet.HasChanges() {
+		log.Println("Found changes for VRF dataplane config", *vrfChangeSet)
+		vrfChangeSet.Log()
+		changeSet = changeSet.Merge(vrfChangeSet)
+	}
+
 	log.Println("Detecting changes for WireGuard ...")
 	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx, containers)
 	if err != nil {

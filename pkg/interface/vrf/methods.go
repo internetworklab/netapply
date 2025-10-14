@@ -3,9 +3,12 @@ package vrf
 import (
 	"context"
 	"fmt"
+	"net"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 )
 
@@ -118,4 +121,99 @@ func (vrfConfig *VRFConfig) Create(ctx context.Context) error {
 
 		return nil
 	})
+}
+
+type VRFChangeSet struct {
+	ContainerName     *string
+	InterfaceName     string
+	AddressesToAdd    []*netlink.Addr
+	AddressesToRemove []*netlink.Addr
+	NeedToSetUp       bool
+}
+
+func (vrfChangeSet *VRFChangeSet) HasUpdates() bool {
+	if vrfChangeSet == nil {
+		return false
+	}
+
+	return len(vrfChangeSet.AddressesToAdd)+len(vrfChangeSet.AddressesToRemove) > 0
+}
+
+func (vrfChangeSet *VRFChangeSet) GetInterfaceName() string {
+	return vrfChangeSet.InterfaceName
+}
+
+func (vrfChangeSet *VRFChangeSet) GetContainerName() *string {
+	return vrfChangeSet.ContainerName
+}
+
+func (vrfChangeSet *VRFChangeSet) Apply(ctx context.Context) error {
+	return pkgdocker.WithNsHandleSafe(ctx, vrfChangeSet.ContainerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(vrfChangeSet.InterfaceName)
+		if err != nil {
+			return fmt.Errorf("failed to get vrf link: %w", err)
+		}
+
+		if vrfChangeSet.NeedToSetUp {
+			err := handle.LinkSetUp(link)
+			return fmt.Errorf("failed to set vrf link up: %w", err)
+		}
+
+		for _, addr := range vrfChangeSet.AddressesToRemove {
+			if err := handle.AddrDel(link, addr); err != nil {
+				return fmt.Errorf("failed to remove address from vrf link: %w", err)
+			}
+		}
+
+		for _, addr := range vrfChangeSet.AddressesToAdd {
+			if err := handle.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add address to vrf link: %w", err)
+			}
+		}
+
+		return nil
+	})
+}
+
+func (vrfConfig *VRFConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
+	changeSet := new(VRFChangeSet)
+	changeSet.ContainerName = vrfConfig.ContainerName
+	changeSet.InterfaceName = vrfConfig.Name
+
+	err := pkgdocker.WithNsHandleSafe(ctx, vrfConfig.ContainerName, func(handle *netlink.Handle) error {
+		vrfLink, err := handle.LinkByName(vrfConfig.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get vrf link: %w", err)
+		}
+
+		upBit := vrfLink.Attrs().Flags & net.FlagUp
+		if upBit == 0 {
+			changeSet.NeedToSetUp = true
+		}
+
+		addrChangeSet, err := pkginterfacecommon.CompareSpecAddrsAgainstActualAddrs(vrfConfig.Addresses, vrfLink, handle)
+		if err != nil {
+			return fmt.Errorf("failed to compare spec addrs against actual addrs: %w", err)
+		}
+		changeSet.AddressesToAdd = addrChangeSet.AddressesToAdd
+		changeSet.AddressesToRemove = addrChangeSet.AddressesToRemove
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changeset: %w", err)
+	}
+
+	return changeSet, nil
+}
+
+func (vrfList VRFConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+	vrfTy := new(netlink.Vrf).Type()
+	provisionerList := make([]pkgreconcile.InterfaceProvisioner, 0)
+	for _, vrf := range vrfList {
+		provisionerList = append(provisionerList, &vrf)
+	}
+
+	return pkgreconcile.DetectChanges(ctx, provisionerList, vrfTy, containers)
 }
