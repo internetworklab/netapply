@@ -12,7 +12,10 @@ type VRFConfig struct {
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 }
 
-type VRFConfigurationList []VRFConfig
+type VRFConfigurationList struct {
+	Containers []string    `yaml:"containers" json:"containers"`
+	VRFs       []VRFConfig `yaml:"vrfs" json:"vrfs"`
+}
 
 const VRFNameEmpty = ""
 const VRFNameDefault = "default"

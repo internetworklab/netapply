@@ -90,8 +90,8 @@ type NodeConfig struct {
 const DefaultStatefulDirRel = ".go-reconciler-state"
 
 type DataplaneConfig struct {
-	VRF       pkginterfacevrf.VRFConfigurationList             `yaml:"vrf,omitempty" json:"vrf,omitempty"`
-	Route     pkginterfaceroute.RouteConfigurationList         `yaml:"route,omitempty" json:"route,omitempty"`
+	VRF       pkginterfacevrf.VRFConfigurationList             `yaml:"vrf_list,omitempty" json:"vrf_list,omitempty"`
+	Route     pkginterfaceroute.RouteConfigurationList         `yaml:"route_list,omitempty" json:"route_list,omitempty"`
 	OpenVPN   pkgopenvpn2.OpenVPN2ConfigurationList            `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
 	WireGuard pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
 	VXLAN     pkginterfacevxlan.VXLANConfigurationList         `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`

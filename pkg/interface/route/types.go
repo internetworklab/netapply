@@ -51,7 +51,15 @@ type RouteConfig struct {
 	Protocol *RouteProtocol `yaml:"protocol,omitempty" json:"protocol,omitempty"`
 }
 
-type RouteConfigurationList []RouteConfig
+type RouteConfigurationList struct {
+	// The containers that will be concerned by the reconciliation process
+	// To specify what containers to check in a reconciliation loop
+	// A special value '-' means host netns
+	Containers []string `yaml:"containers" json:"containers"`
+
+	// The route resource objects in spec
+	Routes []RouteConfig `yaml:"routes" json:"routes"`
+}
 
 type RouteObjectChangeSet struct {
 	Spec *RouteConfig

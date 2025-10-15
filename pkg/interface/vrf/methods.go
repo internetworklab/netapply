@@ -200,12 +200,12 @@ func (vrfConfig *VRFConfig) DetectChanges(ctx context.Context) (pkgreconcile.Int
 	return changeSet, nil
 }
 
-func (vrfList VRFConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (vrfList VRFConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.DataplaneChangeSet, error) {
 	vrfTy := new(netlink.Vrf).Type()
 	provisionerList := make([]pkgreconcile.InterfaceProvisioner, 0)
-	for _, vrf := range vrfList {
+	for _, vrf := range vrfList.VRFs {
 		provisionerList = append(provisionerList, &vrf)
 	}
 
-	return pkgreconcile.DetectChanges(ctx, provisionerList, vrfTy, containers)
+	return pkgreconcile.DetectChanges(ctx, provisionerList, vrfTy, vrfList.Containers)
 }

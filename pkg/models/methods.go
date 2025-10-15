@@ -80,7 +80,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	}
 
 	log.Println("Detecting changes for VRF ...")
-	vrfChangeSet, err := dpConfig.VRF.DetectChanges(ctx, containers)
+	vrfChangeSet, err := dpConfig.VRF.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for VRF: %w", err)
 	}
@@ -144,6 +144,9 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		dummyChangeSet.Log()
 		changeSet = changeSet.Merge(dummyChangeSet)
 	}
+
+	// log.Println("Detecting changes for Route ...")
+	// routeChangeSet, err := dpConfig.Route.DetectChanges(ctx)
 
 	return changeSet, nil
 }
