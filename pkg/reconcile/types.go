@@ -11,7 +11,7 @@ type InterfaceChangeSet interface {
 	GetContainerName() *string
 }
 
-type InterfaceProvisioner interface {
+type ResourceProvisioner interface {
 	// In case the interface is not created yet, one can call `Create` to create the interface.
 	Create(ctx context.Context) error
 
@@ -33,24 +33,24 @@ type InterfaceProvisioner interface {
 	GetType() string
 }
 
-type InterfaceCanceller interface {
+type ResourceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string
 	GetContainerName() *string
 }
 
-type DataplaneChangeSet struct {
+type ResourceListChangeSet struct {
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be added
-	AddedInterfaces map[string][]InterfaceProvisioner
+	AddedResources map[string][]ResourceProvisioner
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be updated
-	UpdatedInterfaces map[string][]InterfaceChangeSet
+	UpdatedResources map[string][]InterfaceChangeSet
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be removed
-	RemovedInterfaces map[string][]InterfaceCanceller
+	RemovedResources map[string][]ResourceCanceller
 }
 
 // netns -> iface name -> iface canceller
-type CurrentIfaceIndex = map[string]map[string]InterfaceCanceller
+type CurrentIfaceIndex = map[string]map[string]ResourceCanceller
 
-type SpecIfaceIndex = map[string]map[string]InterfaceProvisioner
+type SpecIfaceIndex = map[string]map[string]ResourceProvisioner

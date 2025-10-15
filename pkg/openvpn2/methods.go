@@ -282,7 +282,7 @@ func (ovpInst *OpenVPN2Instance) IsLinkExists(ctx context.Context) bool {
 }
 
 // By default, it scans all tun/tap virtual interfaces in the specified containers
-func getContainerAndIfaces(ctx context.Context, serviceName string, containerNames []string) (map[string]map[string]pkgreconcile.InterfaceCanceller, error) {
+func getContainerAndIfaces(ctx context.Context, serviceName string, containerNames []string) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
 	args := filters.NewArgs()
 	args.Add("label", fmt.Sprintf("%s=%s", pkgdocker.LabelKeyService, serviceName))
 	args.Add("label", fmt.Sprintf("%s=%s", pkgdocker.LabelKeyCategory, labelCategoryDataplane))
@@ -306,7 +306,7 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 		scanContNameSet[contName] = true
 	}
 
-	result := make(map[string]map[string]pkgreconcile.InterfaceCanceller)
+	result := make(map[string]map[string]pkgreconcile.ResourceCanceller)
 	for _, cont := range conts {
 		contName := pkgutils.NormalizeContainerName(cont.Names[0])
 		if _, ok := scanContNameSet[contName]; !ok {
@@ -323,14 +323,14 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 	return result, nil
 }
 
-func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 	// Reconciliaton of container-based OpenVPN instances is quite simple, rules:
 	// 1. If the container is present on the system but not in the list, remove it.
 	// 2. If the container is not present on the system but in the list, create it.
 	// 3. If the container is present both on the system and the list, by optimistic assumption, it doesn't need to be updated.
 	// 4. The key is the container name, forget about the interface name.
 
-	changeSet := new(pkgreconcile.DataplaneChangeSet)
+	changeSet := new(pkgreconcile.ResourceListChangeSet)
 
 	serviceName, err := pkgutils.ServiceNameFromCtx(ctx)
 	if err != nil {
@@ -338,8 +338,8 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 	}
 
 	// key is the container name, value is the list of interfaces to be added/removed/updated
-	addedSet := make(map[string][]pkgreconcile.InterfaceProvisioner)
-	removedSet := make(map[string][]pkgreconcile.InterfaceCanceller)
+	addedSet := make(map[string][]pkgreconcile.ResourceProvisioner)
+	removedSet := make(map[string][]pkgreconcile.ResourceCanceller)
 	updatedSet := make(map[string][]pkgreconcile.InterfaceChangeSet)
 
 	specMap := make(map[string]map[string]OpenVPN2Instance)
@@ -361,7 +361,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 			for ifaceName := range ifaceMap {
 				if _, ok := specMap[nsKey]; !ok {
 					if _, hit := removedSet[nsKey]; !hit {
-						removedSet[nsKey] = make([]pkgreconcile.InterfaceCanceller, 0)
+						removedSet[nsKey] = make([]pkgreconcile.ResourceCanceller, 0)
 					}
 					removedSet[nsKey] = append(removedSet[nsKey], &OpenVPN2InterfaceCanceller{ContainerName: nsKey, InterfaceName: ifaceName})
 				}
@@ -372,7 +372,7 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 			for _, ifspec := range specSubMap {
 				if _, ok := currentIfacesMap[nsKey]; !ok {
 					if _, hit := addedSet[nsKey]; !hit {
-						addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
+						addedSet[nsKey] = make([]pkgreconcile.ResourceProvisioner, 0)
 					}
 					addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
 					continue
@@ -390,9 +390,9 @@ func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, cont
 		}
 	}
 
-	changeSet.AddedInterfaces = addedSet
-	changeSet.RemovedInterfaces = removedSet
-	changeSet.UpdatedInterfaces = updatedSet
+	changeSet.AddedResources = addedSet
+	changeSet.RemovedResources = removedSet
+	changeSet.UpdatedResources = updatedSet
 
 	return changeSet, nil
 }

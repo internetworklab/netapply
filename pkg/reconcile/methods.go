@@ -13,7 +13,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *DataplaneChangeSet {
+func (dpChangeSet *ResourceListChangeSet) Merge(other *ResourceListChangeSet) *ResourceListChangeSet {
 	if dpChangeSet == nil {
 		return other
 	}
@@ -22,13 +22,13 @@ func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *Datapla
 		return dpChangeSet
 	}
 
-	result := new(DataplaneChangeSet)
+	result := new(ResourceListChangeSet)
 
-	mergedAdded := make(map[string][]InterfaceProvisioner)
-	for k, v := range dpChangeSet.AddedInterfaces {
+	mergedAdded := make(map[string][]ResourceProvisioner)
+	for k, v := range dpChangeSet.AddedResources {
 		mergedAdded[k] = append(mergedAdded[k], v...)
 	}
-	for k, v := range other.AddedInterfaces {
+	for k, v := range other.AddedResources {
 		if curr, ok := mergedAdded[k]; ok {
 			mergedAdded[k] = append(curr, v...)
 		} else {
@@ -37,10 +37,10 @@ func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *Datapla
 	}
 
 	mergedUpdated := make(map[string][]InterfaceChangeSet)
-	for k, v := range dpChangeSet.UpdatedInterfaces {
+	for k, v := range dpChangeSet.UpdatedResources {
 		mergedUpdated[k] = append(mergedUpdated[k], v...)
 	}
-	for k, v := range other.UpdatedInterfaces {
+	for k, v := range other.UpdatedResources {
 		if curr, ok := mergedUpdated[k]; ok {
 			mergedUpdated[k] = append(curr, v...)
 		} else {
@@ -48,11 +48,11 @@ func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *Datapla
 		}
 	}
 
-	mergedRemoved := make(map[string][]InterfaceCanceller)
-	for k, v := range dpChangeSet.RemovedInterfaces {
+	mergedRemoved := make(map[string][]ResourceCanceller)
+	for k, v := range dpChangeSet.RemovedResources {
 		mergedRemoved[k] = append(mergedRemoved[k], v...)
 	}
-	for k, v := range other.RemovedInterfaces {
+	for k, v := range other.RemovedResources {
 		if curr, ok := mergedRemoved[k]; ok {
 			mergedRemoved[k] = append(curr, v...)
 		} else {
@@ -60,26 +60,26 @@ func (dpChangeSet *DataplaneChangeSet) Merge(other *DataplaneChangeSet) *Datapla
 		}
 	}
 
-	result.AddedInterfaces = mergedAdded
-	result.UpdatedInterfaces = mergedUpdated
-	result.RemovedInterfaces = mergedRemoved
+	result.AddedResources = mergedAdded
+	result.UpdatedResources = mergedUpdated
+	result.RemovedResources = mergedRemoved
 
 	return result
 }
 
-func (dpChangeSet *DataplaneChangeSet) HasChanges() bool {
+func (dpChangeSet *ResourceListChangeSet) HasChanges() bool {
 	if dpChangeSet != nil {
-		for _, addedInterface := range dpChangeSet.AddedInterfaces {
+		for _, addedInterface := range dpChangeSet.AddedResources {
 			if len(addedInterface) > 0 {
 				return true
 			}
 		}
-		for _, updatedInterface := range dpChangeSet.UpdatedInterfaces {
+		for _, updatedInterface := range dpChangeSet.UpdatedResources {
 			if len(updatedInterface) > 0 {
 				return true
 			}
 		}
-		for _, removedInterface := range dpChangeSet.RemovedInterfaces {
+		for _, removedInterface := range dpChangeSet.RemovedResources {
 			if len(removedInterface) > 0 {
 				return true
 			}
@@ -116,8 +116,8 @@ func getOrderByType(ty string) int16 {
 	return defaultOrder
 }
 
-func reOrderAddedInterfaces(provisioners map[string][]InterfaceProvisioner) []InterfaceProvisioner {
-	results := make([]InterfaceProvisioner, 0)
+func reOrderAddedInterfaces(provisioners map[string][]ResourceProvisioner) []ResourceProvisioner {
+	results := make([]ResourceProvisioner, 0)
 	for _, provisioner := range provisioners {
 		results = append(results, provisioner...)
 	}
@@ -129,9 +129,9 @@ func reOrderAddedInterfaces(provisioners map[string][]InterfaceProvisioner) []In
 	return results
 }
 
-func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
+func (dpChangeSet *ResourceListChangeSet) Apply(ctx context.Context) error {
 	if dpChangeSet.HasChanges() {
-		for _, removedInterface := range dpChangeSet.RemovedInterfaces {
+		for _, removedInterface := range dpChangeSet.RemovedResources {
 			for _, canceller := range removedInterface {
 				log.Printf("Removing interface %s in %s ...", canceller.GetInterfaceName(), pkgdocker.GetContainerDisplayName(canceller.GetContainerName()))
 				if err := canceller.Cancel(ctx); err != nil {
@@ -140,7 +140,7 @@ func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 			}
 		}
 
-		for _, updatedInterface := range dpChangeSet.UpdatedInterfaces {
+		for _, updatedInterface := range dpChangeSet.UpdatedResources {
 			for _, changeSet := range updatedInterface {
 				if changeSet.HasUpdates() {
 					log.Printf("Updating interface %s in %s ...", changeSet.GetInterfaceName(), pkgdocker.GetContainerDisplayName(changeSet.GetContainerName()))
@@ -151,7 +151,7 @@ func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 			}
 		}
 
-		for _, provisioner := range reOrderAddedInterfaces(dpChangeSet.AddedInterfaces) {
+		for _, provisioner := range reOrderAddedInterfaces(dpChangeSet.AddedResources) {
 			log.Printf("Creating interface %s in %s ...", provisioner.GetInterfaceName(), pkgdocker.GetContainerDisplayName(provisioner.GetContainerName()))
 			if err := provisioner.Create(ctx); err != nil {
 				return fmt.Errorf("failed to create interface: %w", err)
@@ -161,13 +161,13 @@ func (dpChangeSet *DataplaneChangeSet) Apply(ctx context.Context) error {
 	return nil
 }
 
-func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkType string) (map[string]InterfaceCanceller, error) {
+func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkType string) (map[string]ResourceCanceller, error) {
 	type result struct {
-		ifaces map[string]InterfaceCanceller
+		ifaces map[string]ResourceCanceller
 	}
 
 	res := new(result)
-	res.ifaces = make(map[string]InterfaceCanceller, 0)
+	res.ifaces = make(map[string]ResourceCanceller, 0)
 
 	err := pkgdocker.WithNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
 		links, err := handle.LinkList()
@@ -200,7 +200,7 @@ func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 }
 
 func indexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType string, includeHostNetns bool) (CurrentIfaceIndex, error) {
-	currentInterfaceListMap := make(map[string]map[string]InterfaceCanceller)
+	currentInterfaceListMap := make(map[string]map[string]ResourceCanceller)
 	for _, name := range containers {
 		ifaces, err := GetInterfaceFromContainer(ctx, &name, netlinkIfType)
 		if err != nil {
@@ -220,13 +220,13 @@ func indexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType 
 	return currentInterfaceListMap, nil
 }
 
-func indexSpecIfaces(provisionerList []InterfaceProvisioner) (SpecIfaceIndex, error) {
-	specInterfaceListMap := make(map[string]map[string]InterfaceProvisioner)
+func indexSpecIfaces(provisionerList []ResourceProvisioner) (SpecIfaceIndex, error) {
+	specInterfaceListMap := make(map[string]map[string]ResourceProvisioner)
 	for _, c := range provisionerList {
 		contName := string(pkgdocker.GetContainerKey(c.GetContainerName()))
 
 		if _, ok := specInterfaceListMap[contName]; !ok {
-			specInterfaceListMap[contName] = make(map[string]InterfaceProvisioner, 0)
+			specInterfaceListMap[contName] = make(map[string]ResourceProvisioner, 0)
 		}
 		specInterfaceListMap[contName][c.GetInterfaceName()] = c
 	}
@@ -236,10 +236,10 @@ func indexSpecIfaces(provisionerList []InterfaceProvisioner) (SpecIfaceIndex, er
 
 func detectChangesInContainer(
 	ctx context.Context,
-	provisionerList map[string]InterfaceProvisioner,
-	currentInterfacesInContainer map[string]InterfaceCanceller,
+	provisionerList map[string]ResourceProvisioner,
+	currentInterfacesInContainer map[string]ResourceCanceller,
 	container string,
-) (*DataplaneChangeSet, error) {
+) (*ResourceListChangeSet, error) {
 
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
@@ -251,9 +251,9 @@ func detectChangesInContainer(
 		}
 	}
 
-	addedSet := make(map[string]InterfaceProvisioner)
-	removedSet := make(map[string]InterfaceCanceller)
-	commonSet := make(map[string]InterfaceProvisioner)
+	addedSet := make(map[string]ResourceProvisioner)
+	removedSet := make(map[string]ResourceCanceller)
+	commonSet := make(map[string]ResourceProvisioner)
 	updatedSet := make(map[string]InterfaceChangeSet)
 
 	for _, provisioner := range provisionerList {
@@ -280,8 +280,8 @@ func detectChangesInContainer(
 		}
 	}
 
-	addedList := make([]InterfaceProvisioner, 0)
-	removedList := make([]InterfaceCanceller, 0)
+	addedList := make([]ResourceProvisioner, 0)
+	removedList := make([]ResourceCanceller, 0)
 	updatedList := make([]InterfaceChangeSet, 0)
 
 	for _, provisioner := range addedSet {
@@ -294,20 +294,20 @@ func detectChangesInContainer(
 		updatedList = append(updatedList, changeset)
 	}
 
-	changeSet := new(DataplaneChangeSet)
-	changeSet.AddedInterfaces = make(map[string][]InterfaceProvisioner)
-	changeSet.AddedInterfaces[container] = addedList
+	changeSet := new(ResourceListChangeSet)
+	changeSet.AddedResources = make(map[string][]ResourceProvisioner)
+	changeSet.AddedResources[container] = addedList
 
-	changeSet.RemovedInterfaces = make(map[string][]InterfaceCanceller)
-	changeSet.RemovedInterfaces[container] = removedList
+	changeSet.RemovedResources = make(map[string][]ResourceCanceller)
+	changeSet.RemovedResources[container] = removedList
 
-	changeSet.UpdatedInterfaces = make(map[string][]InterfaceChangeSet)
-	changeSet.UpdatedInterfaces[container] = updatedList
+	changeSet.UpdatedResources = make(map[string][]InterfaceChangeSet)
+	changeSet.UpdatedResources[container] = updatedList
 
 	return changeSet, nil
 }
 
-func DetectChanges(ctx context.Context, provisionerList []InterfaceProvisioner, netlinkIfType string, containers []string) (*DataplaneChangeSet, error) {
+func DetectChanges(ctx context.Context, provisionerList []ResourceProvisioner, netlinkIfType string, containers []string) (*ResourceListChangeSet, error) {
 
 	cli, err := pkgutils.DockerCliFromCtx(ctx)
 	if err != nil {
@@ -347,15 +347,15 @@ func DetectChanges(ctx context.Context, provisionerList []InterfaceProvisioner, 
 		combinedNsMap[k] = true
 	}
 
-	var totalChanges *DataplaneChangeSet
+	var totalChanges *ResourceListChangeSet
 
 	for nsKey := range combinedNsMap {
-		var provisionersInContainer map[string]InterfaceProvisioner
+		var provisionersInContainer map[string]ResourceProvisioner
 		if v, ok := specInterfaceListMap[nsKey]; ok {
 			provisionersInContainer = v
 		}
 
-		var currentInterfacesInContainer map[string]InterfaceCanceller
+		var currentInterfacesInContainer map[string]ResourceCanceller
 		if v, ok := currentInterfaceListMap[nsKey]; ok {
 			currentInterfacesInContainer = v
 		}
@@ -371,11 +371,11 @@ func DetectChanges(ctx context.Context, provisionerList []InterfaceProvisioner, 
 	return totalChanges, nil
 }
 
-func (dpChangeSet *DataplaneChangeSet) Log() {
+func (dpChangeSet *ResourceListChangeSet) Log() {
 	log.Print("Dataplane change set:\n")
 
 	log.Print("Removed interfaces:\n")
-	for ns, ifaces := range dpChangeSet.RemovedInterfaces {
+	for ns, ifaces := range dpChangeSet.RemovedResources {
 		ifaceList := make([]string, 0)
 		for _, iface := range ifaces {
 			ifaceList = append(ifaceList, iface.GetInterfaceName())
@@ -384,7 +384,7 @@ func (dpChangeSet *DataplaneChangeSet) Log() {
 	}
 
 	log.Print("Added interfaces:\n")
-	for ns, ifaces := range dpChangeSet.AddedInterfaces {
+	for ns, ifaces := range dpChangeSet.AddedResources {
 		ifaceList := make([]string, 0)
 		for _, iface := range ifaces {
 			ifaceList = append(ifaceList, iface.GetInterfaceName())
@@ -393,7 +393,7 @@ func (dpChangeSet *DataplaneChangeSet) Log() {
 	}
 
 	log.Print("Updated interfaces:\n")
-	for ns, ifaces := range dpChangeSet.UpdatedInterfaces {
+	for ns, ifaces := range dpChangeSet.UpdatedResources {
 		ifaceList := make([]string, 0)
 		for _, iface := range ifaces {
 			ifaceList = append(ifaceList, iface.GetInterfaceName())

@@ -297,9 +297,9 @@ func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*
 	return res, nil
 }
 
-func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 	vethPairsToCreate := make([]VethPairConfig, 0)
-	vethPairsToDelete := make([]pkgreconcile.InterfaceCanceller, 0)
+	vethPairsToDelete := make([]pkgreconcile.ResourceCanceller, 0)
 	vethPairsToCheckUpdates := make([]VethPairConfig, 0)
 	vethPairsUpdated := make([]pkgreconcile.InterfaceChangeSet, 0)
 
@@ -379,24 +379,24 @@ func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context,
 		}
 	}
 
-	changeSet := new(pkgreconcile.DataplaneChangeSet)
-	changeSet.AddedInterfaces = make(map[string][]pkgreconcile.InterfaceProvisioner)
-	changeSet.UpdatedInterfaces = make(map[string][]pkgreconcile.InterfaceChangeSet)
-	changeSet.RemovedInterfaces = make(map[string][]pkgreconcile.InterfaceCanceller)
+	changeSet := new(pkgreconcile.ResourceListChangeSet)
+	changeSet.AddedResources = make(map[string][]pkgreconcile.ResourceProvisioner)
+	changeSet.UpdatedResources = make(map[string][]pkgreconcile.InterfaceChangeSet)
+	changeSet.RemovedResources = make(map[string][]pkgreconcile.ResourceCanceller)
 
 	for _, vethPairSpec := range vethPairsToCreate {
 		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		changeSet.AddedInterfaces[nsKey] = append(changeSet.AddedInterfaces[nsKey], &vethPairSpec)
+		changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], &vethPairSpec)
 	}
 
 	for _, vethPairSpec := range vethPairsToDelete {
 		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		changeSet.RemovedInterfaces[nsKey] = append(changeSet.RemovedInterfaces[nsKey], vethPairSpec)
+		changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], vethPairSpec)
 	}
 
 	for _, vethPairSpec := range vethPairsUpdated {
 		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		changeSet.UpdatedInterfaces[nsKey] = append(changeSet.UpdatedInterfaces[nsKey], vethPairSpec)
+		changeSet.UpdatedResources[nsKey] = append(changeSet.UpdatedResources[nsKey], vethPairSpec)
 	}
 
 	return changeSet, nil

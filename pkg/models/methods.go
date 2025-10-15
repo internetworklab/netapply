@@ -64,9 +64,9 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	return nil
 }
 
-func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 
-	var changeSet *pkgreconcile.DataplaneChangeSet
+	var changeSet *pkgreconcile.ResourceListChangeSet
 
 	log.Println("Detecting changes for OpenVPN ...")
 	openVPNChangeSet, err := dpConfig.OpenVPN.DetectChanges(ctx, containers)

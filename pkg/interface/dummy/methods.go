@@ -148,9 +148,9 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (dummyList DummyConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (dummyList DummyConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 	dummyTy := new(netlink.Dummy).Type()
-	provisionerList := make([]pkgreconcile.InterfaceProvisioner, 0)
+	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, dummy := range dummyList {
 		provisionerList = append(provisionerList, &dummy)
 	}

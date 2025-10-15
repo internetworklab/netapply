@@ -509,9 +509,9 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 }
 
 // Scan containers specified for any reconciliation clues.
-func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (wgList WireGuardConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 	wgty := new(netlink.Wireguard).Type()
-	provisionerList := make([]pkgreconcile.InterfaceProvisioner, 0)
+	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, wg := range wgList {
 		provisionerList = append(provisionerList, &wg)
 	}

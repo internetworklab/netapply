@@ -158,9 +158,9 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 	vxlanty := new(netlink.Vxlan).Type()
-	provisionerList := make([]pkgreconcile.InterfaceProvisioner, 0)
+	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vxlan := range vxlanList {
 		provisionerList = append(provisionerList, &vxlan)
 	}

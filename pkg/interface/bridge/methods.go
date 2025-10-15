@@ -241,9 +241,9 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.DataplaneChangeSet, error) {
+func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
 	bridgeTy := new(netlink.Bridge).Type()
-	provisionerList := make([]pkgreconcile.InterfaceProvisioner, 0)
+	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, bridge := range bridgeList {
 		provisionerList = append(provisionerList, &bridge)
 	}
