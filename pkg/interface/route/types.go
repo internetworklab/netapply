@@ -33,6 +33,8 @@ type RouteConfig struct {
 
 	NextHopInterface *string `yaml:"next_hop_interface,omitempty" json:"next_hop_interface,omitempty"`
 
+	InboundInterface *string `yaml:"inbound_interface,omitempty" json:"inbound_interface,omitempty"`
+
 	// Source address to prefer for the route
 	Source *string `yaml:"source,omitempty" json:"source,omitempty"`
 

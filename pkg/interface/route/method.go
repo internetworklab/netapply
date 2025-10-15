@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strconv"
 
@@ -165,4 +166,85 @@ func (protocol RouteProtocol) ToInt() netlink.RouteProtocol {
 
 func (r *RouteConfig) GetType() string {
 	return "route"
+}
+
+func (r *RouteConfig) Create(ctx context.Context) error {
+	return pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
+		route := new(netlink.Route)
+
+		tabId, err := r.GetTableId(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get table id: %w", err)
+		}
+
+		if tabId != nil {
+			route.Table = int(*tabId)
+		}
+
+		route.Protocol = RouteProtocolStatic.ToInt()
+		if r.Protocol != nil {
+			route.Protocol = r.Protocol.ToInt()
+		}
+
+		if r.InboundInterface != nil {
+			link, err := handle.LinkByName(*r.InboundInterface)
+			if err != nil {
+				return fmt.Errorf("failed to get inbound interface: %w", err)
+			}
+			route.LinkIndex = link.Attrs().Index
+		}
+
+		if r.NextHopInterface != nil {
+			link, err := handle.LinkByName(*r.NextHopInterface)
+			if err != nil {
+				return fmt.Errorf("failed to get next hop interface: %w", err)
+			}
+			route.LinkIndex = link.Attrs().Index
+		}
+
+		if r.Scope != nil {
+			route.Scope = r.Scope.ToUInt8()
+		}
+
+		if r.Family != nil {
+			route.Family = *r.Family
+		}
+
+		if r.Priority != nil {
+			route.Priority = *r.Priority
+		}
+
+		_, destIPNet, err := net.ParseCIDR(r.Destionation)
+		if err != nil {
+			return fmt.Errorf("failed to parse destination: %w", err)
+		}
+
+		route.Dst = destIPNet
+
+		if r.NextHop == "" {
+			return fmt.Errorf("next hop is not set")
+		}
+
+		nextHopIP := net.ParseIP(r.NextHop)
+		if nextHopIP == nil {
+			return fmt.Errorf("failed to parse next hop: %s", r.NextHop)
+		}
+
+		route.Gw = nextHopIP
+
+		if r.Source != nil && *r.Source != "" {
+			srcIP := net.ParseIP(*r.Source)
+			if srcIP == nil {
+				return fmt.Errorf("failed to parse source: %s", *r.Source)
+			}
+
+			route.Src = srcIP
+		}
+
+		err = handle.RouteAdd(route)
+		if err != nil {
+			return fmt.Errorf("failed to add route: %w", err)
+		}
+		return nil
+	})
 }
