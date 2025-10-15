@@ -1,5 +1,9 @@
 package route
 
+import (
+	"net"
+)
+
 type RouteScope string
 
 const (
@@ -48,3 +52,13 @@ type RouteConfig struct {
 }
 
 type RouteConfigurationList []RouteConfig
+
+type RouteObjectChangeSet struct {
+	Spec *RouteConfig
+
+	ShouldChangeNextHop  *net.IP
+	ShouldChangeSource   *net.IP
+	ShouldChangeDev      *string
+	ShouldChangeIIface   *string
+	ShouldChangePriority *int
+}

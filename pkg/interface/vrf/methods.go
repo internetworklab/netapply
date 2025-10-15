@@ -123,14 +123,6 @@ func (vrfConfig *VRFConfig) Create(ctx context.Context) error {
 	})
 }
 
-type VRFChangeSet struct {
-	ContainerName     *string
-	InterfaceName     string
-	AddressesToAdd    []*netlink.Addr
-	AddressesToRemove []*netlink.Addr
-	NeedToSetUp       bool
-}
-
 func (vrfChangeSet *VRFChangeSet) HasUpdates() bool {
 	if vrfChangeSet == nil {
 		return false

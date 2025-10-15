@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -151,13 +152,13 @@ func (r *RouteConfig) GetType() string {
 
 func (r *RouteConfig) Create(ctx context.Context) error {
 	return pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
-		route := new(netlink.Route)
+		rtObj := new(netlink.Route)
 
-		route.Table = int(r.GetTableId(ctx))
+		rtObj.Table = int(r.GetTableId(ctx))
 
-		route.Protocol = RouteProtocolStatic.ToInt()
+		rtObj.Protocol = RouteProtocolStatic.ToInt()
 		if r.Protocol != nil {
-			route.Protocol = r.Protocol.ToInt()
+			rtObj.Protocol = r.Protocol.ToInt()
 		}
 
 		if r.InboundInterface != nil {
@@ -165,7 +166,7 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to get inbound interface: %w", err)
 			}
-			route.LinkIndex = link.Attrs().Index
+			rtObj.LinkIndex = link.Attrs().Index
 		}
 
 		if r.NextHopInterface != nil {
@@ -173,19 +174,19 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 			if err != nil {
 				return fmt.Errorf("failed to get next hop interface: %w", err)
 			}
-			route.LinkIndex = link.Attrs().Index
+			rtObj.LinkIndex = link.Attrs().Index
 		}
 
 		if r.Scope != nil {
-			route.Scope = r.Scope.ToUInt8()
+			rtObj.Scope = r.Scope.ToUInt8()
 		}
 
 		if r.Family != nil {
-			route.Family = *r.Family
+			rtObj.Family = *r.Family
 		}
 
 		if r.Priority != nil {
-			route.Priority = *r.Priority
+			rtObj.Priority = *r.Priority
 		}
 
 		_, destIPNet, err := net.ParseCIDR(r.Destionation)
@@ -193,7 +194,7 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to parse destination: %w", err)
 		}
 
-		route.Dst = destIPNet
+		rtObj.Dst = destIPNet
 
 		if r.NextHop == "" {
 			return fmt.Errorf("next hop is not set")
@@ -204,7 +205,7 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to parse next hop: %s", r.NextHop)
 		}
 
-		route.Gw = nextHopIP
+		rtObj.Gw = nextHopIP
 
 		if r.Source != nil && *r.Source != "" {
 			srcIP := net.ParseIP(*r.Source)
@@ -212,13 +213,133 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 				return fmt.Errorf("failed to parse source: %s", *r.Source)
 			}
 
-			route.Src = srcIP
+			rtObj.Src = srcIP
 		}
 
-		err = handle.RouteAdd(route)
+		err = handle.RouteAdd(rtObj)
 		if err != nil {
 			return fmt.Errorf("failed to add route: %w", err)
 		}
 		return nil
 	})
+}
+
+func (r *RouteObjectChangeSet) GetContainerName() *string {
+	return r.Spec.GetContainerName()
+}
+
+func (r *RouteObjectChangeSet) GetInterfaceName() string {
+	return r.Spec.GetInterfaceName()
+}
+
+func (r *RouteObjectChangeSet) HasUpdates() bool {
+	if r == nil {
+		return false
+	}
+
+	return r.ShouldChangeNextHop != nil ||
+		r.ShouldChangeSource != nil ||
+		r.ShouldChangeDev != nil ||
+		r.ShouldChangeIIface != nil ||
+		r.ShouldChangePriority != nil
+}
+
+func (r *RouteObjectChangeSet) Apply(ctx context.Context) error {
+
+	if !r.HasUpdates() {
+		return nil
+	}
+
+	return pkgdocker.WithNsHandleSafe(ctx, r.GetContainerName(), func(handle *netlink.Handle) error {
+
+		rtObj, err := r.Spec.RetrieveRouteObject(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve route object: %w", err)
+		}
+
+		if r.ShouldChangeNextHop != nil {
+			rtObj.Gw = *r.ShouldChangeNextHop
+		}
+
+		if r.ShouldChangeSource != nil {
+			rtObj.Src = *r.ShouldChangeSource
+		}
+
+		if r.ShouldChangeDev != nil {
+			link, err := handle.LinkByName(*r.ShouldChangeDev)
+			if err != nil {
+				return fmt.Errorf("failed to get link by name: %w", err)
+			}
+			rtObj.LinkIndex = link.Attrs().Index
+		}
+
+		if r.ShouldChangeIIface != nil {
+			link, err := handle.LinkByName(*r.ShouldChangeIIface)
+			if err != nil {
+				return fmt.Errorf("failed to get link by name: %w", err)
+			}
+			rtObj.ILinkIndex = link.Attrs().Index
+		}
+
+		if r.ShouldChangePriority != nil {
+			rtObj.Priority = *r.ShouldChangePriority
+		}
+
+		return nil
+	})
+}
+
+func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
+	changeSet := new(RouteObjectChangeSet)
+	changeSet.Spec = r
+	err := pkgdocker.WithNsHandleSafe(ctx, r.GetContainerName(), func(handle *netlink.Handle) error {
+		rtObj, err := r.RetrieveRouteObject(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve route object: %w", err)
+		}
+
+		if rtObj.Gw.String() != r.NextHop {
+			desiredNH := net.ParseIP(r.NextHop)
+			if desiredNH == nil {
+				return fmt.Errorf("failed to parse next hop: %s", r.NextHop)
+			}
+			changeSet.ShouldChangeNextHop = &desiredNH
+		}
+
+		if r.Source != nil && *r.Source != "" && rtObj.Src.String() != *r.Source {
+			desiredSrc := net.ParseIP(*r.Source)
+			if desiredSrc == nil {
+				return fmt.Errorf("failed to parse source: %s", *r.Source)
+			}
+			changeSet.ShouldChangeSource = &desiredSrc
+		}
+
+		if r.NextHopInterface != nil && *r.NextHopInterface != "" {
+			link, err := handle.LinkByName(*r.NextHopInterface)
+			if err != nil {
+				return fmt.Errorf("failed to get link by name: %w", err)
+			}
+			if link.Attrs().Index != rtObj.LinkIndex {
+				changeSet.ShouldChangeDev = r.NextHopInterface
+			}
+		}
+
+		if r.InboundInterface != nil && *r.InboundInterface != "" {
+			link, err := handle.LinkByName(*r.InboundInterface)
+			if err != nil {
+				return fmt.Errorf("failed to get link by name: %w", err)
+			}
+			if link.Attrs().Index != rtObj.ILinkIndex {
+				changeSet.ShouldChangeIIface = r.InboundInterface
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changeset: %w", err)
+	}
+
+	return changeSet, nil
 }

@@ -2,6 +2,7 @@ package vrf
 
 import (
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	"github.com/vishvananda/netlink"
 )
 
 type VRFConfig struct {
@@ -18,3 +19,11 @@ const VRFNameDefault = "default"
 
 // If the master index of a link is 0, we consider its VRF as default VRF
 const DefaultVRFIndex int = 0
+
+type VRFChangeSet struct {
+	ContainerName     *string
+	InterfaceName     string
+	AddressesToAdd    []*netlink.Addr
+	AddressesToRemove []*netlink.Addr
+	NeedToSetUp       bool
+}
