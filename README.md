@@ -940,3 +940,7 @@ About how to generate keys for OpenVPN2 serverside and clientside:
 2. Generate client's cert pair by `./generate-client.sh`, modify the CN field for a different CommonName;
 3. Generate server's cert pair by `./generate-server.sh`, modify the CN field for a different CommonName.
 
+## Todos
+
+1. Resource-specific netns range
+2. Improved FRR configuration representation model

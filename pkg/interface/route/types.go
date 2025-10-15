@@ -19,11 +19,6 @@ const (
 type RouteConfig struct {
 	TableId *uint32 `yaml:"table_id,omitempty" json:"table_id,omitempty"`
 
-	// When TableId and VRF are both specified, TableId will take precedence over VRF
-	// If they are both nil, the default VRF will be used
-	// In practice, we recommend you to use table id directly as possible as you can, instead of VRF.
-	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty"`
-
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 
 	// Destination is a CIDR string

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
-	"github.com/internetworklab/netapply/pkg/interface/vrf"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -34,6 +33,9 @@ func (scope RouteScope) ToUInt8() netlink.Scope {
 }
 
 func (r *RouteConfig) GetInterfaceName() string {
+	if r.TableId != nil && *r.TableId != 0 {
+		return fmt.Sprintf("%s (table %d)", r.Destionation, *r.TableId)
+	}
 	return r.Destionation
 }
 
@@ -42,65 +44,31 @@ func (r *RouteConfig) GetContainerName() *string {
 }
 
 // If it returns nil, it means that the table(or vrf) is not created yet
-func (r *RouteConfig) GetTableId(ctx context.Context) (*uint32, error) {
-	type result struct {
-		TableId *uint32
-	}
-	res := new(result)
-	res.TableId = new(uint32)
-	*res.TableId = 0
-
+func (r *RouteConfig) GetTableId(ctx context.Context) uint32 {
 	if r.TableId != nil {
-		return r.TableId, nil
+		return *r.TableId
 	}
-
-	if r.VRF != nil && *r.VRF != vrf.VRFNameDefault && *r.VRF != vrf.VRFNameEmpty {
-		err := pkgdocker.WithNsHandle(ctx, r.ContainerName, func(handle *netlink.Handle) error {
-			vrfLink, err := handle.LinkByName(*r.VRF)
-			if err != nil {
-				return fmt.Errorf("failed to get vrf link: %w", err)
-			}
-			if v, ok := vrfLink.(*netlink.Vrf); ok {
-				var tableId uint32 = v.Table
-				res.TableId = &tableId
-				return nil
-			} else {
-				return fmt.Errorf("link is not a vrf link: %v, probably because the name is used by other types of links (e.g., a dummy, a veth, or a bridge,)", vrfLink)
-			}
-
-		})
-		if err != nil {
-			return nil, err
-		}
-		return res.TableId, nil
-	}
-
-	return res.TableId, nil
+	return 0
 }
 
-func (r *RouteConfig) CheckExist(ctx context.Context) (bool, error) {
-	tableId, err := r.GetTableId(ctx)
-	if err != nil {
-		return false, fmt.Errorf("the route might specified a vrf, but failed to get table id: %w", err)
-	}
-
-	if tableId == nil {
-		return false, fmt.Errorf("the route might specified a vrf, but table id is not available yet")
-	}
+func (r *RouteConfig) RetrieveRouteObject(ctx context.Context) (*netlink.Route, error) {
+	tableId := r.GetTableId(ctx)
 
 	type result struct {
-		Exist bool
+		Route *netlink.Route
 	}
 	res := new(result)
 
-	err = pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
-		destination, err := netlink.ParseAddr(r.Destionation)
+	err := pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
+		destIP, destIPNet, err := net.ParseCIDR(r.Destionation)
 		if err != nil {
 			return fmt.Errorf("failed to parse destination: %w", err)
 		}
-		routes, err := handle.RouteGet(destination.IP)
+		routes, err := handle.RouteGet(destIP)
 		if err != nil {
-			return fmt.Errorf("failed to get routes: %w", err)
+			if _, ok := err.(netlink.LinkNotFoundError); !ok {
+				return fmt.Errorf("failed to get routes: %w", err)
+			}
 		}
 
 		protoExpected := RouteProtocolStatic.ToInt()
@@ -108,8 +76,16 @@ func (r *RouteConfig) CheckExist(ctx context.Context) (bool, error) {
 			protoExpected = r.Protocol.ToInt()
 		}
 		for _, nlroute := range routes {
-			if nlroute.Protocol == protoExpected {
-				res.Exist = true
+			if nlroute.Protocol != protoExpected {
+				continue
+			}
+
+			if tableId != uint32(nlroute.Table) {
+				continue
+			}
+
+			if nlroute.Dst.String() == destIPNet.String() {
+				res.Route = &nlroute
 				break
 			}
 		}
@@ -117,7 +93,12 @@ func (r *RouteConfig) CheckExist(ctx context.Context) (bool, error) {
 		return nil
 	})
 
-	return res.Exist, err
+	return res.Route, err
+}
+
+func (r *RouteConfig) CheckExist(ctx context.Context) (bool, error) {
+	routeObj, err := r.RetrieveRouteObject(ctx)
+	return routeObj != nil, err
 }
 
 func (protocol RouteProtocol) ToInt() netlink.RouteProtocol {
@@ -172,14 +153,7 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 	return pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
 		route := new(netlink.Route)
 
-		tabId, err := r.GetTableId(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get table id: %w", err)
-		}
-
-		if tabId != nil {
-			route.Table = int(*tabId)
-		}
+		route.Table = int(r.GetTableId(ctx))
 
 		route.Protocol = RouteProtocolStatic.ToInt()
 		if r.Protocol != nil {
