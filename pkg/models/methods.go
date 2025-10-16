@@ -71,11 +71,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 		}
 	}
 
-	if changeSet != nil && changeSet.HasChanges() {
-		log.Println("Found changes for dataplane config:")
-		changeSet.Log()
-	}
-
 	return changeSet, nil
 }
 
