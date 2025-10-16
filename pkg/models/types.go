@@ -74,14 +74,6 @@ type NodeConfig struct {
 	Controlplane []ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 	Dataplane    *DataplaneConfig     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
 
-	// Static configs are those append-only and do not participate in a reconciliation loop.
-	// Often use for linking containers/netns that are not managed by netapply.
-	// Interfaces/Resources must have a `TrySetup` method before they are qualified to put into this `Static` section.
-	Static *StaticConfig `yaml:"static,omitempty" json:"static,omitempty"`
-
-	// The list of containers to scan when doing a reconciliation loop
-	Containers []string `yaml:"containers,omitempty" json:"containers,omitempty"`
-
 	// By default, it would use $CWD/.go-reconciler-state as the stateful directory.
 	// There is a GetStatefulDir method in pkgutils model for it.
 	StatefulDir string `yaml:"stateful_dir,omitempty" json:"stateful_dir,omitempty"`

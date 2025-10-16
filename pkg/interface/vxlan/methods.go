@@ -158,13 +158,13 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (vxlanList VXLANConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
+func (vxlanCfgsList VXLANConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
 	vxlanty := new(netlink.Vxlan).Type()
 	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, vxlan := range vxlanList {
+	for _, vxlan := range vxlanCfgsList.VXLANConfigs {
 		provisionerList = append(provisionerList, &vxlan)
 	}
-	return pkgreconcile.DetectChanges(ctx, provisionerList, vxlanty, containers)
+	return pkgreconcile.DetectChanges(ctx, provisionerList, vxlanty, vxlanCfgsList.Containers)
 }
 
 func (vxlanConfig *VXLANConfig) GetType() string {

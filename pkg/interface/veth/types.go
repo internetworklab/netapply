@@ -28,7 +28,10 @@ type VethPairChangeSet struct {
 	Peer  *VethPairPeerChangeSet
 }
 
-type VethPairConfigurationList []VethPairConfig
+type VethPairConfigurationList struct {
+	Containers []string         `yaml:"containers" json:"containers"`
+	VethPairs  []VethPairConfig `yaml:"veth_pairs" json:"veth_pairs"`
+}
 
 type VethPairPlacementStatus struct {
 	FoundInPrimaryNetns   bool

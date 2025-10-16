@@ -323,7 +323,10 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 	return result, nil
 }
 
-func (ovpList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
+func (ovpCfgsList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+	containers := ovpCfgsList.Containers
+	ovpList := ovpCfgsList.Instances
+
 	// Reconciliaton of container-based OpenVPN instances is quite simple, rules:
 	// 1. If the container is present on the system but not in the list, remove it.
 	// 2. If the container is not present on the system but in the list, create it.

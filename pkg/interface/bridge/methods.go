@@ -241,7 +241,10 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (bridgeList BridgeConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
+func (bridgeCfgsList BridgeConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+	containers := bridgeCfgsList.Containers
+	bridgeList := bridgeCfgsList.Bridges
+
 	bridgeTy := new(netlink.Bridge).Type()
 	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, bridge := range bridgeList {

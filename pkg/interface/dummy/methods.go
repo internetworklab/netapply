@@ -148,7 +148,10 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (dummyList DummyConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
+func (dummyCfgsList DummyConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+	containers := dummyCfgsList.Containers
+	dummyList := dummyCfgsList.Dummies
+
 	dummyTy := new(netlink.Dummy).Type()
 	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, dummy := range dummyList {

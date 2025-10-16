@@ -52,4 +52,7 @@ type WireGuardPeerConfig struct {
 	ForceRecheckEndpoint *bool `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty"`
 }
 
-type WireGuardConfigurationList []WireGuardConfig
+type WireGuardConfigurationList struct {
+	Containers       []string          `yaml:"containers" json:"containers"`
+	WireGuardConfigs []WireGuardConfig `yaml:"wireguard_configs" json:"wireguard_configs"`
+}

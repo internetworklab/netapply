@@ -297,7 +297,10 @@ func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*
 	return res, nil
 }
 
-func (vethPairList VethPairConfigurationList) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
+func (vethCfgsList VethPairConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+	containers := vethCfgsList.Containers
+	vethPairList := vethCfgsList.VethPairs
+
 	vethPairsToCreate := make([]VethPairConfig, 0)
 	vethPairsToDelete := make([]pkgreconcile.ResourceCanceller, 0)
 	vethPairsToCheckUpdates := make([]VethPairConfig, 0)

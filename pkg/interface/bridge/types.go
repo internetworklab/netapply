@@ -23,7 +23,10 @@ type BridgeInterfaceChangeSet struct {
 	VRFToSet           *string
 }
 
-type BridgeConfigurationList []BridgeConfig
+type BridgeConfigurationList struct {
+	Containers []string       `yaml:"containers" json:"containers"`
+	Bridges    []BridgeConfig `yaml:"bridges" json:"bridges"`
+}
 
 type BridgingConnectionConfig struct {
 	Name          string  `yaml:"name" json:"name"`

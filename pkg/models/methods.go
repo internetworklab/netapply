@@ -26,29 +26,10 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 
 	if nodeConfig.Dataplane != nil {
 		log.Println("Setting up dataplane ...")
-		if err := nodeConfig.Dataplane.Reconcile(ctx, nodeConfig.Containers); err != nil {
+		if err := nodeConfig.Dataplane.Reconcile(ctx); err != nil {
 			return fmt.Errorf("failed to reconcile dataplane: %w", err)
 		}
 
-	}
-
-	if nodeConfig.Static != nil {
-		log.Println("Setting up static (append-only) dataplane ...")
-		for _, vethpair := range nodeConfig.Static.VethPairs {
-			if err := vethpair.TrySetup(ctx); err != nil {
-				return fmt.Errorf("failed to setup veth pair %s: %w", vethpair.Name, err)
-			}
-		}
-		for _, bridge := range nodeConfig.Static.Bridges {
-			if err := bridge.TrySetup(ctx); err != nil {
-				return fmt.Errorf("failed to setup bridge %s: %w", bridge.Name, err)
-			}
-		}
-		for _, connection := range nodeConfig.Static.Connections {
-			if err := connection.TrySetup(ctx); err != nil {
-				return fmt.Errorf("failed to setup connection %s: %w", connection.Name, err)
-			}
-		}
 	}
 
 	if nodeConfig.Controlplane != nil {
@@ -64,12 +45,12 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	return nil
 }
 
-func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers []string) (*pkgreconcile.ResourceListChangeSet, error) {
+func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
 
 	var changeSet *pkgreconcile.ResourceListChangeSet
 
 	log.Println("Detecting changes for OpenVPN ...")
-	openVPNChangeSet, err := dpConfig.OpenVPN.DetectChanges(ctx, containers)
+	openVPNChangeSet, err := dpConfig.OpenVPN.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for OpenVPN: %w", err)
 	}
@@ -91,7 +72,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	}
 
 	log.Println("Detecting changes for WireGuard ...")
-	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx, containers)
+	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
 	}
@@ -102,7 +83,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	}
 
 	log.Println("Detecting changes for VXLAN ...")
-	vxlanChangeSet, err := dpConfig.VXLAN.DetectChanges(ctx, containers)
+	vxlanChangeSet, err := dpConfig.VXLAN.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for VXLAN: %w", err)
 	}
@@ -113,7 +94,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	}
 
 	log.Println("Detecting changes for VethPair ...")
-	vethPairChangeSet, err := dpConfig.VethPair.DetectChanges(ctx, containers)
+	vethPairChangeSet, err := dpConfig.VethPair.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for VethPair: %w", err)
 	}
@@ -124,7 +105,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	}
 
 	log.Println("Detecting changes for Bridge ...")
-	bridgeChangeSet, err := dpConfig.Bridge.DetectChanges(ctx, containers)
+	bridgeChangeSet, err := dpConfig.Bridge.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for Bridge: %w", err)
 	}
@@ -135,7 +116,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 	}
 
 	log.Println("Detecting changes for Dummy ...")
-	dummyChangeSet, err := dpConfig.Dummy.DetectChanges(ctx, containers)
+	dummyChangeSet, err := dpConfig.Dummy.DetectChanges(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for Dummy: %w", err)
 	}
@@ -145,15 +126,23 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context, containers [
 		changeSet = changeSet.Merge(dummyChangeSet)
 	}
 
-	// log.Println("Detecting changes for Route ...")
-	// routeChangeSet, err := dpConfig.Route.DetectChanges(ctx)
+	log.Println("Detecting changes for Route ...")
+	routeChangeSet, err := dpConfig.Route.DetectChanges(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for Route: %w", err)
+	}
+	if routeChangeSet != nil && routeChangeSet.HasChanges() {
+		log.Println("Found changes for Route dataplane config", *routeChangeSet)
+		routeChangeSet.Log()
+		changeSet = changeSet.Merge(routeChangeSet)
+	}
 
 	return changeSet, nil
 }
 
-func (dpConfig *DataplaneConfig) Reconcile(ctx context.Context, containers []string) error {
+func (dpConfig *DataplaneConfig) Reconcile(ctx context.Context) error {
 	log.Println("Detecting changes for dataplane config ...")
-	changeSet, err := dpConfig.DetectChanges(ctx, containers)
+	changeSet, err := dpConfig.DetectChanges(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to detect changes: %w", err)
 	}
@@ -171,7 +160,7 @@ func (dpConfig *DataplaneConfig) Reconcile(ctx context.Context, containers []str
 		}
 
 		log.Println("Changeset is applied to dataplane config, detecting changes again ...")
-		changeSet, err = dpConfig.DetectChanges(ctx, containers)
+		changeSet, err = dpConfig.DetectChanges(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to detect changes: %w", err)
 		}

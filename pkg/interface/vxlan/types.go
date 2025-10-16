@@ -30,4 +30,7 @@ type VXLANInterfaceChangeSet struct {
 	InterfaceName     string
 }
 
-type VXLANConfigurationList []VXLANConfig
+type VXLANConfigurationList struct {
+	Containers   []string      `yaml:"containers" json:"containers"`
+	VXLANConfigs []VXLANConfig `yaml:"vxlan_configs" json:"vxlan_configs"`
+}

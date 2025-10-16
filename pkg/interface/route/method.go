@@ -343,3 +343,12 @@ func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.Interface
 
 	return changeSet, nil
 }
+
+func (r *RouteConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+	// containers := r.Containers
+	// routeList := r.Routes
+
+	// todo: implement
+
+	return nil, nil
+}

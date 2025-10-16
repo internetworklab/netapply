@@ -20,4 +20,7 @@ type DummyInterfaceChangeSet struct {
 	VRFToSet          *string
 }
 
-type DummyConfigurationList []DummyConfig
+type DummyConfigurationList struct {
+	Containers []string      `yaml:"containers" json:"containers"`
+	Dummies    []DummyConfig `yaml:"dummies" json:"dummies"`
+}

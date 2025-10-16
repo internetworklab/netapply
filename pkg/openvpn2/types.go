@@ -258,7 +258,10 @@ type OpenVPN2Instance struct {
 	OpenStdin *bool `openvpn2:"-" yaml:"stdin_open,omitempty" json:"stdin_open,omitempty"`
 }
 
-type OpenVPN2ConfigurationList []OpenVPN2Instance
+type OpenVPN2ConfigurationList struct {
+	Containers []string           `yaml:"containers" json:"containers"`
+	Instances  []OpenVPN2Instance `yaml:"instances" json:"instances"`
+}
 
 type OpenVPN2InterfaceCanceller struct {
 	ContainerName string
