@@ -756,6 +756,7 @@ func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) 
 				SectionData: make(map[string]string),
 			}
 			currentSection = &sectionObj
+			sections = append(sections, sectionObj)
 			continue
 		}
 
@@ -788,7 +789,7 @@ func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) 
 	}
 
 	if interfaceSection == nil {
-		return nil, fmt.Errorf("no [Interface] section found, thus it's not a valid WireGuard ini config")
+		return nil, fmt.Errorf("no [Interface] section found, thus it's not a valid WireGuard ini config:\n%s\n", filecontent)
 	}
 
 	return eINIWGAdapterSecondPass(interfaceSection.SectionData, peerSectionMaps, additionals)

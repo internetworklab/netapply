@@ -58,12 +58,12 @@ type NodeConfig struct {
 const DefaultStatefulDirRel = ".go-reconciler-state"
 
 type ResourcesConfig struct {
-	VRF       pkginterfacevrf.VRFConfigurationList             `yaml:"vrf_list,omitempty" json:"vrf_list,omitempty"`
-	Route     pkginterfaceroute.RouteConfigurationList         `yaml:"route_list,omitempty" json:"route_list,omitempty"`
-	OpenVPN   pkgopenvpn2.OpenVPN2ConfigurationList            `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
-	WireGuard pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
-	VXLAN     pkginterfacevxlan.VXLANConfigurationList         `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
-	VethPair  pkginterfaceveth.VethPairConfigurationList       `yaml:"veth,omitempty" json:"veth,omitempty"`
-	Bridge    pkginterfacebridge.BridgeConfigurationList       `yaml:"bridge,omitempty" json:"bridge,omitempty"`
-	Dummy     pkginterfacedummy.DummyConfigurationList         `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+	VRF       *pkginterfacevrf.VRFConfigurationList             `yaml:"vrf_list,omitempty" json:"vrf_list,omitempty"`
+	Route     *pkginterfaceroute.RouteConfigurationList         `yaml:"route_list,omitempty" json:"route_list,omitempty"`
+	OpenVPN   *pkgopenvpn2.OpenVPN2ConfigurationList            `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
+	WireGuard *pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
+	VXLAN     *pkginterfacevxlan.VXLANConfigurationList         `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
+	VethPair  *pkginterfaceveth.VethPairConfigurationList       `yaml:"veth,omitempty" json:"veth,omitempty"`
+	Bridge    *pkginterfacebridge.BridgeConfigurationList       `yaml:"bridge,omitempty" json:"bridge,omitempty"`
+	Dummy     *pkginterfacedummy.DummyConfigurationList         `yaml:"dummy,omitempty" json:"dummy,omitempty"`
 }
