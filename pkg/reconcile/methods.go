@@ -213,6 +213,9 @@ func IndexProvisionersList(ctx context.Context, provisionersList []ResourceProvi
 }
 
 func (dpChangeSet *ResourceListChangeSet) Log() {
+	if dpChangeSet == nil {
+		return
+	}
 
 	rows := make([]table.Row, 0)
 	for _, ifaces := range dpChangeSet.AddedResources {
@@ -271,6 +274,10 @@ func (dpChangeSet *ResourceListChangeSet) Log() {
 }
 
 func DetectChangesForProvisionersList(ctx context.Context, provisionersList ResourceProvisionersList) (*ResourceListChangeSet, error) {
+	if provisionersList == nil {
+		return nil, nil
+	}
+
 	specsMap, err := IndexProvisionersList(ctx, provisionersList.GetProvisioners())
 	if err != nil {
 		return nil, fmt.Errorf("failed to index resources in spec: %w", err)
@@ -287,6 +294,9 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 	for nsKey, subMap := range currentResourcesMap {
 		for resKey, resCanceller := range subMap {
 			if _, ok := specsMap[nsKey]; !ok {
+				if changeSet.RemovedResources == nil {
+					changeSet.RemovedResources = make(map[string][]ResourceCanceller)
+				}
 				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
 					changeSet.RemovedResources[nsKey] = make([]ResourceCanceller, 0)
 				}
@@ -295,6 +305,9 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 			}
 
 			if _, ok := specsMap[nsKey][resKey]; !ok {
+				if changeSet.RemovedResources == nil {
+					changeSet.RemovedResources = make(map[string][]ResourceCanceller)
+				}
 				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
 					changeSet.RemovedResources[nsKey] = make([]ResourceCanceller, 0)
 				}
@@ -313,6 +326,9 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 	for nsKey, subMap := range specsMap {
 		for resKey, resProvisioner := range subMap {
 			if _, ok := currentResourcesMap[nsKey]; !ok {
+				if changeSet.AddedResources == nil {
+					changeSet.AddedResources = make(map[string][]ResourceProvisioner)
+				}
 				if _, hit := changeSet.AddedResources[nsKey]; !hit {
 					changeSet.AddedResources[nsKey] = make([]ResourceProvisioner, 0)
 				}
@@ -321,6 +337,9 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 			}
 
 			if _, ok := currentResourcesMap[nsKey][resKey]; !ok {
+				if changeSet.AddedResources == nil {
+					changeSet.AddedResources = make(map[string][]ResourceProvisioner)
+				}
 				if _, hit := changeSet.AddedResources[nsKey]; !hit {
 					changeSet.AddedResources[nsKey] = make([]ResourceProvisioner, 0)
 				}
@@ -352,6 +371,9 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 			}
 
 			if changes != nil && changes.HasUpdates() {
+				if changeSet.UpdatedResources == nil {
+					changeSet.UpdatedResources = make(map[string][]InterfaceChangeSet)
+				}
 				if _, hit := changeSet.UpdatedResources[nsKey]; !hit {
 					changeSet.UpdatedResources[nsKey] = make([]InterfaceChangeSet, 0)
 				}
@@ -365,6 +387,10 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 }
 
 func IndexStubNetlinkInterfaceList(ctx context.Context, interfaceList StubNetlinkInterfaceList) (map[string]map[string]ResourceCanceller, error) {
+	if interfaceList == nil {
+		return nil, nil
+	}
+
 	currentResourcesMap := make(map[string]map[string]ResourceCanceller)
 	for _, container := range interfaceList.GetContainers() {
 		nsKey := string(pkgdocker.GetContainerKey(&container))

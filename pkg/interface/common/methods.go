@@ -7,9 +7,29 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+func parseCIDR(cidr string) (net.IP, *net.IPNet, error) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err == nil {
+		return ip, ipnet, nil
+	}
+
+	ip = net.ParseIP(cidr)
+	if ip == nil {
+		return nil, nil, fmt.Errorf("failed to parse cidr: %w", err)
+	}
+	ipnet = &net.IPNet{
+		IP:   ip,
+		Mask: ip.DefaultMask(),
+	}
+	if ipnet.Mask == nil {
+		ipnet.Mask = net.CIDRMask(128, 128)
+	}
+	return ip, ipnet, nil
+}
+
 func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 	if addrConfig.Peer != nil && addrConfig.Local != nil {
-		peerIPObj, peerIPNet, err := net.ParseCIDR(*addrConfig.Peer)
+		peerIP, peerIPNet, err := parseCIDR(*addrConfig.Peer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse peer ip: %w", err)
 		}
@@ -22,7 +42,7 @@ func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 		nlAddr := new(netlink.Addr)
 		nlAddr.Peer = new(net.IPNet)
 		nlAddr.Peer = peerIPNet
-		nlAddr.Peer.IP = peerIPObj
+		nlAddr.Peer.IP = peerIP
 		nlAddr.IPNet = new(net.IPNet)
 		nlAddr.IP = localIp
 

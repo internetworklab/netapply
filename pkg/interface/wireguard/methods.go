@@ -524,7 +524,10 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 }
 
 // Scan containers specified for any reconciliation clues.
-func (wgCfgsList WireGuardConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (wgCfgsList *WireGuardConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if wgCfgsList == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, wgCfg := range wgCfgsList.WireGuardConfigs {
 		provisioners = append(provisioners, &wgCfg)
@@ -532,19 +535,28 @@ func (wgCfgsList WireGuardConfigurationList) GetProvisioners() []pkgreconcile.Re
 	return provisioners
 }
 
-func (wgCfgsList WireGuardConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (wgCfgsList *WireGuardConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if wgCfgsList == nil {
+		return nil, nil
+	}
 	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, wgCfgsList)
 }
 
-func (wgCfgsList WireGuardConfigurationList) GetContainers() []string {
+func (wgCfgsList *WireGuardConfigurationList) GetContainers() []string {
+	if wgCfgsList == nil {
+		return nil
+	}
 	return wgCfgsList.Containers
 }
 
-func (wgCfgsList WireGuardConfigurationList) GetType() string {
+func (wgCfgsList *WireGuardConfigurationList) GetType() string {
 	return new(netlink.Wireguard).Type()
 }
 
-func (wgCfgsList WireGuardConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (wgCfgsList *WireGuardConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if wgCfgsList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 

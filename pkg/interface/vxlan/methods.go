@@ -158,7 +158,10 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (vxlanCfgsList VXLANConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (vxlanCfgsList *VXLANConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if vxlanCfgsList == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vxlanCfg := range vxlanCfgsList.VXLANConfigs {
 		provisioners = append(provisioners, &vxlanCfg)
@@ -166,19 +169,28 @@ func (vxlanCfgsList VXLANConfigurationList) GetProvisioners() []pkgreconcile.Res
 	return provisioners
 }
 
-func (vxlanCfgsList VXLANConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (vxlanCfgsList *VXLANConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if vxlanCfgsList == nil {
+		return nil, nil
+	}
 	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vxlanCfgsList)
 }
 
-func (vxlanCfgsList VXLANConfigurationList) GetContainers() []string {
+func (vxlanCfgsList *VXLANConfigurationList) GetContainers() []string {
+	if vxlanCfgsList == nil {
+		return nil
+	}
 	return vxlanCfgsList.Containers
 }
 
-func (vxlanCfgsList VXLANConfigurationList) GetType() string {
+func (vxlanCfgsList *VXLANConfigurationList) GetType() string {
 	return new(netlink.Vxlan).Type()
 }
 
-func (vxlanCfgsList VXLANConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (vxlanCfgsList *VXLANConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if vxlanCfgsList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 

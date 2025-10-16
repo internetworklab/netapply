@@ -11,6 +11,7 @@ import (
 
 	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
 	pkgmodels "github.com/internetworklab/netapply/pkg/models"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"gopkg.in/yaml.v3"
 )
 
@@ -90,7 +91,15 @@ func main() {
 	}
 
 	if ContainerName != "" {
-		nodeCfgs.Resources.WireGuard.Containers = []string{ContainerName}
+		if nodeCfgs.Resources != nil {
+			if nodeCfgs.Resources.WireGuard != nil {
+				nodeCfgs.Resources.WireGuard.Containers = []string{ContainerName}
+				for i := range nodeCfgs.Resources.WireGuard.WireGuardConfigs {
+					nodeCfgs.Resources.WireGuard.WireGuardConfigs[i].ContainerName = pkgutils.StringPtr(ContainerName)
+				}
+			}
+		}
+
 	}
 
 	yaml.NewEncoder(os.Stdout).Encode(nodeCfgs)

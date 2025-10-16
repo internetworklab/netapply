@@ -148,7 +148,10 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (dummyCfgsList DummyConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if dummyCfgsList == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, dummyCfg := range dummyCfgsList.Dummies {
 		provisioners = append(provisioners, &dummyCfg)
@@ -156,19 +159,28 @@ func (dummyCfgsList DummyConfigurationList) GetProvisioners() []pkgreconcile.Res
 	return provisioners
 }
 
-func (dummyCfgsList DummyConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (dummyCfgsList *DummyConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if dummyCfgsList == nil {
+		return nil, nil
+	}
 	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, dummyCfgsList)
 }
 
-func (dummyCfgsList DummyConfigurationList) GetContainers() []string {
+func (dummyCfgsList *DummyConfigurationList) GetContainers() []string {
+	if dummyCfgsList == nil {
+		return nil
+	}
 	return dummyCfgsList.Containers
 }
 
-func (dummyCfgsList DummyConfigurationList) GetType() string {
+func (dummyCfgsList *DummyConfigurationList) GetType() string {
 	return new(netlink.Dummy).Type()
 }
 
-func (dummyCfgsList DummyConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (dummyCfgsList *DummyConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if dummyCfgsList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 

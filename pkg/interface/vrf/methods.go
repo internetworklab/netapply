@@ -200,7 +200,10 @@ func (vrfConfig *VRFConfig) DetectChanges(ctx context.Context) (pkgreconcile.Int
 	return changeSet, nil
 }
 
-func (vrfList VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (vrfList *VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if vrfList == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vrfCfg := range vrfList.VRFs {
 		provisioners = append(provisioners, &vrfCfg)
@@ -208,15 +211,21 @@ func (vrfList VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourcePro
 	return provisioners
 }
 
-func (vrfList VRFConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (vrfList *VRFConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if vrfList == nil {
+		return nil, nil
+	}
 	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vrfList)
 }
 
-func (vrfList VRFConfigurationList) GetContainers() []string {
+func (vrfList *VRFConfigurationList) GetContainers() []string {
+	if vrfList == nil {
+		return nil
+	}
 	return vrfList.Containers
 }
 
-func (vrfList VRFConfigurationList) GetType() string {
+func (vrfList *VRFConfigurationList) GetType() string {
 	return new(netlink.Vrf).Type()
 }
 
@@ -224,6 +233,9 @@ func (vrfChangeSet *VRFChangeSet) GetType() string {
 	return new(netlink.Vrf).Type()
 }
 
-func (vrfList VRFConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (vrfList *VRFConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if vrfList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }

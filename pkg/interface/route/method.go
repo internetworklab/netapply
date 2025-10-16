@@ -387,7 +387,10 @@ func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.Interface
 	return changeSet, nil
 }
 
-func (r RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (r *RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if r == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
@@ -422,7 +425,10 @@ func (r *RouteResourceCanceller) GetType() string {
 	return ResourceTypeRoute
 }
 
-func (r RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (r *RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if r == nil {
+		return nil, nil
+	}
 	currentResourcesMap := make(map[string]map[string]pkgreconcile.ResourceCanceller)
 	for _, container := range r.Containers {
 		err := pkgdocker.WithNsHandleSafe(ctx, &container, func(handle *netlink.Handle) error {
@@ -455,7 +461,10 @@ func (r RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[
 	return currentResourcesMap, nil
 }
 
-func (r RouteConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (r *RouteConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if r == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, routeCfg := range r.Routes {
 		provisioners = append(provisioners, &routeCfg)
@@ -467,6 +476,6 @@ func (r *RouteObjectChangeSet) GetType() string {
 	return ResourceTypeRoute
 }
 
-func (r RouteConfigurationList) GetType() string {
+func (r *RouteConfigurationList) GetType() string {
 	return ResourceTypeRoute
 }

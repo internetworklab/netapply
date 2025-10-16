@@ -45,24 +45,28 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	return nil
 }
 
+func appendNoNil(targets []pkgreconcile.ResourceProvisionersList, target pkgreconcile.ResourceProvisionersList) []pkgreconcile.ResourceProvisionersList {
+	if target == nil {
+		return targets
+	}
+	return append(targets, target)
+}
+
 func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
 
 	var changeSet *pkgreconcile.ResourceListChangeSet
 
 	reconcileTargets := make([]pkgreconcile.ResourceProvisionersList, 0)
-	reconcileTargets = append(reconcileTargets, dpConfig.OpenVPN)
-	reconcileTargets = append(reconcileTargets, dpConfig.VRF)
-	reconcileTargets = append(reconcileTargets, dpConfig.WireGuard)
-	reconcileTargets = append(reconcileTargets, dpConfig.VXLAN)
-	reconcileTargets = append(reconcileTargets, dpConfig.VethPair)
-	reconcileTargets = append(reconcileTargets, dpConfig.Bridge)
-	reconcileTargets = append(reconcileTargets, dpConfig.Dummy)
-	reconcileTargets = append(reconcileTargets, dpConfig.Route)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.OpenVPN)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VRF)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.WireGuard)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VXLAN)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VethPair)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.Bridge)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.Dummy)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.Route)
 
 	for _, reconcileTarget := range reconcileTargets {
-		if reconcileTarget == nil {
-			continue
-		}
 		log.Println("Detecting changes for", reconcileTarget.GetType(), "...")
 		subChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, reconcileTarget)
 		if err != nil {

@@ -241,11 +241,15 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (bridgeCfgsList BridgeConfigurationList) GetType() string {
+func (bridgeCfgsList *BridgeConfigurationList) GetType() string {
 	return new(netlink.Bridge).Type()
 }
 
-func (bridgeCfgsList BridgeConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if bridgeCfgsList == nil {
+		return nil
+	}
+
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, bridgeCfg := range bridgeCfgsList.Bridges {
 		provisioners = append(provisioners, &bridgeCfg)
@@ -253,15 +257,24 @@ func (bridgeCfgsList BridgeConfigurationList) GetProvisioners() []pkgreconcile.R
 	return provisioners
 }
 
-func (bridgeCfgsList BridgeConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (bridgeCfgsList *BridgeConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if bridgeCfgsList == nil {
+		return nil, nil
+	}
 	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, bridgeCfgsList)
 }
 
-func (bridgeCfgsList BridgeConfigurationList) GetContainers() []string {
+func (bridgeCfgsList *BridgeConfigurationList) GetContainers() []string {
+	if bridgeCfgsList == nil {
+		return nil
+	}
 	return bridgeCfgsList.Containers
 }
 
-func (bridgeCfgsList BridgeConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (bridgeCfgsList *BridgeConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if bridgeCfgsList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
@@ -289,28 +302,6 @@ func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {
 		}
 
 		return nil
-	})
-}
-
-func (bridgingConnectionConfig *BridgingConnectionConfig) TrySetup(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, bridgingConnectionConfig.ContainerName, func(handle *netlink.Handle) error {
-		vethLink, err := handle.LinkByName(bridgingConnectionConfig.VethName)
-		if err != nil {
-			if _, ok := err.(netlink.LinkNotFoundError); !ok {
-				return fmt.Errorf("failed to get veth link: %w", err)
-			}
-			return fmt.Errorf("veth link %s not found", bridgingConnectionConfig.VethName)
-		}
-
-		bridgeLink, err := handle.LinkByName(bridgingConnectionConfig.BridgeName)
-		if err != nil {
-			if _, ok := err.(netlink.LinkNotFoundError); !ok {
-				return fmt.Errorf("failed to get bridge link: %w", err)
-			}
-			return fmt.Errorf("bridge link %s not found", bridgingConnectionConfig.BridgeName)
-		}
-
-		return handle.LinkSetMaster(vethLink, bridgeLink)
 	})
 }
 

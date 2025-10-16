@@ -342,7 +342,10 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 	return rewrapOpenVPN2InstanceCancellers(ctx, result), nil
 }
 
-func (ovpCfgsList OpenVPN2ConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (ovpCfgsList *OpenVPN2ConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if ovpCfgsList == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, ovpCfg := range ovpCfgsList.Instances {
 		provisioners = append(provisioners, &ovpCfg)
@@ -383,7 +386,10 @@ func rewrapOpenVPN2InstanceCancellers(ctx context.Context, cancellersMap map[str
 	return rewrappedCancellersMap
 }
 
-func (ovpCfgsList OpenVPN2ConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (ovpCfgsList *OpenVPN2ConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if ovpCfgsList == nil {
+		return nil, nil
+	}
 	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get service name from context: %w", err)
@@ -397,15 +403,21 @@ func (ovpCfgsList OpenVPN2ConfigurationList) IndexCurrentResources(ctx context.C
 	return cancellersMap, nil
 }
 
-func (ovpCfgsList OpenVPN2ConfigurationList) GetContainers() []string {
+func (ovpCfgsList *OpenVPN2ConfigurationList) GetContainers() []string {
+	if ovpCfgsList == nil {
+		return nil
+	}
 	return ovpCfgsList.Containers
 }
 
-func (ovpCfgsList OpenVPN2ConfigurationList) GetType() string {
+func (ovpCfgsList *OpenVPN2ConfigurationList) GetType() string {
 	return new(netlink.Tuntap).Type()
 }
 
-func (ovpCfgsList OpenVPN2ConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (ovpCfgsList *OpenVPN2ConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if ovpCfgsList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 

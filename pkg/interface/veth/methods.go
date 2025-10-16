@@ -296,11 +296,14 @@ func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*
 	return res, nil
 }
 
-func (vethCfgsList VethPairConfigurationList) GetType() string {
+func (vethCfgsList *VethPairConfigurationList) GetType() string {
 	return new(netlink.Veth).Type()
 }
 
-func (vethCfgsList VethPairConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (vethCfgsList *VethPairConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	if vethCfgsList == nil {
+		return nil
+	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vethCfg := range vethCfgsList.VethPairs {
 		provisioners = append(provisioners, &vethCfg)
@@ -308,15 +311,24 @@ func (vethCfgsList VethPairConfigurationList) GetProvisioners() []pkgreconcile.R
 	return provisioners
 }
 
-func (vethCfgsList VethPairConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (vethCfgsList *VethPairConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	if vethCfgsList == nil {
+		return nil, nil
+	}
 	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vethCfgsList)
 }
 
-func (vethCfgsList VethPairConfigurationList) GetContainers() []string {
+func (vethCfgsList *VethPairConfigurationList) GetContainers() []string {
+	if vethCfgsList == nil {
+		return nil
+	}
 	return vethCfgsList.Containers
 }
 
-func (vethCfgsList VethPairConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+func (vethCfgsList *VethPairConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	if vethCfgsList == nil {
+		return false, nil
+	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
