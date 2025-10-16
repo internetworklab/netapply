@@ -309,7 +309,14 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 	result := make(map[string]map[string]pkgreconcile.ResourceCanceller)
 	for _, cont := range conts {
 		contName := pkgutils.NormalizeContainerName(cont.Names[0])
+
+		if !pkgdocker.IsRegularContainerName(contName) {
+			// This would be very likely to be the host netns, skip it
+			continue
+		}
+
 		if _, ok := scanContNameSet[contName]; !ok {
+			// This doesn't seems like any one of the containers we're interested in, skip it
 			continue
 		}
 
@@ -320,7 +327,19 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 		result[contName] = ifaceMap
 	}
 
-	return result, nil
+	// here's how to rewrap:
+	// 1. If the netns is host, the canceller simply does nothing,
+	//    it won't ever try do delete anything in the host netns,
+	//    because all the openvpn instances are supposed to be provisioned
+	//    in the container's form but never in host netns, so, if there's
+	//    anything in the host netns that looks like an openvpn tuntap interface,
+	//    it's definitely not created by us.
+	//    (of course, this is guaranteed because we already skipped the host netns, see Line 313)
+	//
+	// 2. All openvpn2-related containers are deleted in its entirety,
+	//    when the canceller performs its cancellation job, the entire container
+	//    will be deleted along with all its interfaces all at once.
+	return rewrapOpenVPN2InstanceCancellers(ctx, result), nil
 }
 
 func (ovpCfgsList OpenVPN2ConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
@@ -331,9 +350,51 @@ func (ovpCfgsList OpenVPN2ConfigurationList) GetProvisioners() []pkgreconcile.Re
 	return provisioners
 }
 
+// Wrap all cancellers in one netns into a single canceller that cancels the entire container (hence all interfaces in it are also cancelled alongside)
+func rewrapOpenVPN2InstanceCancellers(ctx context.Context, cancellersMap map[string]map[string]pkgreconcile.ResourceCanceller) map[string]map[string]pkgreconcile.ResourceCanceller {
+	rewrappedCancellersMap := make(map[string]map[string]pkgreconcile.ResourceCanceller)
+	for nsKey, ifaceMap := range cancellersMap {
+		if len(ifaceMap) == 0 {
+			continue
+		}
+		for _, canceller := range ifaceMap {
+			containerName := canceller.GetContainerName()
+			if containerName == nil {
+				continue
+			}
+			if !pkgdocker.IsRegularContainerName(*containerName) {
+				// like said, we try best not to delete anything in the host netns.
+				continue
+			}
+			interfaceName := canceller.GetInterfaceName()
+			ovp2Canceller := &OpenVPN2InterfaceCanceller{
+				ContainerName: *containerName,
+				InterfaceName: interfaceName,
+			}
+			if _, ok := rewrappedCancellersMap[nsKey]; !ok {
+				rewrappedCancellersMap[nsKey] = make(map[string]pkgreconcile.ResourceCanceller)
+			}
+			rewrappedCancellersMap[nsKey][interfaceName] = ovp2Canceller
+
+			// one canceller per one container(netns), so, no more loops needed
+			break
+		}
+	}
+	return rewrappedCancellersMap
+}
+
 func (ovpCfgsList OpenVPN2ConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	// todo
-	return nil, nil
+	servicename, err := pkgutils.ServiceNameFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get service name from context: %w", err)
+	}
+
+	cancellersMap, err := getContainerAndIfaces(ctx, servicename, ovpCfgsList.Containers)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container and interfaces: %w", err)
+	}
+
+	return cancellersMap, nil
 }
 
 func (ovpCfgsList OpenVPN2ConfigurationList) GetContainers() []string {
@@ -358,4 +419,8 @@ func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetContainerName() *str
 
 func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetInterfaceName() string {
 	return ovpInterfaceCanceller.InterfaceName
+}
+
+func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetType() string {
+	return new(netlink.Tuntap).Type()
 }

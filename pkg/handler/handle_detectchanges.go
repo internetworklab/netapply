@@ -48,8 +48,8 @@ func HandleDetectChanges(ctx context.Context, w http.ResponseWriter, r *http.Req
 
 	result := new(ChangeSetSummary)
 
-	if nodeConfig.Dataplane != nil {
-		changeSet, err := nodeConfig.Dataplane.DetectChanges(ctx)
+	if nodeConfig.Resources != nil {
+		changeSet, err := nodeConfig.Resources.DetectChanges(ctx)
 		if err != nil {
 			RespondWithError(w, err, http.StatusInternalServerError)
 			return

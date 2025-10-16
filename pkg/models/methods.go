@@ -24,9 +24,9 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 		}
 	}
 
-	if nodeConfig.Dataplane != nil {
+	if nodeConfig.Resources != nil {
 		log.Println("Setting up dataplane ...")
-		if err := nodeConfig.Dataplane.Reconcile(ctx); err != nil {
+		if err := nodeConfig.Resources.Reconcile(ctx); err != nil {
 			return fmt.Errorf("failed to reconcile dataplane: %w", err)
 		}
 
@@ -45,7 +45,7 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
 	return nil
 }
 
-func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
 
 	var changeSet *pkgreconcile.ResourceListChangeSet
 
@@ -74,7 +74,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	return changeSet, nil
 }
 
-func (dpConfig *DataplaneConfig) Reconcile(ctx context.Context) error {
+func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context) error {
 	log.Println("Detecting changes for dataplane config ...")
 	changeSet, err := dpConfig.DetectChanges(ctx)
 	if err != nil {

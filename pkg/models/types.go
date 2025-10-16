@@ -39,40 +39,16 @@ type ControlplaneConfig struct {
 	RouteMap []pkgprotocolbgp.RouteMapConfig  `yaml:"route_maps,omitempty" json:"route_maps,omitempty"`
 }
 
-type StaticConfig struct {
-
-	// Todo: implement
-	VRFs pkginterfacevrf.VRFConfigurationList `yaml:"vrf,omitempty" json:"vrf,omitempty"`
-
-	// Todo: implement
-	Routes pkginterfaceroute.RouteConfigurationList `yaml:"route,omitempty" json:"route,omitempty"`
-
-	// Todo: implement
-	WireGuards pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
-
-	// Todo: implement
-	VXLANs pkginterfacevxlan.VXLANConfigurationList `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
-
-	// Todo: implement
-	VethPairs pkginterfaceveth.VethPairConfigurationList `yaml:"veth,omitempty" json:"veth,omitempty"`
-
-	// Todo: implement
-	Bridges pkginterfacebridge.BridgeConfigurationList `yaml:"bridge,omitempty" json:"bridge,omitempty"`
-
-	// Todo: implement
-	Dummys pkginterfacedummy.DummyConfigurationList `yaml:"dummy,omitempty" json:"dummy,omitempty"`
-
-	// A BridgingConnection simply trys to enslave a veth interface to a bridge interface and no more than that.
-	// E.g. we want to connect one end of a veth pair to a bridge interface which is not controlled by netapply.
-	Connections []pkginterfacebridge.BridgingConnectionConfig `yaml:"connections,omitempty" json:"connections,omitempty"`
-}
-
 type NodeConfig struct {
 	FRRContainers []pkgfrrcontainer.FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
 
 	// Currently, the implementation of the controlplane are largely outsourced to (maybe containerized) FRR instance.
 	Controlplane []ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
-	Dataplane    *DataplaneConfig     `yaml:"dataplane,omitempty" json:"dataplane,omitempty"`
+
+	// Resources field are use to define resource-like objects,
+	// which means it can be created, updated, and deleted and the controller knows how to detect its existence as well as its changes (aka reconciliation)
+	// To say, resource-like objects are simply those reconcile-able.
+	Resources *ResourcesConfig `yaml:"resources,omitempty" json:"resources,omitempty"`
 
 	// By default, it would use $CWD/.go-reconciler-state as the stateful directory.
 	// There is a GetStatefulDir method in pkgutils model for it.
@@ -81,7 +57,7 @@ type NodeConfig struct {
 
 const DefaultStatefulDirRel = ".go-reconciler-state"
 
-type DataplaneConfig struct {
+type ResourcesConfig struct {
 	VRF       pkginterfacevrf.VRFConfigurationList             `yaml:"vrf_list,omitempty" json:"vrf_list,omitempty"`
 	Route     pkginterfaceroute.RouteConfigurationList         `yaml:"route_list,omitempty" json:"route_list,omitempty"`
 	OpenVPN   pkgopenvpn2.OpenVPN2ConfigurationList            `yaml:"openvpn,omitempty" json:"openvpn,omitempty"`
