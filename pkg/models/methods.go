@@ -60,6 +60,9 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	reconcileTargets = append(reconcileTargets, dpConfig.Route)
 
 	for _, reconcileTarget := range reconcileTargets {
+		if reconcileTarget == nil {
+			continue
+		}
 		log.Println("Detecting changes for", reconcileTarget.GetType(), "...")
 		subChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, reconcileTarget)
 		if err != nil {
