@@ -35,6 +35,7 @@ type ResourceProvisioner interface {
 }
 
 type ResourceProvisionersList interface {
+	GetType() string
 	GetProvisioners() []ResourceProvisioner
 	IndexCurrentResources(ctx context.Context) (map[string]map[string]ResourceCanceller, error)
 	CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]ResourceProvisioner, resource ResourceCanceller) (bool, error)
@@ -61,3 +62,8 @@ type ResourceListChangeSet struct {
 type CurrentIfaceIndex = map[string]map[string]ResourceCanceller
 
 type SpecIfaceIndex = map[string]map[string]ResourceProvisioner
+
+type StubNetlinkInterfaceList interface {
+	GetType() string
+	GetContainers() []string
+}

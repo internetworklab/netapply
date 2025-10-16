@@ -3,7 +3,6 @@ package veth
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
@@ -297,112 +296,28 @@ func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*
 	return res, nil
 }
 
-func (vethCfgsList VethPairConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	containers := vethCfgsList.Containers
-	vethPairList := vethCfgsList.VethPairs
+func (vethCfgsList VethPairConfigurationList) GetType() string {
+	return new(netlink.Veth).Type()
+}
 
-	vethPairsToCreate := make([]VethPairConfig, 0)
-	vethPairsToDelete := make([]pkgreconcile.ResourceCanceller, 0)
-	vethPairsToCheckUpdates := make([]VethPairConfig, 0)
-	vethPairsUpdated := make([]pkgreconcile.InterfaceChangeSet, 0)
-
-	vethSpecMap := make(map[string]map[string]interface{})
-
-	for _, vethPairSpec := range vethPairList {
-		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		if _, ok := vethSpecMap[nsKey]; !ok {
-			vethSpecMap[nsKey] = make(map[string]interface{})
-		}
-		vethSpecMap[nsKey][vethPairSpec.GetInterfaceName()] = true
-		secondaryNsKey := string(pkgdocker.GetContainerKey(vethPairSpec.Peer.GetContainerName()))
-		if _, ok := vethSpecMap[secondaryNsKey]; !ok {
-			vethSpecMap[secondaryNsKey] = make(map[string]interface{})
-		}
-		vethSpecMap[secondaryNsKey][vethPairSpec.Peer.GetInterfaceName()] = true
-
-		placementStatus, err := vethPairSpec.GetPlacementStatus(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get placement status for veth pair %s: %w", vethPairSpec.Name, err)
-		}
-
-		if placementStatus.FoundInPrimaryNetns && placementStatus.FoundInSecondaryNetns {
-			vethPairsToCheckUpdates = append(vethPairsToCheckUpdates, vethPairSpec)
-		} else if !placementStatus.FoundInPrimaryNetns && !placementStatus.FoundInSecondaryNetns {
-			vethPairsToCreate = append(vethPairsToCreate, vethPairSpec)
-		} else if placementStatus.FoundInPrimaryNetns && !placementStatus.FoundInSecondaryNetns {
-			vethPairsToDelete = append(vethPairsToDelete, &pkginterfacestub.StubInterfaceCanceller{ContainerName: vethPairSpec.GetContainerName(), InterfaceName: vethPairSpec.GetInterfaceName()})
-			vethPairsToCreate = append(vethPairsToCreate, vethPairSpec)
-		} else if !placementStatus.FoundInPrimaryNetns && placementStatus.FoundInSecondaryNetns {
-			vethPairsToDelete = append(vethPairsToDelete, &pkginterfacestub.StubInterfaceCanceller{ContainerName: vethPairSpec.Peer.GetContainerName(), InterfaceName: vethPairSpec.Peer.GetInterfaceName()})
-			vethPairsToCreate = append(vethPairsToCreate, vethPairSpec)
-		} else {
-			continue
-		}
+func (vethCfgsList VethPairConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	for _, vethCfg := range vethCfgsList.VethPairs {
+		provisioners = append(provisioners, &vethCfg)
 	}
+	return provisioners
+}
 
-	for _, vethPairSpec := range vethPairsToCheckUpdates {
-		changes, err := vethPairSpec.DetectChanges(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect changes for veth pair %s: %w", vethPairSpec.Name, err)
-		}
-		if changes != nil && changes.HasUpdates() {
-			vethPairsUpdated = append(vethPairsUpdated, changes)
-		}
-	}
+func (vethCfgsList VethPairConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vethCfgsList)
+}
 
-	vethTy := new(netlink.Veth).Type()
-	for _, cont := range containers {
-		err := pkgdocker.WithNsHandleSafe(ctx, &cont, func(handle *netlink.Handle) error {
-			links, err := handle.LinkList()
-			if err != nil {
-				return fmt.Errorf("failed to list links: %w", err)
-			}
+func (vethCfgsList VethPairConfigurationList) GetContainers() []string {
+	return vethCfgsList.Containers
+}
 
-			for _, link := range links {
-				if strings.HasPrefix(link.Attrs().Name, "eth") || strings.HasPrefix(link.Attrs().Name, "lo") {
-					continue
-				}
-
-				if link.Type() != vethTy {
-					continue
-				}
-
-				if ifmap, ok := vethSpecMap[cont]; ok {
-					if _, ok := ifmap[link.Attrs().Name]; ok {
-						continue
-					}
-				}
-				vethPairsToDelete = append(vethPairsToDelete, &pkginterfacestub.StubInterfaceCanceller{ContainerName: &cont, InterfaceName: link.Attrs().Name})
-			}
-
-			return nil
-		})
-		if err != nil {
-			return nil, fmt.Errorf("failed to list links for container %s: %w", cont, err)
-		}
-	}
-
-	changeSet := new(pkgreconcile.ResourceListChangeSet)
-	changeSet.AddedResources = make(map[string][]pkgreconcile.ResourceProvisioner)
-	changeSet.UpdatedResources = make(map[string][]pkgreconcile.InterfaceChangeSet)
-	changeSet.RemovedResources = make(map[string][]pkgreconcile.ResourceCanceller)
-
-	for _, vethPairSpec := range vethPairsToCreate {
-		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], &vethPairSpec)
-	}
-
-	for _, vethPairSpec := range vethPairsToDelete {
-		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], vethPairSpec)
-	}
-
-	for _, vethPairSpec := range vethPairsUpdated {
-		nsKey := string(pkgdocker.GetContainerKey(vethPairSpec.GetContainerName()))
-		changeSet.UpdatedResources[nsKey] = append(changeSet.UpdatedResources[nsKey], vethPairSpec)
-	}
-
-	return changeSet, nil
+func (vethCfgsList VethPairConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (vethPairSpec *VethPairConfig) TrySetup(ctx context.Context) error {

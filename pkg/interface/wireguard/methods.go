@@ -509,14 +509,28 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 }
 
 // Scan containers specified for any reconciliation clues.
-func (wgCfgsList WireGuardConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-
-	wgty := new(netlink.Wireguard).Type()
-	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, wg := range wgCfgsList.WireGuardConfigs {
-		provisionerList = append(provisionerList, &wg)
+func (wgCfgsList WireGuardConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	for _, wgCfg := range wgCfgsList.WireGuardConfigs {
+		provisioners = append(provisioners, &wgCfg)
 	}
-	return pkgreconcile.DetectChanges(ctx, provisionerList, wgty, wgCfgsList.Containers)
+	return provisioners
+}
+
+func (wgCfgsList WireGuardConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, wgCfgsList)
+}
+
+func (wgCfgsList WireGuardConfigurationList) GetContainers() []string {
+	return wgCfgsList.Containers
+}
+
+func (wgCfgsList WireGuardConfigurationList) GetType() string {
+	return new(netlink.Wireguard).Type()
+}
+
+func (wgCfgsList WireGuardConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetType() string {

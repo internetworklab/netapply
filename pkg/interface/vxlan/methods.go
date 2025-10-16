@@ -158,13 +158,28 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (vxlanCfgsList VXLANConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	vxlanty := new(netlink.Vxlan).Type()
-	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, vxlan := range vxlanCfgsList.VXLANConfigs {
-		provisionerList = append(provisionerList, &vxlan)
+func (vxlanCfgsList VXLANConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	for _, vxlanCfg := range vxlanCfgsList.VXLANConfigs {
+		provisioners = append(provisioners, &vxlanCfg)
 	}
-	return pkgreconcile.DetectChanges(ctx, provisionerList, vxlanty, vxlanCfgsList.Containers)
+	return provisioners
+}
+
+func (vxlanCfgsList VXLANConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vxlanCfgsList)
+}
+
+func (vxlanCfgsList VXLANConfigurationList) GetContainers() []string {
+	return vxlanCfgsList.Containers
+}
+
+func (vxlanCfgsList VXLANConfigurationList) GetType() string {
+	return new(netlink.Vxlan).Type()
+}
+
+func (vxlanCfgsList VXLANConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (vxlanConfig *VXLANConfig) GetType() string {

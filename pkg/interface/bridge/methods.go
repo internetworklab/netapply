@@ -241,16 +241,28 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (bridgeCfgsList BridgeConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	containers := bridgeCfgsList.Containers
-	bridgeList := bridgeCfgsList.Bridges
+func (bridgeCfgsList BridgeConfigurationList) GetType() string {
+	return new(netlink.Bridge).Type()
+}
 
-	bridgeTy := new(netlink.Bridge).Type()
-	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, bridge := range bridgeList {
-		provisionerList = append(provisionerList, &bridge)
+func (bridgeCfgsList BridgeConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	for _, bridgeCfg := range bridgeCfgsList.Bridges {
+		provisioners = append(provisioners, &bridgeCfg)
 	}
-	return pkgreconcile.DetectChanges(ctx, provisionerList, bridgeTy, containers)
+	return provisioners
+}
+
+func (bridgeCfgsList BridgeConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, bridgeCfgsList)
+}
+
+func (bridgeCfgsList BridgeConfigurationList) GetContainers() []string {
+	return bridgeCfgsList.Containers
+}
+
+func (bridgeCfgsList BridgeConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {

@@ -49,84 +49,26 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 
 	var changeSet *pkgreconcile.ResourceListChangeSet
 
-	log.Println("Detecting changes for OpenVPN ...")
-	openVPNChangeSet, err := dpConfig.OpenVPN.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for OpenVPN: %w", err)
-	}
-	if openVPNChangeSet != nil && openVPNChangeSet.HasChanges() {
-		log.Println("Found changes for OpenVPN dataplane config", *openVPNChangeSet)
-		changeSet = changeSet.Merge(openVPNChangeSet)
-	}
+	reconcileTargets := make([]pkgreconcile.ResourceProvisionersList, 0)
+	reconcileTargets = append(reconcileTargets, dpConfig.OpenVPN)
+	reconcileTargets = append(reconcileTargets, dpConfig.VRF)
+	reconcileTargets = append(reconcileTargets, dpConfig.WireGuard)
+	reconcileTargets = append(reconcileTargets, dpConfig.VXLAN)
+	reconcileTargets = append(reconcileTargets, dpConfig.VethPair)
+	reconcileTargets = append(reconcileTargets, dpConfig.Bridge)
+	reconcileTargets = append(reconcileTargets, dpConfig.Dummy)
+	reconcileTargets = append(reconcileTargets, dpConfig.Route)
 
-	log.Println("Detecting changes for VRF ...")
-	vrfChangeSet, err := dpConfig.VRF.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for VRF: %w", err)
-	}
-	if vrfChangeSet != nil && vrfChangeSet.HasChanges() {
-		log.Println("Found changes for VRF dataplane config", *vrfChangeSet)
-		changeSet = changeSet.Merge(vrfChangeSet)
-	}
-
-	log.Println("Detecting changes for WireGuard ...")
-	wireGuardChangeSet, err := dpConfig.WireGuard.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for WireGuard: %w", err)
-	}
-	if wireGuardChangeSet != nil && wireGuardChangeSet.HasChanges() {
-		log.Println("Found changes for WireGuard dataplane config", *wireGuardChangeSet)
-		changeSet = changeSet.Merge(wireGuardChangeSet)
-	}
-
-	log.Println("Detecting changes for VXLAN ...")
-	vxlanChangeSet, err := dpConfig.VXLAN.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for VXLAN: %w", err)
-	}
-	if vxlanChangeSet != nil && vxlanChangeSet.HasChanges() {
-		log.Printf("Found changes for VXLAN dataplane config: %v\n", *vxlanChangeSet)
-		changeSet = changeSet.Merge(vxlanChangeSet)
-	}
-
-	log.Println("Detecting changes for VethPair ...")
-	vethPairChangeSet, err := dpConfig.VethPair.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for VethPair: %w", err)
-	}
-	if vethPairChangeSet != nil && vethPairChangeSet.HasChanges() {
-		log.Println("Found changes for VethPair dataplane config", *vethPairChangeSet)
-		changeSet = changeSet.Merge(vethPairChangeSet)
-	}
-
-	log.Println("Detecting changes for Bridge ...")
-	bridgeChangeSet, err := dpConfig.Bridge.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for Bridge: %w", err)
-	}
-	if bridgeChangeSet != nil && bridgeChangeSet.HasChanges() {
-		log.Println("Found changes for Bridge dataplane config", *bridgeChangeSet)
-		changeSet = changeSet.Merge(bridgeChangeSet)
-	}
-
-	log.Println("Detecting changes for Dummy ...")
-	dummyChangeSet, err := dpConfig.Dummy.DetectChanges(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for Dummy: %w", err)
-	}
-	if dummyChangeSet != nil && dummyChangeSet.HasChanges() {
-		log.Println("Found changes for Dummy dataplane config", *dummyChangeSet)
-		changeSet = changeSet.Merge(dummyChangeSet)
-	}
-
-	log.Println("Detecting changes for Route ...")
-	routeChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, dpConfig.Route)
-	if err != nil {
-		return nil, fmt.Errorf("failed to detect changes for Route: %w", err)
-	}
-	if routeChangeSet != nil && routeChangeSet.HasChanges() {
-		log.Println("Found changes for Route dataplane config", *routeChangeSet)
-		changeSet = changeSet.Merge(routeChangeSet)
+	for _, reconcileTarget := range reconcileTargets {
+		log.Println("Detecting changes for", reconcileTarget.GetType(), "...")
+		subChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, reconcileTarget)
+		if err != nil {
+			return nil, fmt.Errorf("failed to detect changes for %s: %w", reconcileTarget.GetType(), err)
+		}
+		if subChangeSet != nil && subChangeSet.HasChanges() {
+			log.Println("Found changes for", reconcileTarget.GetType(), "dataplane config", *subChangeSet)
+			changeSet = changeSet.Merge(subChangeSet)
+		}
 	}
 
 	if changeSet != nil && changeSet.HasChanges() {

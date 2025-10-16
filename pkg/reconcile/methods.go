@@ -9,7 +9,6 @@ import (
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
-	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/vishvananda/netlink"
@@ -171,7 +170,7 @@ func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	res := new(result)
 	res.ifaces = make(map[string]ResourceCanceller, 0)
 
-	err := pkgdocker.WithNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
+	err := pkgdocker.WithNsHandleSafe(ctx, containerName, func(handle *netlink.Handle) error {
 		links, err := handle.LinkList()
 		if err != nil {
 			return fmt.Errorf("failed to list links: %w", err)
@@ -201,27 +200,6 @@ func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 	return res.ifaces, nil
 }
 
-func indexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType string, includeHostNetns bool) (CurrentIfaceIndex, error) {
-	currentInterfaceListMap := make(map[string]map[string]ResourceCanceller)
-	for _, name := range containers {
-		ifaces, err := GetInterfaceFromContainer(ctx, &name, netlinkIfType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get interface from container: %w", err)
-		}
-		currentInterfaceListMap[name] = ifaces
-	}
-
-	if includeHostNetns {
-		hostInterfaceList, err := GetInterfaceFromContainer(ctx, nil, netlinkIfType)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get interface from host: %w", err)
-		}
-		currentInterfaceListMap[string(pkgdocker.ContainerKeyHost)] = hostInterfaceList
-	}
-
-	return currentInterfaceListMap, nil
-}
-
 func IndexProvisionersList(ctx context.Context, provisionersList []ResourceProvisioner) (map[string]map[string]ResourceProvisioner, error) {
 	specsMap := make(map[string]map[string]ResourceProvisioner)
 	for _, provisioner := range provisionersList {
@@ -232,143 +210,6 @@ func IndexProvisionersList(ctx context.Context, provisionersList []ResourceProvi
 		specsMap[nsKey][provisioner.GetInterfaceName()] = provisioner
 	}
 	return specsMap, nil
-}
-
-func detectChangesInContainer(
-	ctx context.Context,
-	provisionerList map[string]ResourceProvisioner,
-	currentInterfacesInContainer map[string]ResourceCanceller,
-	container string,
-) (*ResourceListChangeSet, error) {
-
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
-	}
-	if pkgdocker.IsRegularContainerName(container) {
-		if contSummary, err := pkgdocker.FindContainer(ctx, cli, container); err != nil || contSummary == nil {
-			return nil, nil
-		}
-	}
-
-	addedSet := make(map[string]ResourceProvisioner)
-	removedSet := make(map[string]ResourceCanceller)
-	commonSet := make(map[string]ResourceProvisioner)
-	updatedSet := make(map[string]InterfaceChangeSet)
-
-	for _, provisioner := range provisionerList {
-		if _, ok := currentInterfacesInContainer[provisioner.GetInterfaceName()]; !ok {
-			addedSet[provisioner.GetInterfaceName()] = provisioner
-		}
-	}
-
-	for _, currentInterface := range currentInterfacesInContainer {
-		if p, ok := provisionerList[currentInterface.GetInterfaceName()]; ok {
-			commonSet[currentInterface.GetInterfaceName()] = p
-		} else {
-			removedSet[currentInterface.GetInterfaceName()] = currentInterface
-		}
-	}
-
-	for ifaceName, provisioner := range commonSet {
-		changes, err := provisioner.DetectChanges(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect changes in container %s for interface %s: %w", container, ifaceName, err)
-		}
-		if changes != nil && changes.HasUpdates() {
-			updatedSet[ifaceName] = changes
-		}
-	}
-
-	addedList := make([]ResourceProvisioner, 0)
-	removedList := make([]ResourceCanceller, 0)
-	updatedList := make([]InterfaceChangeSet, 0)
-
-	for _, provisioner := range addedSet {
-		addedList = append(addedList, provisioner)
-	}
-	for _, currentInterface := range removedSet {
-		removedList = append(removedList, currentInterface)
-	}
-	for _, changeset := range updatedSet {
-		updatedList = append(updatedList, changeset)
-	}
-
-	changeSet := new(ResourceListChangeSet)
-	changeSet.AddedResources = make(map[string][]ResourceProvisioner)
-	changeSet.AddedResources[container] = addedList
-
-	changeSet.RemovedResources = make(map[string][]ResourceCanceller)
-	changeSet.RemovedResources[container] = removedList
-
-	changeSet.UpdatedResources = make(map[string][]InterfaceChangeSet)
-	changeSet.UpdatedResources[container] = updatedList
-
-	return changeSet, nil
-}
-
-func DetectChanges(ctx context.Context, provisionerList []ResourceProvisioner, netlinkIfType string, containers []string) (*ResourceListChangeSet, error) {
-
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
-	}
-
-	containersToScan := make([]string, 0)
-	for _, contName := range containers {
-		if pkgdocker.IsRegularContainerName(contName) {
-			if contSummary, err := pkgdocker.FindContainer(ctx, cli, contName); err != nil || contSummary == nil {
-				// if a container in the scan list is not present during the moment of reconciliation, simply skip it
-				// and this is intentional rather than ad-hoc
-				continue
-			}
-		}
-		containersToScan = append(containersToScan, contName)
-	}
-
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the container
-	// for now, skip the host netns, so includeHostNetns is set to false
-	currentInterfaceListMap, err := indexCurrentIfaces(ctx, containersToScan, netlinkIfType, false)
-	if err != nil {
-		return nil, fmt.Errorf("failed to index current interface: %w", err)
-	}
-
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
-	specInterfaceListMap, err := IndexProvisionersList(ctx, provisionerList)
-	if err != nil {
-		return nil, fmt.Errorf("failed to index spec interface: %w", err)
-	}
-
-	combinedNsMap := make(map[string]interface{})
-	for k := range currentInterfaceListMap {
-		combinedNsMap[k] = true
-	}
-	for k := range specInterfaceListMap {
-		combinedNsMap[k] = true
-	}
-
-	var totalChanges *ResourceListChangeSet
-
-	for nsKey := range combinedNsMap {
-		var provisionersInContainer map[string]ResourceProvisioner
-		if v, ok := specInterfaceListMap[nsKey]; ok {
-			provisionersInContainer = v
-		}
-
-		var currentInterfacesInContainer map[string]ResourceCanceller
-		if v, ok := currentInterfaceListMap[nsKey]; ok {
-			currentInterfacesInContainer = v
-		}
-
-		changes, err := detectChangesInContainer(ctx, provisionersInContainer, currentInterfacesInContainer, nsKey)
-		if err != nil {
-			return nil, fmt.Errorf("failed to detect changes in container %s: %w", nsKey, err)
-		}
-
-		totalChanges = totalChanges.Merge(changes)
-	}
-
-	return totalChanges, nil
 }
 
 func (dpChangeSet *ResourceListChangeSet) Log() {
@@ -521,4 +362,38 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 	}
 
 	return changeSet, nil
+}
+
+func IndexStubNetlinkInterfaceList(ctx context.Context, interfaceList StubNetlinkInterfaceList) (map[string]map[string]ResourceCanceller, error) {
+	currentResourcesMap := make(map[string]map[string]ResourceCanceller)
+	for _, container := range interfaceList.GetContainers() {
+		nsKey := string(pkgdocker.GetContainerKey(&container))
+		ifaces, err := GetInterfaceFromContainer(ctx, &container, interfaceList.GetType())
+		if err != nil {
+			return nil, fmt.Errorf("failed to get interface from container: %w", err)
+		}
+		if len(ifaces) > 0 {
+			if _, ok := currentResourcesMap[nsKey]; !ok {
+				currentResourcesMap[nsKey] = make(map[string]ResourceCanceller)
+			}
+			for _, ifaceCanceller := range ifaces {
+				currentResourcesMap[nsKey][ifaceCanceller.GetInterfaceName()] = ifaceCanceller
+			}
+		}
+	}
+
+	return currentResourcesMap, nil
+}
+
+func CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]ResourceProvisioner, resource ResourceCanceller) (bool, error) {
+	nsKey := string(pkgdocker.GetContainerKey(resource.GetContainerName()))
+	if subSpecsMap, ok := specsMap[nsKey]; ok {
+		if _, ok := subSpecsMap[resource.GetInterfaceName()]; ok {
+			// Because, we assumed, that, if two resources are identical, they should generate the same resource name
+			//  (hence the result of .GetInterfaceName() call should be equal)
+			return true, nil
+		}
+	}
+
+	return false, nil
 }

@@ -376,16 +376,7 @@ func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.Interface
 }
 
 func (r RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	nsKey := string(pkgdocker.GetContainerKey(resource.GetContainerName()))
-	if subSpecsMap, ok := specsMap[nsKey]; ok {
-		if _, ok := subSpecsMap[resource.GetInterfaceName()]; ok {
-			// Because, we assumed, that, if two resources are identical, they should generate the same resource name
-			//  (hence the result of .GetInterfaceName() call should be equal)
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (r RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
@@ -429,5 +420,9 @@ func (r RouteConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisi
 }
 
 func (r *RouteObjectChangeSet) GetType() string {
+	return ResourceTypeRoute
+}
+
+func (r RouteConfigurationList) GetType() string {
 	return ResourceTypeRoute
 }

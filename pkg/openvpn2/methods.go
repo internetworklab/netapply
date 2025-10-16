@@ -323,81 +323,29 @@ func getContainerAndIfaces(ctx context.Context, serviceName string, containerNam
 	return result, nil
 }
 
-func (ovpCfgsList OpenVPN2ConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	containers := ovpCfgsList.Containers
-	ovpList := ovpCfgsList.Instances
-
-	// Reconciliaton of container-based OpenVPN instances is quite simple, rules:
-	// 1. If the container is present on the system but not in the list, remove it.
-	// 2. If the container is not present on the system but in the list, create it.
-	// 3. If the container is present both on the system and the list, by optimistic assumption, it doesn't need to be updated.
-	// 4. The key is the container name, forget about the interface name.
-
-	changeSet := new(pkgreconcile.ResourceListChangeSet)
-
-	serviceName, err := pkgutils.ServiceNameFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get service name: %w", err)
+func (ovpCfgsList OpenVPN2ConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	for _, ovpCfg := range ovpCfgsList.Instances {
+		provisioners = append(provisioners, &ovpCfg)
 	}
+	return provisioners
+}
 
-	// key is the container name, value is the list of interfaces to be added/removed/updated
-	addedSet := make(map[string][]pkgreconcile.ResourceProvisioner)
-	removedSet := make(map[string][]pkgreconcile.ResourceCanceller)
-	updatedSet := make(map[string][]pkgreconcile.InterfaceChangeSet)
+func (ovpCfgsList OpenVPN2ConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	// todo
+	return nil, nil
+}
 
-	specMap := make(map[string]map[string]OpenVPN2Instance)
-	for _, c := range ovpList {
-		nsKey := string(pkgdocker.GetContainerKey(c.GetContainerName()))
-		if _, ok := specMap[nsKey]; !ok {
-			specMap[nsKey] = make(map[string]OpenVPN2Instance)
-		}
-		specMap[nsKey][c.GetInterfaceName()] = c
-	}
+func (ovpCfgsList OpenVPN2ConfigurationList) GetContainers() []string {
+	return ovpCfgsList.Containers
+}
 
-	currentIfacesMap, err := getContainerAndIfaces(ctx, serviceName, containers)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container and ifaces: %w", err)
-	}
+func (ovpCfgsList OpenVPN2ConfigurationList) GetType() string {
+	return new(netlink.Tuntap).Type()
+}
 
-	for _, nsKey := range containers {
-		if ifaceMap, ok := currentIfacesMap[nsKey]; ok && ifaceMap != nil {
-			for ifaceName := range ifaceMap {
-				if _, ok := specMap[nsKey]; !ok {
-					if _, hit := removedSet[nsKey]; !hit {
-						removedSet[nsKey] = make([]pkgreconcile.ResourceCanceller, 0)
-					}
-					removedSet[nsKey] = append(removedSet[nsKey], &OpenVPN2InterfaceCanceller{ContainerName: nsKey, InterfaceName: ifaceName})
-				}
-			}
-		}
-
-		if specSubMap, ok := specMap[nsKey]; ok && specSubMap != nil {
-			for _, ifspec := range specSubMap {
-				if _, ok := currentIfacesMap[nsKey]; !ok {
-					if _, hit := addedSet[nsKey]; !hit {
-						addedSet[nsKey] = make([]pkgreconcile.ResourceProvisioner, 0)
-					}
-					addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
-					continue
-				}
-
-				// for openvpn2, don't look into interface name inside the container, in client mode, tap interface is not guaranteed to be present
-				// if _, ok := currentIfacesMap[nsKey][ifaceName]; !ok {
-				// 	if _, hit := removedSet[nsKey]; !hit {
-				// 		addedSet[nsKey] = make([]pkgreconcile.InterfaceProvisioner, 0)
-				// 	}
-				// 	addedSet[nsKey] = append(addedSet[nsKey], &ifspec)
-				// 	continue
-				// }
-			}
-		}
-	}
-
-	changeSet.AddedResources = addedSet
-	changeSet.RemovedResources = removedSet
-	changeSet.UpdatedResources = updatedSet
-
-	return changeSet, nil
+func (ovpCfgsList OpenVPN2ConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) Cancel(ctx context.Context) error {

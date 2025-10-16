@@ -148,16 +148,28 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (dummyCfgsList DummyConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	containers := dummyCfgsList.Containers
-	dummyList := dummyCfgsList.Dummies
-
-	dummyTy := new(netlink.Dummy).Type()
-	provisionerList := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, dummy := range dummyList {
-		provisionerList = append(provisionerList, &dummy)
+func (dummyCfgsList DummyConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	for _, dummyCfg := range dummyCfgsList.Dummies {
+		provisioners = append(provisioners, &dummyCfg)
 	}
-	return pkgreconcile.DetectChanges(ctx, provisionerList, dummyTy, containers)
+	return provisioners
+}
+
+func (dummyCfgsList DummyConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, dummyCfgsList)
+}
+
+func (dummyCfgsList DummyConfigurationList) GetContainers() []string {
+	return dummyCfgsList.Containers
+}
+
+func (dummyCfgsList DummyConfigurationList) GetType() string {
+	return new(netlink.Dummy).Type()
+}
+
+func (dummyCfgsList DummyConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (dummyConfig *DummyConfig) GetType() string {
