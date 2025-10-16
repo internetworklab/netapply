@@ -17,6 +17,10 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) GetContainerName() *string
 	return stubInterfaceCanceller.ContainerName
 }
 
+func (stubInterfaceCanceller *StubInterfaceCanceller) GetType() string {
+	return stubInterfaceCanceller.Type
+}
+
 func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
 	if stubInterfaceCanceller.InterfaceName == "lo" {
 		// skip special interfaces such as "lo"

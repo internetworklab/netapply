@@ -186,7 +186,7 @@ func GetInterfaceFromContainer(ctx context.Context, containerName *string, linkT
 			}
 
 			if link.Type() == linkType {
-				res.ifaces[link.Attrs().Name] = &pkginterfacestub.StubInterfaceCanceller{ContainerName: containerName, InterfaceName: link.Attrs().Name}
+				res.ifaces[link.Attrs().Name] = &pkginterfacestub.StubInterfaceCanceller{ContainerName: containerName, InterfaceName: link.Attrs().Name, Type: link.Type()}
 			}
 		}
 
@@ -235,7 +235,7 @@ func (dpChangeSet *ResourceListChangeSet) Log() {
 					"Removed",
 					pkgdocker.GetContainerDisplayName(iface.GetContainerName()),
 					iface.GetInterfaceName(),
-					"-",
+					iface.GetType(),
 				},
 			)
 		}
@@ -248,7 +248,7 @@ func (dpChangeSet *ResourceListChangeSet) Log() {
 					"Updated",
 					pkgdocker.GetContainerDisplayName(iface.GetContainerName()),
 					iface.GetInterfaceName(),
-					"-",
+					iface.GetType(),
 				},
 			)
 		}

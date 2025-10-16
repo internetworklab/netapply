@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -379,6 +378,25 @@ func (r RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, sp
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
+func (r *RouteResourceCanceller) Cancel(ctx context.Context) error {
+	// todo
+	return nil
+}
+
+func (r *RouteResourceCanceller) GetInterfaceName() string {
+	// todo
+	return ""
+}
+
+func (r *RouteResourceCanceller) GetContainerName() *string {
+	// todo
+	return nil
+}
+
+func (r *RouteResourceCanceller) GetType() string {
+	return ResourceTypeRoute
+}
+
 func (r RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
 	currentResourcesMap := make(map[string]map[string]pkgreconcile.ResourceCanceller)
 	for _, container := range r.Containers {
@@ -397,7 +415,8 @@ func (r RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[
 				if _, ok := currentResourcesMap[container]; !ok {
 					currentResourcesMap[container] = make(map[string]pkgreconcile.ResourceCanceller)
 				}
-				currentResourcesMap[container][routeKey] = &pkginterfacestub.StubInterfaceCanceller{ContainerName: &container, InterfaceName: routeKey}
+				containerKey := string(pkgdocker.GetContainerKey(&container))
+				currentResourcesMap[containerKey][routeKey] = &RouteResourceCanceller{ResourceName: routeKey, ResourceContainer: &containerKey}
 			}
 
 			return nil

@@ -45,6 +45,7 @@ type ResourceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string
 	GetContainerName() *string
+	GetType() string
 }
 
 type ResourceListChangeSet struct {

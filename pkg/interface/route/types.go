@@ -70,3 +70,9 @@ type RouteObjectChangeSet struct {
 	ShouldChangeIIface   *string
 	ShouldChangePriority *int
 }
+
+type RouteResourceCanceller struct {
+	ResourceName      string
+	ResourceContainer *string
+	// todo
+}
