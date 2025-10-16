@@ -1,10 +1,11 @@
 package cli
 
 import (
-	"fmt"
 	"context"
-	pkgmodels "github.com/internetworklab/netapply/pkg/models"
+	"fmt"
 	"log"
+
+	pkgmodels "github.com/internetworklab/netapply/pkg/models"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
@@ -18,24 +19,17 @@ func (cmd *UpCmd) Run(globalCLIConfig *CLI) error {
 	clientAuth, _ := pkgutils.ClientAuthFromCtx(ctx)
 
 	// Read and parse the configuration
-	var globalConfig *pkgmodels.GlobalConfig
-	if globalConfig, err = getGlobalConfig(cmd.Config, clientAuth); err != nil || globalConfig == nil {
+	var nodecfg *pkgmodels.NodeConfig
+	if nodecfg, err = getnodecfg(cmd.Config, clientAuth); err != nil || nodecfg == nil {
 		return fmt.Errorf("failed to load config: %w", err)
-	}
-
-	// Get the specified node configuration
-	nodeConfig, ok := globalConfig.Nodes[globalCLIConfig.Node]
-	if !ok {
-		return fmt.Errorf("node '%s' not found in configuration", globalCLIConfig.Node)
 	}
 
 	// Start the service
 	log.Printf("Setting up service %s on node %s ...", cmd.ServiceName, globalCLIConfig.Node)
 	ctx = pkgutils.SetServiceNameInCtx(ctx, cmd.ServiceName)
-	if err := nodeConfig.Up(ctx); err != nil {
+	if err := nodecfg.Up(ctx); err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 
 	return nil
 }
-
