@@ -82,32 +82,29 @@ func (r *RouteConfig) GetTableId(ctx context.Context) uint32 {
 	return 0
 }
 
-func (r *RouteConfig) RetrieveRouteObject(ctx context.Context) (*netlink.Route, error) {
-	tableId := r.GetTableId(ctx)
-
+func retrieveRouteObject(
+	ctx context.Context,
+	container *string,
+	tableId uint32,
+	destIPNet net.IPNet,
+	proto netlink.RouteProtocol,
+) (*netlink.Route, error) {
 	type result struct {
 		Route *netlink.Route
 	}
 	res := new(result)
 
-	err := pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
-		destIP, destIPNet, err := net.ParseCIDR(r.Destionation)
-		if err != nil {
-			return fmt.Errorf("failed to parse destination: %w", err)
-		}
-		routes, err := handle.RouteGet(destIP)
+	err := pkgdocker.WithNsHandleSafe(ctx, container, func(handle *netlink.Handle) error {
+
+		routes, err := handle.RouteGet(destIPNet.IP)
 		if err != nil {
 			if _, ok := err.(netlink.LinkNotFoundError); !ok {
 				return fmt.Errorf("failed to get routes: %w", err)
 			}
 		}
 
-		protoExpected := RouteProtocolStatic.ToInt()
-		if r.Protocol != nil {
-			protoExpected = r.Protocol.ToInt()
-		}
 		for _, nlroute := range routes {
-			if nlroute.Protocol != protoExpected {
+			if nlroute.Protocol != proto {
 				continue
 			}
 
@@ -125,6 +122,22 @@ func (r *RouteConfig) RetrieveRouteObject(ctx context.Context) (*netlink.Route, 
 	})
 
 	return res.Route, err
+}
+
+func (r *RouteConfig) RetrieveRouteObject(ctx context.Context) (*netlink.Route, error) {
+	tableId := r.GetTableId(ctx)
+
+	_, destIPNet, err := net.ParseCIDR(r.Destionation)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse destination: %w", err)
+	}
+
+	protoExpected := RouteProtocolStatic.ToInt()
+	if r.Protocol != nil {
+		protoExpected = r.Protocol.ToInt()
+	}
+
+	return retrieveRouteObject(ctx, r.ContainerName, tableId, *destIPNet, protoExpected)
 }
 
 func (r *RouteConfig) CheckExist(ctx context.Context) (bool, error) {
@@ -379,18 +392,30 @@ func (r RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, sp
 }
 
 func (r *RouteResourceCanceller) Cancel(ctx context.Context) error {
-	// todo
-	return nil
+	return pkgdocker.WithNsHandleSafe(ctx, r.ResourceContainer, func(handle *netlink.Handle) error {
+
+		routeObj, err := retrieveRouteObject(ctx, r.ResourceContainer, r.TableId, r.Destination, RouteProtocolStatic.ToInt())
+		if err != nil {
+			// Can't retrieve the route object, presumably it's already deleted
+			return nil
+		}
+
+		err = handle.RouteDel(routeObj)
+		if err != nil {
+			// It it's successfully retrieved but failed to delete, it should be considered as an error
+			return fmt.Errorf("failed to delete route: %w", err)
+		}
+
+		return nil
+	})
 }
 
 func (r *RouteResourceCanceller) GetInterfaceName() string {
-	// todo
-	return ""
+	return getResourceKey(&r.TableId, r.Destination)
 }
 
 func (r *RouteResourceCanceller) GetContainerName() *string {
-	// todo
-	return nil
+	return r.ResourceContainer
 }
 
 func (r *RouteResourceCanceller) GetType() string {

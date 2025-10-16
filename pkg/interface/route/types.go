@@ -74,5 +74,6 @@ type RouteObjectChangeSet struct {
 type RouteResourceCanceller struct {
 	ResourceName      string
 	ResourceContainer *string
-	// todo
+	Destination       net.IPNet
+	TableId           uint32
 }
