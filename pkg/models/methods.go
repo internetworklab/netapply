@@ -120,7 +120,7 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 
 	log.Println("Detecting changes for Route ...")
-	routeChangeSet, err := dpConfig.Route.DetectChanges(ctx)
+	routeChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, dpConfig.Route)
 	if err != nil {
 		return nil, fmt.Errorf("failed to detect changes for Route: %w", err)
 	}

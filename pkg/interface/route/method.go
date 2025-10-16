@@ -375,8 +375,7 @@ func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.Interface
 	return changeSet, nil
 }
 
-func (r *RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-
+func (r RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
 	nsKey := string(pkgdocker.GetContainerKey(resource.GetContainerName()))
 	if subSpecsMap, ok := specsMap[nsKey]; ok {
 		if _, ok := subSpecsMap[resource.GetInterfaceName()]; ok {
@@ -389,7 +388,7 @@ func (r *RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, s
 	return false, nil
 }
 
-func (r *RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+func (r RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
 	currentResourcesMap := make(map[string]map[string]pkgreconcile.ResourceCanceller)
 	for _, container := range r.Containers {
 		err := pkgdocker.WithNsHandleSafe(ctx, &container, func(handle *netlink.Handle) error {
@@ -421,114 +420,12 @@ func (r *RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map
 	return currentResourcesMap, nil
 }
 
-func (r *RouteConfigurationList) IndexResourcesInSpec(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceProvisioner, error) {
-	specsMap := make(map[string]map[string]pkgreconcile.ResourceProvisioner)
+func (r RouteConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, routeCfg := range r.Routes {
-		nsKey := string(pkgdocker.GetContainerKey(routeCfg.GetContainerName()))
-		if _, ok := specsMap[nsKey]; !ok {
-			specsMap[nsKey] = make(map[string]pkgreconcile.ResourceProvisioner)
-		}
-		specsMap[nsKey][routeCfg.GetInterfaceName()] = &routeCfg
+		provisioners = append(provisioners, &routeCfg)
 	}
-	return specsMap, nil
-}
-
-func DetectChanges(ctx context.Context, routeCfgsList *RouteConfigurationList) (*pkgreconcile.ResourceListChangeSet, error) {
-	specsMap, err := routeCfgsList.IndexResourcesInSpec(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to index resources in spec: %w", err)
-	}
-
-	currentResourcesMap, err := routeCfgsList.IndexCurrentResources(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to index current resources: %w", err)
-	}
-
-	commonSet := make(map[string]map[string]pkgreconcile.ResourceProvisioner)
-
-	changeSet := new(pkgreconcile.ResourceListChangeSet)
-	for nsKey, subMap := range currentResourcesMap {
-		for resKey, resCanceller := range subMap {
-			if _, ok := specsMap[nsKey]; !ok {
-				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
-					changeSet.RemovedResources[nsKey] = make([]pkgreconcile.ResourceCanceller, 0)
-				}
-				changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], resCanceller)
-				continue
-			}
-
-			if _, ok := specsMap[nsKey][resKey]; !ok {
-				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
-					changeSet.RemovedResources[nsKey] = make([]pkgreconcile.ResourceCanceller, 0)
-				}
-				changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], resCanceller)
-				continue
-			}
-
-			// Now, since the resource is both set of specs and set of current resources, we add it into the set of common resources
-			if _, ok := commonSet[nsKey]; !ok {
-				commonSet[nsKey] = make(map[string]pkgreconcile.ResourceProvisioner)
-			}
-			commonSet[nsKey][resKey] = specsMap[nsKey][resKey]
-		}
-	}
-
-	for nsKey, subMap := range specsMap {
-		for resKey, resProvisioner := range subMap {
-			if _, ok := currentResourcesMap[nsKey]; !ok {
-				if _, hit := changeSet.AddedResources[nsKey]; !hit {
-					changeSet.AddedResources[nsKey] = make([]pkgreconcile.ResourceProvisioner, 0)
-				}
-				changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], resProvisioner)
-				continue
-			}
-
-			if _, ok := currentResourcesMap[nsKey][resKey]; !ok {
-				if _, hit := changeSet.AddedResources[nsKey]; !hit {
-					changeSet.AddedResources[nsKey] = make([]pkgreconcile.ResourceProvisioner, 0)
-				}
-				changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], resProvisioner)
-				continue
-			}
-
-			// Now, since the resource is both set of specs and set of current resources, we add it into the set of common resources
-			if _, ok := commonSet[nsKey]; !ok {
-				commonSet[nsKey] = make(map[string]pkgreconcile.ResourceProvisioner)
-			}
-			commonSet[nsKey][resKey] = resProvisioner
-		}
-	}
-
-	for nsKey, subMap := range commonSet {
-		for resKey, resProvisioner := range subMap {
-			exist, err := resProvisioner.CheckExist(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to check if resource exists, resource in common set but doesn't actually exists: %w", err)
-			}
-			if !exist {
-				return nil, fmt.Errorf("failed to check if resource exists, resource in common set but doesn't actually exists")
-			}
-
-			changes, err := resProvisioner.DetectChanges(ctx)
-			if err != nil {
-				return nil, fmt.Errorf("failed to detect changes in resource %s in container %s: %w", resKey, nsKey, err)
-			}
-
-			if changes != nil && changes.HasUpdates() {
-				if _, hit := changeSet.UpdatedResources[nsKey]; !hit {
-					changeSet.UpdatedResources[nsKey] = make([]pkgreconcile.InterfaceChangeSet, 0)
-				}
-				changeSet.UpdatedResources[nsKey] = append(changeSet.UpdatedResources[nsKey], changes)
-				continue
-			}
-		}
-	}
-
-	return changeSet, nil
-}
-
-func (r *RouteConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	return DetectChanges(ctx, r)
+	return provisioners
 }
 
 func (r *RouteObjectChangeSet) GetType() string {

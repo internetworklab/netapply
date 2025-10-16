@@ -222,18 +222,16 @@ func indexCurrentIfaces(ctx context.Context, containers []string, netlinkIfType 
 	return currentInterfaceListMap, nil
 }
 
-func indexSpecIfaces(provisionerList []ResourceProvisioner) (SpecIfaceIndex, error) {
-	specInterfaceListMap := make(map[string]map[string]ResourceProvisioner)
-	for _, c := range provisionerList {
-		contName := string(pkgdocker.GetContainerKey(c.GetContainerName()))
-
-		if _, ok := specInterfaceListMap[contName]; !ok {
-			specInterfaceListMap[contName] = make(map[string]ResourceProvisioner, 0)
+func IndexProvisionersList(ctx context.Context, provisionersList []ResourceProvisioner) (map[string]map[string]ResourceProvisioner, error) {
+	specsMap := make(map[string]map[string]ResourceProvisioner)
+	for _, provisioner := range provisionersList {
+		nsKey := string(pkgdocker.GetContainerKey(provisioner.GetContainerName()))
+		if _, ok := specsMap[nsKey]; !ok {
+			specsMap[nsKey] = make(map[string]ResourceProvisioner)
 		}
-		specInterfaceListMap[contName][c.GetInterfaceName()] = c
+		specsMap[nsKey][provisioner.GetInterfaceName()] = provisioner
 	}
-
-	return specInterfaceListMap, nil
+	return specsMap, nil
 }
 
 func detectChangesInContainer(
@@ -336,7 +334,7 @@ func DetectChanges(ctx context.Context, provisionerList []ResourceProvisioner, n
 	}
 
 	// key is the container name, for default netns, the key will be '-', value is the list of interfaces present in the spec
-	specInterfaceListMap, err := indexSpecIfaces(provisionerList)
+	specInterfaceListMap, err := IndexProvisionersList(ctx, provisionerList)
 	if err != nil {
 		return nil, fmt.Errorf("failed to index spec interface: %w", err)
 	}
@@ -429,4 +427,98 @@ func (dpChangeSet *ResourceListChangeSet) Log() {
 	tw.Style().Options.SeparateColumns = false
 	// render it
 	fmt.Println(tw.Render())
+}
+
+func DetectChangesForProvisionersList(ctx context.Context, provisionersList ResourceProvisionersList) (*ResourceListChangeSet, error) {
+	specsMap, err := IndexProvisionersList(ctx, provisionersList.GetProvisioners())
+	if err != nil {
+		return nil, fmt.Errorf("failed to index resources in spec: %w", err)
+	}
+
+	currentResourcesMap, err := provisionersList.IndexCurrentResources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index current resources: %w", err)
+	}
+
+	commonSet := make(map[string]map[string]ResourceProvisioner)
+
+	changeSet := new(ResourceListChangeSet)
+	for nsKey, subMap := range currentResourcesMap {
+		for resKey, resCanceller := range subMap {
+			if _, ok := specsMap[nsKey]; !ok {
+				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
+					changeSet.RemovedResources[nsKey] = make([]ResourceCanceller, 0)
+				}
+				changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], resCanceller)
+				continue
+			}
+
+			if _, ok := specsMap[nsKey][resKey]; !ok {
+				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
+					changeSet.RemovedResources[nsKey] = make([]ResourceCanceller, 0)
+				}
+				changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], resCanceller)
+				continue
+			}
+
+			// Now, since the resource is both set of specs and set of current resources, we add it into the set of common resources
+			if _, ok := commonSet[nsKey]; !ok {
+				commonSet[nsKey] = make(map[string]ResourceProvisioner)
+			}
+			commonSet[nsKey][resKey] = specsMap[nsKey][resKey]
+		}
+	}
+
+	for nsKey, subMap := range specsMap {
+		for resKey, resProvisioner := range subMap {
+			if _, ok := currentResourcesMap[nsKey]; !ok {
+				if _, hit := changeSet.AddedResources[nsKey]; !hit {
+					changeSet.AddedResources[nsKey] = make([]ResourceProvisioner, 0)
+				}
+				changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], resProvisioner)
+				continue
+			}
+
+			if _, ok := currentResourcesMap[nsKey][resKey]; !ok {
+				if _, hit := changeSet.AddedResources[nsKey]; !hit {
+					changeSet.AddedResources[nsKey] = make([]ResourceProvisioner, 0)
+				}
+				changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], resProvisioner)
+				continue
+			}
+
+			// Now, since the resource is both set of specs and set of current resources, we add it into the set of common resources
+			if _, ok := commonSet[nsKey]; !ok {
+				commonSet[nsKey] = make(map[string]ResourceProvisioner)
+			}
+			commonSet[nsKey][resKey] = resProvisioner
+		}
+	}
+
+	for nsKey, subMap := range commonSet {
+		for resKey, resProvisioner := range subMap {
+			exist, err := resProvisioner.CheckExist(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check if resource exists, resource in common set but doesn't actually exists: %w", err)
+			}
+			if !exist {
+				return nil, fmt.Errorf("failed to check if resource exists, resource in common set but doesn't actually exists")
+			}
+
+			changes, err := resProvisioner.DetectChanges(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect changes in resource %s in container %s: %w", resKey, nsKey, err)
+			}
+
+			if changes != nil && changes.HasUpdates() {
+				if _, hit := changeSet.UpdatedResources[nsKey]; !hit {
+					changeSet.UpdatedResources[nsKey] = make([]InterfaceChangeSet, 0)
+				}
+				changeSet.UpdatedResources[nsKey] = append(changeSet.UpdatedResources[nsKey], changes)
+				continue
+			}
+		}
+	}
+
+	return changeSet, nil
 }

@@ -34,6 +34,12 @@ type ResourceProvisioner interface {
 	GetType() string
 }
 
+type ResourceProvisionersList interface {
+	GetProvisioners() []ResourceProvisioner
+	IndexCurrentResources(ctx context.Context) (map[string]map[string]ResourceCanceller, error)
+	CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]ResourceProvisioner, resource ResourceCanceller) (bool, error)
+}
+
 type ResourceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string
