@@ -21,9 +21,17 @@ func NewRouterHandler(ctx context.Context) *RouterHandler {
 		HandleDetectChanges(ctx, w, r)
 	})
 
+	routerHandler.Mux.HandleFunc("/version", func(w http.ResponseWriter, r *http.Request) {
+		HandleVersion(ctx, w, r)
+	})
+
+	routerHandler.Mux.HandleFunc("/basicinfo", func(w http.ResponseWriter, r *http.Request) {
+		HandleBasicInfo(ctx, w, r)
+	})
+
 	return routerHandler
 }
 
 func (h *RouterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// todo
+	h.Mux.ServeHTTP(w, r)
 }

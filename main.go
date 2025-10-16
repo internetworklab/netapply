@@ -1,4 +1,11 @@
-//go:generate sh -c "printf %s $(git rev-parse HEAD) > commit.txt"
+//go:generate sh -c "echo CommitHash: $(git rev-parse HEAD) > commit.txt"
+//go:generate sh -c "echo BuildTime: $(date --utc --iso-8601=seconds) >> commit.txt"
+//go:generate sh -c "echo RevisionOrTag: $(git describe --exact-match --tags) >> commit.txt"
+//go:generate sh -c "echo GoVersion: $(go version) >> commit.txt"
+//go:generate sh -c "echo Uname-srvm: $(uname -srvm) >> commit.txt"
+//go:generate sh -c "echo OfficialSite: https://github.com/internetworklab/netapply >> commit.txt"
+//go:generate sh -c "echo License: MIT >> commit.txt"
+//go:generate sh -c "echo 'Copyright: Copyright (c) 2025 duststars' >> commit.txt"
 
 package main
 
@@ -11,8 +18,10 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sort"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/docker/docker/client"
@@ -27,7 +36,7 @@ import (
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
-func down(ctx context.Context) error {
+func handleCleanUp(ctx context.Context) error {
 	serviceName, err := pkgutils.ServiceNameFromCtx(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get service name from context: %w", err)
@@ -101,6 +110,7 @@ type CLI struct {
 	TLSClientKey          string `help:"Path to client private key file for TLS" type:"path"`
 	HTTPBasicAuthUsername string `help:"Username for HTTP basic authentication"`
 	HTTPBasicAuthPassword string `help:"Password for HTTP basic authentication"`
+	VersionMetadata       map[string]string
 }
 
 type VersionCmd struct {
@@ -108,7 +118,20 @@ type VersionCmd struct {
 }
 
 func (cmd *VersionCmd) Run(globalCLIConfig *CLI) error {
-	fmt.Printf("Commit Hash: %s\n", globalCLIConfig.Version.CommitHash)
+	pairs := make([][]string, 0)
+	for key, value := range globalCLIConfig.VersionMetadata {
+		pair := make([]string, 0)
+		pair = append(pair, key)
+		pair = append(pair, value)
+		pairs = append(pairs, pair)
+	}
+	sort.Slice(pairs, func(i, j int) bool {
+		return pairs[i][0] < pairs[j][0]
+	})
+	for _, pair := range pairs {
+		fmt.Printf("%s: %s\n", pair[0], pair[1])
+	}
+
 	return nil
 }
 
@@ -198,7 +221,7 @@ func (cmd *DownCmd) Run(globalCLIConfig *CLI) error {
 	ctx = pkgutils.SetDockerCliInCtx(ctx, cli)
 
 	// Stop all containers associated with the service
-	if err := down(ctx); err != nil {
+	if err := handleCleanUp(ctx); err != nil {
 		return fmt.Errorf("failed to stop service: %w", err)
 	}
 
@@ -212,6 +235,10 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 		return fmt.Errorf("failed to initialize context: %w", err)
 	}
 	ctx = pkgutils.SetServiceNameInCtx(ctx, cmd.ServiceName)
+	ctx = pkgutils.SetVersionMetadataInCtx(ctx, globalCLIConfig.VersionMetadata)
+	ctx = pkgutils.SetNodeNameInCtx(ctx, globalCLIConfig.Node)
+	ctx = pkgutils.SetStartedAtInCtx(ctx, uint64(time.Now().Unix()))
+	ctx = pkgutils.SetUnixSocketPathInCtx(ctx, cmd.BindUnixSocket)
 
 	log.Printf("Serving as a local configurator on %s\n", cmd.BindUnixSocket)
 
@@ -279,7 +306,7 @@ var CommitHash string
 func main() {
 	var cli CLI
 	ctx := kong.Parse(&cli)
-	cli.Version.CommitHash = CommitHash
+	cli.VersionMetadata = pkgutils.ParseKVPairs(":", CommitHash)
 	err := ctx.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

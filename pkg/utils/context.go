@@ -13,6 +13,10 @@ const ctxKeyDockerCli CtxKey = "docker_cli"
 const ctxKeyServiceName CtxKey = "service_name"
 const ctxKeyStatefulDir CtxKey = "stateful_dir"
 const CtxKeyClientAuth CtxKey = "client_auth"
+const CtxKeyVersionMetadata CtxKey = "version_metadata"
+const CtxKeyNodeName CtxKey = "node_name"
+const CtxKeyStartedAt CtxKey = "started_at"
+const CtxKeyUnixSocketPath CtxKey = "unix_socket_path"
 
 type ClientAuth struct {
 	TLSClientCertFile     string
@@ -20,6 +24,54 @@ type ClientAuth struct {
 	TLSTrustedCACertFile  string
 	HTTPBasicAuthUsername string
 	HTTPBasicAuthPassword string
+}
+
+func UnixSocketPathFromCtx(ctx context.Context) (string, error) {
+	unixSocketPath, ok := ctx.Value(CtxKeyUnixSocketPath).(string)
+	if !ok {
+		return "", fmt.Errorf("unix socket path is not set in context")
+	}
+	return unixSocketPath, nil
+}
+
+func SetUnixSocketPathInCtx(ctx context.Context, unixSocketPath string) context.Context {
+	return context.WithValue(ctx, CtxKeyUnixSocketPath, unixSocketPath)
+}
+
+func StartedAtFromCtx(ctx context.Context) (uint64, error) {
+	startedAt, ok := ctx.Value(CtxKeyStartedAt).(uint64)
+	if !ok {
+		return 0, fmt.Errorf("started at is not set in context")
+	}
+	return startedAt, nil
+}
+
+func SetStartedAtInCtx(ctx context.Context, startedAt uint64) context.Context {
+	return context.WithValue(ctx, CtxKeyStartedAt, startedAt)
+}
+
+func NodeNameFromCtx(ctx context.Context) (string, error) {
+	nodeName, ok := ctx.Value(CtxKeyNodeName).(string)
+	if !ok {
+		return "", fmt.Errorf("node name is not set in context")
+	}
+	return nodeName, nil
+}
+
+func SetNodeNameInCtx(ctx context.Context, nodeName string) context.Context {
+	return context.WithValue(ctx, CtxKeyNodeName, nodeName)
+}
+
+func VersionMetadataFromCtx(ctx context.Context) (map[string]string, error) {
+	versionMetadata, ok := ctx.Value(CtxKeyVersionMetadata).(map[string]string)
+	if !ok {
+		return nil, fmt.Errorf("version metadata is not set in context")
+	}
+	return versionMetadata, nil
+}
+
+func SetVersionMetadataInCtx(ctx context.Context, versionMetadata map[string]string) context.Context {
+	return context.WithValue(ctx, CtxKeyVersionMetadata, versionMetadata)
 }
 
 func ClientAuthFromCtx(ctx context.Context) (*ClientAuth, error) {
