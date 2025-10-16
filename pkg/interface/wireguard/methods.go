@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
 	"strings"
+	"time"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
@@ -349,6 +351,19 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wg
 	}
 	peercfg.PublicKey = *pkObj
 
+	if wgPeerConfig.PresharedKey != "" || wgPeerConfig.PresharedKeyFrom != nil {
+		pskObj, err := getKeyObj(ctx, wgPeerConfig.PresharedKey, wgPeerConfig.PresharedKeyFrom)
+		if err != nil {
+			return nil, fmt.Errorf("psk specified, but failed to get preshared key object: %w", err)
+		}
+		peercfg.PresharedKey = pskObj
+	}
+
+	if wgPeerConfig.PersistentKeepalive != nil {
+		dur := time.Duration(*wgPeerConfig.PersistentKeepalive) * time.Second
+		peercfg.PersistentKeepaliveInterval = &dur
+	}
+
 	if wgPeerConfig.Endpoint != nil {
 		udpAddr, err := net.ResolveUDPAddr("udp", *wgPeerConfig.Endpoint)
 		if err != nil {
@@ -535,4 +550,246 @@ func (wgCfgsList WireGuardConfigurationList) CheckResourceExistInSpec(ctx contex
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetType() string {
 	return new(netlink.Wireguard).Type()
+}
+
+func parseSectionHeader(line string) string {
+	if len(line) <= 2 {
+		return ""
+	}
+
+	sectionName := strings.TrimRight(line[1:], "]")
+	return strings.TrimSpace(sectionName)
+}
+
+const WGINIKeyListenPort string = "ListenPort"
+const WGINIKeyPrivateKey string = "PrivateKey"
+const WGINIKeyAllowedIPs string = "AllowedIPs"
+const WGINIKeyEndpoint string = "Endpoint"
+const WGINIKeyPublicKey string = "PublicKey"
+const WGINIKeyPresharedKey string = "PresharedKey"
+const WGINIKeyPersistentKeepalive string = "PersistentKeepalive"
+
+const WGAdditionalKeyLinkLocal = "linklocal"
+const WGAdditionalKeyPeerLinkLocal = "peerlinklocal"
+
+func parsePeerSection(peerSection map[string]string) (*WireGuardPeerConfig, error) {
+	wgPeerCfg := new(WireGuardPeerConfig)
+
+	if val, ok := peerSection[WGINIKeyPublicKey]; ok {
+		pkObj, err := wgtypes.ParseKey(strings.TrimSpace(val))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse public key: %w", err)
+		}
+		wgPeerCfg.PublicKey = pkObj.String()
+	}
+
+	if val, ok := peerSection[WGINIKeyPresharedKey]; ok {
+		if val != "" {
+			pskObj, err := wgtypes.ParseKey(strings.TrimSpace(val))
+			if err != nil {
+				return nil, fmt.Errorf("failed to parse preshared key: %w", err)
+			}
+			wgPeerCfg.PresharedKey = pskObj.String()
+		}
+	}
+
+	if val, ok := peerSection[WGINIKeyEndpoint]; ok {
+		if val != "" {
+			wgPeerCfg.Endpoint = &val
+		}
+	}
+
+	if val, ok := peerSection[WGINIKeyAllowedIPs]; ok {
+		if val != "" {
+			allowedIPs := make([]string, 0)
+			for _, allowedIP := range strings.Split(val, ",") {
+				a := strings.TrimSpace(allowedIP)
+				if a != "" {
+					allowedIPs = append(allowedIPs, a)
+				}
+			}
+			if len(allowedIPs) > 0 {
+				wgPeerCfg.AllowedIPs = allowedIPs
+			}
+		}
+	}
+
+	if val, ok := peerSection[WGINIKeyPersistentKeepalive]; ok {
+		if val != "" {
+			pkl, err := strconv.Atoi(val)
+			if err != nil {
+				return nil, fmt.Errorf("failed to convert persistent keepalive to int: %w", err)
+			}
+			wgPeerCfg.PersistentKeepalive = &pkl
+		}
+	}
+
+	return wgPeerCfg, nil
+}
+
+func eINIWGAdapterSecondPass(interfaceSection map[string]string, peerSections []map[string]string, additionals map[string]string) (*WireGuardConfig, error) {
+	wgConf := new(WireGuardConfig)
+
+	if val, ok := interfaceSection[WGINIKeyListenPort]; ok {
+		listenPort, err := strconv.Atoi(val)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert listen port to int: %w", err)
+		}
+		wgConf.ListenPort = &listenPort
+	}
+
+	if val, ok := interfaceSection[WGINIKeyPrivateKey]; ok {
+		pkObj, err := wgtypes.ParseKey(strings.TrimSpace(val))
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key: %w", err)
+		}
+		wgConf.PrivateKey = pkObj.String()
+	}
+
+	for _, peerSection := range peerSections {
+		peerCfg, err := parsePeerSection(peerSection)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse peer section: %w", err)
+		}
+		wgConf.Peers = append(wgConf.Peers, *peerCfg)
+	}
+
+	for k, v := range additionals {
+		if wgConf.Additionals == nil {
+			wgConf.Additionals = make(map[string]string)
+		}
+		wgConf.Additionals[k] = v
+	}
+
+	ll, llok := wgConf.Additionals[WGAdditionalKeyLinkLocal]
+	peerll, peerllok := wgConf.Additionals[WGAdditionalKeyPeerLinkLocal]
+	if llok && peerllok && ll != "" && peerll != "" {
+		// both have local side ip and peer side ip set
+		addrconf := pkginterfacecommon.AddressConfig{
+			Local: &ll,
+			Peer:  &peerll,
+		}
+		if wgConf.Addresses == nil {
+			wgConf.Addresses = make([]pkginterfacecommon.AddressConfig, 0)
+		}
+		wgConf.Addresses = append(wgConf.Addresses, addrconf)
+	} else if llok || ll != "" {
+		_, ipnet, err := net.ParseCIDR(ll)
+		if err != nil {
+			ip := net.ParseIP(ll)
+			if ip == nil {
+				return nil, fmt.Errorf("failed to parse local ip: %w", err)
+			}
+			ipnet = &net.IPNet{
+				IP:   ip,
+				Mask: ip.DefaultMask(),
+			}
+			if ipnet.Mask == nil {
+				ipnet.Mask = net.CIDRMask(64, 64)
+			}
+			cidr := ipnet.String()
+			addrconf := pkginterfacecommon.AddressConfig{
+				CIDR: &cidr,
+			}
+			wgConf.Addresses = append(wgConf.Addresses, addrconf)
+		} else {
+			cidr := ipnet.String()
+			addrconf := pkginterfacecommon.AddressConfig{
+				CIDR: &cidr,
+			}
+			wgConf.Addresses = append(wgConf.Addresses, addrconf)
+		}
+	} else {
+		return nil, fmt.Errorf("missing local ip")
+	}
+
+	return wgConf, nil
+}
+
+func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) (*WireGuardConfig, error) {
+	filecontent := string(raw)
+	lines := strings.Split(filecontent, "\n")
+
+	var additionals map[string]string = nil
+
+	// stage 1: parse additionals, and we will skip additional fields in the later stage(s)
+	for _, line := range lines {
+		trimed := strings.TrimSpace(line)
+		if len(trimed) > 0 && trimed[0] == '#' {
+			kvpairs := pkgutils.ParseKVPairs(":", trimed[1:])
+			if len(kvpairs) > 0 {
+				if additionals == nil {
+					additionals = make(map[string]string)
+				}
+				for k, v := range kvpairs {
+					additionals[k] = v
+				}
+			}
+		}
+	}
+
+	type sectionobject struct {
+		SectionName string
+		SectionData map[string]string
+	}
+
+	sections := make([]sectionobject, 0)
+	var currentSection *sectionobject = nil
+
+	for lineIdx := 0; lineIdx < len(lines); lineIdx++ {
+		trimed := strings.TrimSpace(lines[lineIdx])
+
+		if trimed == "" {
+			// skip empty lines
+			continue
+		}
+
+		if trimed[0] == '#' {
+			// as we already parsed additionals, we can simply skip them
+			continue
+		}
+
+		if trimed[0] == '[' {
+			sectionName := parseSectionHeader(trimed)
+			sectionObj := sectionobject{
+				SectionName: sectionName,
+				SectionData: make(map[string]string),
+			}
+			currentSection = &sectionObj
+			continue
+		}
+
+		if currentSection == nil {
+			return nil, fmt.Errorf("no corresponding section found for line: %s", trimed)
+		}
+
+		kvpairs := pkgutils.ParseKVPairs("=", trimed)
+		for k, v := range kvpairs {
+			currentSection.SectionData[k] = v
+		}
+	}
+
+	var interfaceSection *sectionobject = nil
+	var peersSections []sectionobject = nil
+	for _, section := range sections {
+		if section.SectionName == "Interface" {
+			interfaceSection = &section
+			continue
+		}
+		if section.SectionName == "Peer" {
+			peersSections = append(peersSections, section)
+			continue
+		}
+	}
+
+	peerSectionMaps := make([]map[string]string, 0)
+	for _, section := range peersSections {
+		peerSectionMaps = append(peerSectionMaps, section.SectionData)
+	}
+
+	if interfaceSection == nil {
+		return nil, fmt.Errorf("no [Interface] section found, thus it's not a valid WireGuard ini config")
+	}
+
+	return eINIWGAdapterSecondPass(interfaceSection.SectionData, peerSectionMaps, additionals)
 }

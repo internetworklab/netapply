@@ -20,6 +20,9 @@ type WireGuardConfig struct {
 	MTU            *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 
 	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+
+	// Use to store metadata or anything that is business-relevant.
+	Additionals map[string]string `yaml:"additionals,omitempty" json:"additionals,omitempty"`
 }
 
 type WireGuardInterfaceChangeSet struct {
@@ -38,7 +41,14 @@ type WireGuardInterfaceChangeSet struct {
 }
 
 type WireGuardPeerConfig struct {
-	PublicKey string `yaml:"publickey,omitempty" json:"publickey,omitempty"`
+	PublicKey           string `yaml:"publickey,omitempty" json:"publickey,omitempty"`
+	PersistentKeepalive *int   `yaml:"persistent_keepalive,omitempty" json:"persistent_keepalive,omitempty"`
+
+	PresharedKey string `yaml:"presharedkey,omitempty" json:"presharedkey,omitempty"`
+
+	// If PresharedKey is not set, PresharedKeyFrom will be checked, if PresharedKeyFrom is not nil and not empty,
+	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
+	PresharedKeyFrom *string `yaml:"presharedkey_from,omitempty" json:"presharedkey_from,omitempty"`
 
 	// If PublicKey is not set, PublicKeyFrom will be checked, if PublicKeyFrom is not nil and not empty,
 	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
@@ -56,3 +66,10 @@ type WireGuardConfigurationList struct {
 	Containers       []string          `yaml:"containers" json:"containers"`
 	WireGuardConfigs []WireGuardConfig `yaml:"wireguard_configs" json:"wireguard_configs"`
 }
+
+// Might be used to convert any plaintext or binary representation of WireGuard config to WireGuardConfig object in memory.
+type WireGuardConfigAdapter interface {
+	ToWireGuardConfig(raw []byte) (*WireGuardConfig, error)
+}
+
+type ExtendedINIWireGuardConfigAdapter struct{}
