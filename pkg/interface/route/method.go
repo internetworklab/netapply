@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
@@ -35,11 +36,39 @@ func (scope RouteScope) ToUInt8() netlink.Scope {
 	}
 }
 
-func (r *RouteConfig) GetInterfaceName() string {
-	if r.TableId != nil && *r.TableId != 0 {
-		return fmt.Sprintf("%s (table %d)", r.Destionation, *r.TableId)
+// We use net.IPNet rather than string because we want a unique representation for the same route,
+// for example, 10.2.3.4/32 and 10.2.3.4 should be treated as the same destination.
+// And also we wanna reuse this function in the indexing procedure of RouteConfigurationList
+func getResourceKey(table *uint32, destIPNet net.IPNet) string {
+	if table == nil || *table == 0 {
+		return destIPNet.String()
 	}
-	return r.Destionation
+	return fmt.Sprintf("%s (table %d)", destIPNet.String(), *table)
+}
+
+const InvalidDestination = "(invalid)"
+
+func (r *RouteConfig) GetInterfaceName() string {
+	_, ipNet, err := net.ParseCIDR(r.Destionation)
+	if err != nil {
+		// deal with a.b.c.d or A:B::C:D notation (i.e. no VLSM, so we treat it as full mask)
+		ip := net.ParseIP(r.Destionation)
+		if ip == nil {
+			return InvalidDestination
+		}
+		fullMuskNet := &net.IPNet{
+			IP: ip,
+		}
+		mask := ip.DefaultMask()
+		fullMuskNet.Mask = mask
+		if mask == nil {
+			// mask is nil if it's not a valid IPv4 addr
+			fullMuskNet.Mask = net.CIDRMask(128, 128)
+		}
+		return getResourceKey(r.TableId, *fullMuskNet)
+	}
+	// Deal with normal a.b.c.d/x or A:B::C:D/y CIDR notation
+	return getResourceKey(r.TableId, *ipNet)
 }
 
 func (r *RouteConfig) GetContainerName() *string {
@@ -346,13 +375,160 @@ func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.Interface
 	return changeSet, nil
 }
 
+func (r *RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
+
+	nsKey := string(pkgdocker.GetContainerKey(resource.GetContainerName()))
+	if subSpecsMap, ok := specsMap[nsKey]; ok {
+		if _, ok := subSpecsMap[resource.GetInterfaceName()]; ok {
+			// Because, we assumed, that, if two resources are identical, they should generate the same resource name
+			//  (hence the result of .GetInterfaceName() call should be equal)
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (r *RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
+	currentResourcesMap := make(map[string]map[string]pkgreconcile.ResourceCanceller)
+	for _, container := range r.Containers {
+		err := pkgdocker.WithNsHandleSafe(ctx, &container, func(handle *netlink.Handle) error {
+			routes, err := handle.RouteList(nil, netlink.FAMILY_ALL)
+			if err != nil {
+				return fmt.Errorf("failed to list routes: %w", err)
+			}
+			for _, route := range routes {
+				if route.Dst == nil {
+					// since we rely on Dst to calculate the resource key, if Dst is nil, we simply skip it (because it's non-comparable)
+					continue
+				}
+				tb := uint32(route.Table)
+				routeKey := getResourceKey(&tb, *route.Dst)
+				if _, ok := currentResourcesMap[container]; !ok {
+					currentResourcesMap[container] = make(map[string]pkgreconcile.ResourceCanceller)
+				}
+				currentResourcesMap[container][routeKey] = &pkginterfacestub.StubInterfaceCanceller{ContainerName: &container, InterfaceName: routeKey}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get current route resources: %w", err)
+		}
+	}
+
+	return currentResourcesMap, nil
+}
+
+func (r *RouteConfigurationList) IndexResourcesInSpec(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceProvisioner, error) {
+	specsMap := make(map[string]map[string]pkgreconcile.ResourceProvisioner)
+	for _, routeCfg := range r.Routes {
+		nsKey := string(pkgdocker.GetContainerKey(routeCfg.GetContainerName()))
+		if _, ok := specsMap[nsKey]; !ok {
+			specsMap[nsKey] = make(map[string]pkgreconcile.ResourceProvisioner)
+		}
+		specsMap[nsKey][routeCfg.GetInterfaceName()] = &routeCfg
+	}
+	return specsMap, nil
+}
+
+func DetectChanges(ctx context.Context, routeCfgsList *RouteConfigurationList) (*pkgreconcile.ResourceListChangeSet, error) {
+	specsMap, err := routeCfgsList.IndexResourcesInSpec(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index resources in spec: %w", err)
+	}
+
+	currentResourcesMap, err := routeCfgsList.IndexCurrentResources(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to index current resources: %w", err)
+	}
+
+	commonSet := make(map[string]map[string]pkgreconcile.ResourceProvisioner)
+
+	changeSet := new(pkgreconcile.ResourceListChangeSet)
+	for nsKey, subMap := range currentResourcesMap {
+		for resKey, resCanceller := range subMap {
+			if _, ok := specsMap[nsKey]; !ok {
+				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
+					changeSet.RemovedResources[nsKey] = make([]pkgreconcile.ResourceCanceller, 0)
+				}
+				changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], resCanceller)
+				continue
+			}
+
+			if _, ok := specsMap[nsKey][resKey]; !ok {
+				if _, hit := changeSet.RemovedResources[nsKey]; !hit {
+					changeSet.RemovedResources[nsKey] = make([]pkgreconcile.ResourceCanceller, 0)
+				}
+				changeSet.RemovedResources[nsKey] = append(changeSet.RemovedResources[nsKey], resCanceller)
+				continue
+			}
+
+			// Now, since the resource is both set of specs and set of current resources, we add it into the set of common resources
+			if _, ok := commonSet[nsKey]; !ok {
+				commonSet[nsKey] = make(map[string]pkgreconcile.ResourceProvisioner)
+			}
+			commonSet[nsKey][resKey] = specsMap[nsKey][resKey]
+		}
+	}
+
+	for nsKey, subMap := range specsMap {
+		for resKey, resProvisioner := range subMap {
+			if _, ok := currentResourcesMap[nsKey]; !ok {
+				if _, hit := changeSet.AddedResources[nsKey]; !hit {
+					changeSet.AddedResources[nsKey] = make([]pkgreconcile.ResourceProvisioner, 0)
+				}
+				changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], resProvisioner)
+				continue
+			}
+
+			if _, ok := currentResourcesMap[nsKey][resKey]; !ok {
+				if _, hit := changeSet.AddedResources[nsKey]; !hit {
+					changeSet.AddedResources[nsKey] = make([]pkgreconcile.ResourceProvisioner, 0)
+				}
+				changeSet.AddedResources[nsKey] = append(changeSet.AddedResources[nsKey], resProvisioner)
+				continue
+			}
+
+			// Now, since the resource is both set of specs and set of current resources, we add it into the set of common resources
+			if _, ok := commonSet[nsKey]; !ok {
+				commonSet[nsKey] = make(map[string]pkgreconcile.ResourceProvisioner)
+			}
+			commonSet[nsKey][resKey] = resProvisioner
+		}
+	}
+
+	for nsKey, subMap := range commonSet {
+		for resKey, resProvisioner := range subMap {
+			exist, err := resProvisioner.CheckExist(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check if resource exists, resource in common set but doesn't actually exists: %w", err)
+			}
+			if !exist {
+				return nil, fmt.Errorf("failed to check if resource exists, resource in common set but doesn't actually exists")
+			}
+
+			changes, err := resProvisioner.DetectChanges(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("failed to detect changes in resource %s in container %s: %w", resKey, nsKey, err)
+			}
+
+			if changes != nil && changes.HasUpdates() {
+				if _, hit := changeSet.UpdatedResources[nsKey]; !hit {
+					changeSet.UpdatedResources[nsKey] = make([]pkgreconcile.InterfaceChangeSet, 0)
+				}
+				changeSet.UpdatedResources[nsKey] = append(changeSet.UpdatedResources[nsKey], changes)
+				continue
+			}
+		}
+	}
+
+	return changeSet, nil
+}
+
 func (r *RouteConfigurationList) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
-	// containers := r.Containers
-	// routeList := r.Routes
-
-	// todo: implement
-
-	return nil, nil
+	return DetectChanges(ctx, r)
 }
 
 func (r *RouteObjectChangeSet) GetType() string {
