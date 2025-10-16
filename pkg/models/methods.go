@@ -56,7 +56,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if openVPNChangeSet != nil && openVPNChangeSet.HasChanges() {
 		log.Println("Found changes for OpenVPN dataplane config", *openVPNChangeSet)
-		openVPNChangeSet.Log()
 		changeSet = changeSet.Merge(openVPNChangeSet)
 	}
 
@@ -67,7 +66,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if vrfChangeSet != nil && vrfChangeSet.HasChanges() {
 		log.Println("Found changes for VRF dataplane config", *vrfChangeSet)
-		vrfChangeSet.Log()
 		changeSet = changeSet.Merge(vrfChangeSet)
 	}
 
@@ -78,7 +76,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if wireGuardChangeSet != nil && wireGuardChangeSet.HasChanges() {
 		log.Println("Found changes for WireGuard dataplane config", *wireGuardChangeSet)
-		wireGuardChangeSet.Log()
 		changeSet = changeSet.Merge(wireGuardChangeSet)
 	}
 
@@ -89,7 +86,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if vxlanChangeSet != nil && vxlanChangeSet.HasChanges() {
 		log.Printf("Found changes for VXLAN dataplane config: %v\n", *vxlanChangeSet)
-		vxlanChangeSet.Log()
 		changeSet = changeSet.Merge(vxlanChangeSet)
 	}
 
@@ -100,7 +96,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if vethPairChangeSet != nil && vethPairChangeSet.HasChanges() {
 		log.Println("Found changes for VethPair dataplane config", *vethPairChangeSet)
-		vethPairChangeSet.Log()
 		changeSet = changeSet.Merge(vethPairChangeSet)
 	}
 
@@ -111,7 +106,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if bridgeChangeSet != nil && bridgeChangeSet.HasChanges() {
 		log.Println("Found changes for Bridge dataplane config", *bridgeChangeSet)
-		bridgeChangeSet.Log()
 		changeSet = changeSet.Merge(bridgeChangeSet)
 	}
 
@@ -122,7 +116,6 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if dummyChangeSet != nil && dummyChangeSet.HasChanges() {
 		log.Println("Found changes for Dummy dataplane config", *dummyChangeSet)
-		dummyChangeSet.Log()
 		changeSet = changeSet.Merge(dummyChangeSet)
 	}
 
@@ -133,8 +126,12 @@ func (dpConfig *DataplaneConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	}
 	if routeChangeSet != nil && routeChangeSet.HasChanges() {
 		log.Println("Found changes for Route dataplane config", *routeChangeSet)
-		routeChangeSet.Log()
 		changeSet = changeSet.Merge(routeChangeSet)
+	}
+
+	if changeSet != nil && changeSet.HasChanges() {
+		log.Println("Found changes for dataplane config:")
+		changeSet.Log()
 	}
 
 	return changeSet, nil

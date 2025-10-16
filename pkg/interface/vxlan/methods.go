@@ -174,3 +174,7 @@ func (vxlanConfig *VXLANConfig) GetType() string {
 func (vxlanConfig *VXLANConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, vxlanConfig)
 }
+
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetType() string {
+	return new(netlink.Vxlan).Type()
+}

@@ -209,3 +209,7 @@ func (vrfList VRFConfigurationList) DetectChanges(ctx context.Context) (*pkgreco
 
 	return pkgreconcile.DetectChanges(ctx, provisionerList, vrfTy, vrfList.Containers)
 }
+
+func (vrfChangeSet *VRFChangeSet) GetType() string {
+	return new(netlink.Vrf).Type()
+}

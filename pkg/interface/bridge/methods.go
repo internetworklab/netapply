@@ -309,3 +309,7 @@ func (bridgeConfig *BridgeConfig) GetType() string {
 func (bridgeConfig *BridgeConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, bridgeConfig)
 }
+
+func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
+	return new(netlink.Bridge).Type()
+}

@@ -518,3 +518,7 @@ func (wgCfgsList WireGuardConfigurationList) DetectChanges(ctx context.Context) 
 	}
 	return pkgreconcile.DetectChanges(ctx, provisionerList, wgty, wgCfgsList.Containers)
 }
+
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetType() string {
+	return new(netlink.Wireguard).Type()
+}

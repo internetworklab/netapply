@@ -16,6 +16,8 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+const ResourceTypeRoute = "route"
+
 func (scope RouteScope) ToUInt8() netlink.Scope {
 	switch scope {
 	case RouteScopeUniverse:
@@ -147,7 +149,7 @@ func (protocol RouteProtocol) ToInt() netlink.RouteProtocol {
 }
 
 func (r *RouteConfig) GetType() string {
-	return "route"
+	return ResourceTypeRoute
 }
 
 func (r *RouteConfig) Create(ctx context.Context) error {
@@ -351,4 +353,8 @@ func (r *RouteConfigurationList) DetectChanges(ctx context.Context) (*pkgreconci
 	// todo: implement
 
 	return nil, nil
+}
+
+func (r *RouteObjectChangeSet) GetType() string {
+	return ResourceTypeRoute
 }

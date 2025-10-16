@@ -462,3 +462,7 @@ func (vethPairSpec *VethPairConfig) GetType() string {
 func (vethPairSpec *VethPairConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, vethPairSpec)
 }
+
+func (vethPairChangeSet *VethPairChangeSet) GetType() string {
+	return new(netlink.Veth).Type()
+}

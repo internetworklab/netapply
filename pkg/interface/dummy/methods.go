@@ -167,3 +167,7 @@ func (dummyConfig *DummyConfig) GetType() string {
 func (dummyConfig *DummyConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, dummyConfig)
 }
+
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetType() string {
+	return new(netlink.Dummy).Type()
+}

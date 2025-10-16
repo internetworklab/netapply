@@ -9,6 +9,7 @@ type InterfaceChangeSet interface {
 	HasUpdates() bool
 	GetInterfaceName() string
 	GetContainerName() *string
+	GetType() string
 }
 
 type ResourceProvisioner interface {

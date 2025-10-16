@@ -10,6 +10,8 @@ import (
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
+	"github.com/jedib0t/go-pretty/v6/table"
+	"github.com/jedib0t/go-pretty/v6/text"
 	"github.com/vishvananda/netlink"
 )
 
@@ -372,33 +374,59 @@ func DetectChanges(ctx context.Context, provisionerList []ResourceProvisioner, n
 }
 
 func (dpChangeSet *ResourceListChangeSet) Log() {
-	log.Print("Dataplane change set:\n")
 
-	log.Print("Removed interfaces:\n")
-	for ns, ifaces := range dpChangeSet.RemovedResources {
-		ifaceList := make([]string, 0)
+	rows := make([]table.Row, 0)
+	for _, ifaces := range dpChangeSet.AddedResources {
 		for _, iface := range ifaces {
-			ifaceList = append(ifaceList, iface.GetInterfaceName())
+			rows = append(rows,
+				table.Row{
+					"Added",
+					pkgdocker.GetContainerDisplayName(iface.GetContainerName()),
+					iface.GetInterfaceName(),
+					iface.GetType(),
+				},
+			)
 		}
-		log.Printf("%v: %v", ns, strings.Join(ifaceList, ", "))
 	}
 
-	log.Print("Added interfaces:\n")
-	for ns, ifaces := range dpChangeSet.AddedResources {
-		ifaceList := make([]string, 0)
+	for _, ifaces := range dpChangeSet.RemovedResources {
 		for _, iface := range ifaces {
-			ifaceList = append(ifaceList, iface.GetInterfaceName())
+			rows = append(rows,
+				table.Row{
+					"Removed",
+					pkgdocker.GetContainerDisplayName(iface.GetContainerName()),
+					iface.GetInterfaceName(),
+					"-",
+				},
+			)
 		}
-		log.Printf("%v: %v", ns, strings.Join(ifaceList, ", "))
 	}
 
-	log.Print("Updated interfaces:\n")
-	for ns, ifaces := range dpChangeSet.UpdatedResources {
-		ifaceList := make([]string, 0)
+	for _, ifaces := range dpChangeSet.UpdatedResources {
 		for _, iface := range ifaces {
-			ifaceList = append(ifaceList, iface.GetInterfaceName())
+			rows = append(rows,
+				table.Row{
+					"Updated",
+					pkgdocker.GetContainerDisplayName(iface.GetContainerName()),
+					iface.GetInterfaceName(),
+					"-",
+				},
+			)
 		}
-		log.Printf("%v: %v", ns, strings.Join(ifaceList, ", "))
 	}
 
+	// table with some amount of customization
+	tw := table.NewWriter()
+	// append a header row
+	tw.AppendHeader(table.Row{"Direction", "Container", "Resource", "Type"})
+	// append some data rows
+	tw.AppendRows(rows)
+	tw.SetStyle(table.StyleLight)
+	// customize the style and change some stuff
+	tw.Style().Format.Header = text.FormatLower
+	tw.Style().Format.Row = text.FormatLower
+	tw.Style().Format.Footer = text.FormatLower
+	tw.Style().Options.SeparateColumns = false
+	// render it
+	fmt.Println(tw.Render())
 }
