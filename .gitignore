@@ -4,3 +4,5 @@ bin/
 .go-reconciler-state
 .go-reconciler-state/
 commit.txt
+resources.yaml
+

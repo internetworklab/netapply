@@ -73,7 +73,7 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconci
 			return nil, fmt.Errorf("failed to detect changes for %s: %w", reconcileTarget.GetType(), err)
 		}
 		if subChangeSet != nil && subChangeSet.HasChanges() {
-			log.Println("Found changes for", reconcileTarget.GetType(), "dataplane config", *subChangeSet)
+			log.Println("Found changes for", reconcileTarget.GetType())
 			changeSet = changeSet.Merge(subChangeSet)
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"strconv"
 	"strings"
@@ -447,18 +448,24 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 
 func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 	return pkgdocker.WithNsHandle(ctx, nil, func(handle *netlink.Handle) error {
-		link := &netlink.Wireguard{
+		wgLink := &netlink.Wireguard{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: wgConf.Name,
 			},
 		}
 
 		if wgConf.MTU != nil {
-			link.MTU = *wgConf.MTU
+			wgLink.MTU = *wgConf.MTU
 		}
 
-		if err := handle.LinkAdd(link); err != nil {
-			return fmt.Errorf("failed to add wireguard link: %w", err)
+		var link netlink.Link = wgLink
+		err := handle.LinkAdd(link)
+		if err != nil {
+			log.Printf("failed to add wireguard link %s: %v", wgConf.Name, err)
+			link, err = handle.LinkByName(wgConf.Name)
+			if err != nil {
+				return fmt.Errorf("failed to get wireguard link %s: %w", wgConf.Name, err)
+			}
 		}
 
 		wgCtrl, err := wgctrl.New()
@@ -492,7 +499,7 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 			}
 			if pidPtr != nil {
 				if err := netlink.LinkSetNsPid(link, int(*pidPtr)); err != nil {
-					return fmt.Errorf("failed to set wireguard link ns pid: %w", err)
+					return fmt.Errorf("failed to set wireguard link %s to ns pid %d: %w", wgConf.Name, *pidPtr, err)
 				}
 			}
 		}
