@@ -19,7 +19,7 @@ type VXLANConfig struct {
 
 	// To explicitly specify the underlay interface, also to automatically calculate appropriate MTU.
 	Dev      *string `yaml:"dev,omitempty" json:"dev,omitempty"`
-	DestPort *uint16
+	DestPort *uint16 `yaml:"dst_port,omitempty" json:"dst_port,omitempty"`
 }
 
 type VXLANInterfaceChangeSet struct {
