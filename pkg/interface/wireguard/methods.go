@@ -620,6 +620,7 @@ const WGINIKeyPersistentKeepalive string = "PersistentKeepalive"
 
 const WGAdditionalKeyLinkLocal = "linklocal"
 const WGAdditionalKeyPeerLinkLocal = "peerlinklocal"
+const WGAdditionalKeyVRF = "vrf"
 
 func parsePeerSection(peerSection map[string]string) (*WireGuardPeerConfig, error) {
 	wgPeerCfg := new(WireGuardPeerConfig)
@@ -750,6 +751,10 @@ func eINIWGAdapterSecondPass(interfaceSection map[string]string, peerSections []
 		}
 	} else {
 		return nil, fmt.Errorf("missing local ip")
+	}
+
+	if vrf, vrfok := wgConf.Additionals[WGAdditionalKeyVRF]; vrfok && vrf != "" {
+		wgConf.VRF = &vrf
 	}
 
 	return wgConf, nil
