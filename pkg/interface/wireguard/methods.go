@@ -46,34 +46,42 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
 	}
 
 	if wgInterfaceChangeSet.PrivateKeyToSet != nil {
+		log.Printf("wireguard link %s private key changed to %s", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.PrivateKeyToSet)
 		return true
 	}
 
 	if wgInterfaceChangeSet.MTUToSet != nil {
+		log.Printf("wireguard link %s mtu changed to %d", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.MTUToSet)
 		return true
 	}
 
 	if wgInterfaceChangeSet.ListenPortToSet != nil {
+		log.Printf("wireguard link %s listen port changed to %d", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.ListenPortToSet)
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.PeersToRemove) > 0 {
+		log.Printf("wireguard link %s peers removed: %v", wgInterfaceChangeSet.InterfaceName, wgInterfaceChangeSet.PeersToRemove)
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.PeersToAdd) > 0 {
+		log.Printf("wireguard link %s peers added: %v", wgInterfaceChangeSet.InterfaceName, wgInterfaceChangeSet.PeersToAdd)
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.AddressesToAdd) > 0 {
+		log.Printf("wireguard link %s addresses added: %v", wgInterfaceChangeSet.InterfaceName, len(wgInterfaceChangeSet.AddressesToAdd))
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.AddressesToRemove) > 0 {
+		log.Printf("wireguard link %s addresses removed: %v", wgInterfaceChangeSet.InterfaceName, len(wgInterfaceChangeSet.AddressesToRemove))
 		return true
 	}
 
 	if wgInterfaceChangeSet.VRFToSet != nil {
+		log.Printf("wireguard link %s vrf changed to %s", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.VRFToSet)
 		return true
 	}
 
@@ -145,43 +153,41 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		}
 	}
 
-	if wgInterfaceChangeSet.MTUToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.VRFToSet != nil {
-		err := pkgdocker.WithNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
-			link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
-			if err != nil {
-				return fmt.Errorf("failed to get wireguard link: %w", err)
-			}
-
-			if wgInterfaceChangeSet.VRFToSet != nil {
-				if err := pkginterfacevrf.TrySetVRF(handle, link, wgInterfaceChangeSet.VRFToSet); err != nil {
-					return fmt.Errorf("failed to set vrf for wireguard link: %w", err)
-				}
-			}
-
-			if wgInterfaceChangeSet.MTUToSet != nil {
-				if err := handle.LinkSetMTU(link, *wgInterfaceChangeSet.MTUToSet); err != nil {
-					return fmt.Errorf("failed to set wireguard link mtu: %w", err)
-				}
-			}
-
-			for _, addr := range wgInterfaceChangeSet.AddressesToRemove {
-				if err := handle.AddrDel(link, addr); err != nil {
-					return fmt.Errorf("failed to remove wireguard link address: %w", err)
-				}
-			}
-
-			for _, addr := range wgInterfaceChangeSet.AddressesToAdd {
-				if err := handle.AddrAdd(link, addr); err != nil {
-					return fmt.Errorf("failed to add wireguard link address: %w", err)
-				}
-			}
-
-			return nil
-		})
-
+	err := pkgdocker.WithNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
 		if err != nil {
-			return fmt.Errorf("failed to apply wireguard netlink config: %w", err)
+			return fmt.Errorf("failed to get wireguard link: %w", err)
 		}
+
+		if wgInterfaceChangeSet.VRFToSet != nil {
+			if err := pkginterfacevrf.TrySetVRF(handle, link, wgInterfaceChangeSet.VRFToSet); err != nil {
+				return fmt.Errorf("failed to set vrf for wireguard link: %w", err)
+			}
+		}
+
+		if wgInterfaceChangeSet.MTUToSet != nil {
+			if err := handle.LinkSetMTU(link, *wgInterfaceChangeSet.MTUToSet); err != nil {
+				return fmt.Errorf("failed to set wireguard link mtu: %w", err)
+			}
+		}
+
+		for _, addr := range wgInterfaceChangeSet.AddressesToRemove {
+			if err := handle.AddrDel(link, addr); err != nil {
+				return fmt.Errorf("failed to remove wireguard link address: %w", err)
+			}
+		}
+
+		for _, addr := range wgInterfaceChangeSet.AddressesToAdd {
+			if err := handle.AddrAdd(link, addr); err != nil {
+				return fmt.Errorf("failed to add wireguard link address: %w", err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to apply wireguard netlink config: %w", err)
 	}
 
 	return nil
@@ -332,8 +338,13 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		}
 
 		if wgConf.VRF != nil {
-			if changeSet.VRFToSet, err = pkginterfacevrf.CheckVRFDiff(handle, link, wgConf.VRF); err != nil {
+			vrfDiff, err := pkginterfacevrf.CheckVRFDiff(handle, link, wgConf.VRF)
+			if err != nil {
 				return fmt.Errorf("failed to check vrf diff: %w", err)
+			}
+			if vrfDiff != nil {
+				changeSet.VRFToSet = vrfDiff
+				log.Printf("wireguard link %s vrf changed to %s", wgConf.Name, *vrfDiff)
 			}
 		}
 
