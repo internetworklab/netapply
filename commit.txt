@@ -1,0 +1,8 @@
+CommitHash: e93a8520d9b6db56eba1818432ca1e581aefb73f
+BuildTime: 2025-10-17T23:55:54+00:00
+RevisionOrTag:
+GoVersion: go version go1.24.1 linux/arm64
+Uname-srvm: Linux 6.1.0-32-arm64 #1 SMP Debian 6.1.129-1 (2025-03-06) aarch64
+OfficialSite: https://github.com/internetworklab/netapply
+License: MIT
+Copyright: Copyright (c) 2025 duststars
