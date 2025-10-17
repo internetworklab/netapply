@@ -38,6 +38,8 @@ type WireGuardInterfaceChangeSet struct {
 
 	AddressesToAdd    []*netlink.Addr
 	AddressesToRemove []*netlink.Addr
+
+	VRFToSet *string
 }
 
 type WireGuardPeerConfig struct {

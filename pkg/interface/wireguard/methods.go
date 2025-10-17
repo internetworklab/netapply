@@ -14,6 +14,7 @@ import (
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -69,6 +70,10 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
 	}
 
 	if len(wgInterfaceChangeSet.AddressesToRemove) > 0 {
+		return true
+	}
+
+	if wgInterfaceChangeSet.VRFToSet != nil {
 		return true
 	}
 
@@ -140,11 +145,17 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		}
 	}
 
-	if wgInterfaceChangeSet.MTUToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil {
+	if wgInterfaceChangeSet.MTUToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.VRFToSet != nil {
 		err := pkgdocker.WithNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard link: %w", err)
+			}
+
+			if wgInterfaceChangeSet.VRFToSet != nil {
+				if err := pkginterfacevrf.TrySetVRF(handle, link, wgInterfaceChangeSet.VRFToSet); err != nil {
+					return fmt.Errorf("failed to set vrf for wireguard link: %w", err)
+				}
 			}
 
 			if wgInterfaceChangeSet.MTUToSet != nil {
@@ -318,6 +329,12 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		link, err := handle.LinkByName(wgConf.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard link: %w", err)
+		}
+
+		if wgConf.VRF != nil {
+			if changeSet.VRFToSet, err = pkginterfacevrf.CheckVRFDiff(handle, link, wgConf.VRF); err != nil {
+				return fmt.Errorf("failed to check vrf diff: %w", err)
+			}
 		}
 
 		if wgConf.MTU != nil {
