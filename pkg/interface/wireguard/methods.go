@@ -366,7 +366,7 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wg
 	}
 
 	if wgPeerConfig.Endpoint != nil {
-		udpAddr, err := net.ResolveUDPAddr("udp", *wgPeerConfig.Endpoint)
+		udpAddr, err := pkgutils.TryResolveUDPAddrManyTimes(*wgPeerConfig.Endpoint, 5, 1*time.Second)
 		if err != nil {
 			return nil, fmt.Errorf("failed to resolve udp address: %w", err)
 		}
@@ -808,7 +808,7 @@ func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) 
 	}
 
 	if interfaceSection == nil {
-		return nil, fmt.Errorf("no [Interface] section found, thus it's not a valid WireGuard ini config:\n%s\n", filecontent)
+		return nil, fmt.Errorf("no [Interface] section found, thus it's not a valid WireGuard ini config")
 	}
 
 	return eINIWGAdapterSecondPass(interfaceSection.SectionData, peerSectionMaps, additionals)
