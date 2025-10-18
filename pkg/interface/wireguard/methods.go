@@ -293,7 +293,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 			}
 
 			if err != nil {
-				return fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
+				return fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
 			}
 			specPeerConfigs = append(specPeerConfigs, *peercfg)
 		}
@@ -461,14 +461,14 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 
 	pk, err := getKeyObj(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key: %w", err)
+		return nil, fmt.Errorf("failed to parse private key of interface %s: %w", wgConf.Name, err)
 	}
 	wgtypesConf.PrivateKey = pk
 
 	for _, peer := range wgConf.Peers {
 		peercfg, err := peer.ToWGTypesPeer(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert peer to wgtypes peer: %w", err)
+			return nil, fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
 		}
 		wgtypesConf.Peers = append(wgtypesConf.Peers, *peercfg)
 	}
