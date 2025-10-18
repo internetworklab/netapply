@@ -106,6 +106,7 @@ func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context) error {
 			return fmt.Errorf("failed to detect changes: %w", err)
 		}
 		maxLoop--
+		iterId++
 	}
 
 	if maxLoop == 0 && changeSet != nil && changeSet.HasChanges() {
