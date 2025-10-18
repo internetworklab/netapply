@@ -84,6 +84,11 @@ func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
 
 func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec *VethPairConfig, handle *netlink.Handle) (*VethPairPeerChangeSet, error) {
 
+	if spec.Stub {
+		// stub interface never actually reconciles
+		return nil, nil
+	}
+
 	changeSet := new(VethPairPeerChangeSet)
 	changeSet.ContainerName = containerName
 	changeSet.InterfaceName = interfaceName
@@ -116,6 +121,11 @@ func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec 
 }
 
 func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
+	if vethPairConfig.Stub {
+		// stub interface never actually reconciles
+		return nil, nil
+	}
+
 	changeSet := new(VethPairChangeSet)
 
 	// Detecting local changeset
@@ -156,6 +166,10 @@ func (vethPairConfig *VethPairConfig) GetInterfaceName() string {
 }
 
 func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
+	if vethPairConfig.Stub {
+		// stub interface never actually creates or reconciles
+		return nil
+	}
 
 	return pkgdocker.WithNsHandleSafe(ctx, nil, func(handle *netlink.Handle) error {
 		cli, err := pkgutils.DockerCliFromCtx(ctx)
@@ -274,28 +288,6 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 	})
 }
 
-func (vethPairConfig *VethPairConfig) GetPlacementStatus(ctx context.Context) (*VethPairPlacementStatus, error) {
-	res := new(VethPairPlacementStatus)
-
-	pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.GetContainerName(), func(handle *netlink.Handle) error {
-		link, err := handle.LinkByName(vethPairConfig.GetInterfaceName())
-		if err == nil && link != nil {
-			res.FoundInPrimaryNetns = true
-		}
-		return nil
-	})
-
-	pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.Peer.GetContainerName(), func(handle *netlink.Handle) error {
-		link, err := handle.LinkByName(vethPairConfig.Peer.GetInterfaceName())
-		if err == nil && link != nil {
-			res.FoundInSecondaryNetns = true
-		}
-		return nil
-	})
-
-	return res, nil
-}
-
 func (vethCfgsList *VethPairConfigurationList) GetType() string {
 	return new(netlink.Veth).Type()
 }
@@ -330,56 +322,6 @@ func (vethCfgsList *VethPairConfigurationList) CheckResourceExistInSpec(ctx cont
 		return false, nil
 	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
-}
-
-func (vethPairSpec *VethPairConfig) TrySetup(ctx context.Context) error {
-	placementStatus, err := vethPairSpec.GetPlacementStatus(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get placement status for veth pair %s: %w", vethPairSpec.Name, err)
-	}
-
-	if placementStatus.FoundInPrimaryNetns && placementStatus.FoundInSecondaryNetns {
-		changeSet, err := vethPairSpec.DetectChanges(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to detect changes for veth pair %s: %w", vethPairSpec.Name, err)
-		}
-		if changeSet.HasUpdates() {
-			return changeSet.Apply(ctx)
-		}
-		return nil
-	}
-
-	if placementStatus.FoundInPrimaryNetns {
-		err := pkgdocker.WithNsHandleSafe(ctx, vethPairSpec.GetContainerName(), func(handle *netlink.Handle) error {
-			link, err := handle.LinkByName(vethPairSpec.GetInterfaceName())
-			if err != nil {
-				return fmt.Errorf("failed to get veth link: %w", err)
-			}
-			return handle.LinkDel(link)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to delete veth link: %w", err)
-		}
-
-		return vethPairSpec.Create(ctx)
-	}
-
-	if placementStatus.FoundInSecondaryNetns {
-		err := pkgdocker.WithNsHandleSafe(ctx, vethPairSpec.Peer.GetContainerName(), func(handle *netlink.Handle) error {
-			link, err := handle.LinkByName(vethPairSpec.Peer.GetInterfaceName())
-			if err != nil {
-				return fmt.Errorf("failed to get veth link: %w", err)
-			}
-			return handle.LinkDel(link)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to delete veth link: %w", err)
-		}
-
-		return vethPairSpec.Create(ctx)
-	}
-
-	return vethPairSpec.Create(ctx)
 }
 
 func (vethPairSpec *VethPairConfig) GetType() string {

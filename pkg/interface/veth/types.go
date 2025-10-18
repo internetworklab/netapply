@@ -12,6 +12,9 @@ type VethPairConfig struct {
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 	MTU           *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 	VRF           *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+
+	// A stub veth simply represents the another end of a veth pair, it's not actually created or actually reconciled.
+	Stub bool `yaml:"stub,omitempty" json:"stub,omitempty"`
 }
 
 type VethPairPeerChangeSet struct {
