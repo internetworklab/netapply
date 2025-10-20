@@ -1,0 +1,147 @@
+nodes:
+  hkg1:
+    listen_port_base: 57870
+    endpoint_host: hkg1.exploro.one
+  lax1:
+    listen_port_base: 57870
+    endpoint_host: lax1.exploro.one
+  sgp1:
+    listen_port_base: 57870
+    endpoint_host: sgp1.exploro.one
+  tokyo1:
+    listen_port_base: 57870
+    endpoint_host: tokyo1.exploro.one
+connections:
+  hkg1:
+    lax1:
+      self_private_key_file: /root/ansible/plan/keys/hkg1-lax1.key
+      self_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
+      peer_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
+      self_listen_port: 57870
+      peer_endpoint_host: lax1.exploro.one
+      peer_endpoint_port: 57870
+      connection_id: hkg1-lax1
+    sgp1:
+      self_private_key_file: /root/ansible/plan/keys/hkg1-sgp1.key
+      self_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
+      peer_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
+      self_listen_port: 57871
+      peer_endpoint_host: sgp1.exploro.one
+      peer_endpoint_port: 57870
+      connection_id: hkg1-sgp1
+    tokyo1:
+      self_private_key_file: /root/ansible/plan/keys/hkg1-tokyo1.key
+      self_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
+      peer_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
+      self_listen_port: 57872
+      peer_endpoint_host: tokyo1.exploro.one
+      peer_endpoint_port: 57870
+      connection_id: hkg1-tokyo1
+  lax1:
+    hkg1:
+      self_private_key_file: /root/ansible/plan/keys/lax1-hkg1.key
+      self_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
+      peer_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
+      self_listen_port: 57870
+      peer_endpoint_host: hkg1.exploro.one
+      peer_endpoint_port: 57870
+      connection_id: lax1-hkg1
+    tokyo1:
+      self_private_key_file: /root/ansible/plan/keys/lax1-tokyo1.key
+      self_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
+      peer_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
+      self_listen_port: 57871
+      peer_endpoint_host: tokyo1.exploro.one
+      peer_endpoint_port: 57871
+      connection_id: lax1-tokyo1
+  sgp1:
+    hkg1:
+      self_private_key_file: /root/ansible/plan/keys/sgp1-hkg1.key
+      self_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
+      peer_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
+      self_listen_port: 57870
+      peer_endpoint_host: hkg1.exploro.one
+      peer_endpoint_port: 57871
+      connection_id: sgp1-hkg1
+  tokyo1:
+    hkg1:
+      self_private_key_file: /root/ansible/plan/keys/tokyo1-hkg1.key
+      self_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
+      peer_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
+      self_listen_port: 57870
+      peer_endpoint_host: hkg1.exploro.one
+      peer_endpoint_port: 57872
+      connection_id: tokyo1-hkg1
+    lax1:
+      self_private_key_file: /root/ansible/plan/keys/tokyo1-lax1.key
+      self_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
+      peer_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
+      self_listen_port: 57871
+      peer_endpoint_host: lax1.exploro.one
+      peer_endpoint_port: 57871
+      connection_id: tokyo1-lax1
+indexed_connections:
+  hkg1-lax1:
+    self_private_key_file: /root/ansible/plan/keys/hkg1-lax1.key
+    self_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
+    peer_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
+    self_listen_port: 57870
+    peer_endpoint_host: lax1.exploro.one
+    peer_endpoint_port: 57870
+    connection_id: hkg1-lax1
+  hkg1-sgp1:
+    self_private_key_file: /root/ansible/plan/keys/hkg1-sgp1.key
+    self_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
+    peer_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
+    self_listen_port: 57871
+    peer_endpoint_host: sgp1.exploro.one
+    peer_endpoint_port: 57870
+    connection_id: hkg1-sgp1
+  hkg1-tokyo1:
+    self_private_key_file: /root/ansible/plan/keys/hkg1-tokyo1.key
+    self_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
+    peer_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
+    self_listen_port: 57872
+    peer_endpoint_host: tokyo1.exploro.one
+    peer_endpoint_port: 57870
+    connection_id: hkg1-tokyo1
+  lax1-hkg1:
+    self_private_key_file: /root/ansible/plan/keys/lax1-hkg1.key
+    self_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
+    peer_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
+    self_listen_port: 57870
+    peer_endpoint_host: hkg1.exploro.one
+    peer_endpoint_port: 57870
+    connection_id: lax1-hkg1
+  lax1-tokyo1:
+    self_private_key_file: /root/ansible/plan/keys/lax1-tokyo1.key
+    self_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
+    peer_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
+    self_listen_port: 57871
+    peer_endpoint_host: tokyo1.exploro.one
+    peer_endpoint_port: 57871
+    connection_id: lax1-tokyo1
+  sgp1-hkg1:
+    self_private_key_file: /root/ansible/plan/keys/sgp1-hkg1.key
+    self_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
+    peer_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
+    self_listen_port: 57870
+    peer_endpoint_host: hkg1.exploro.one
+    peer_endpoint_port: 57871
+    connection_id: sgp1-hkg1
+  tokyo1-hkg1:
+    self_private_key_file: /root/ansible/plan/keys/tokyo1-hkg1.key
+    self_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
+    peer_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
+    self_listen_port: 57870
+    peer_endpoint_host: hkg1.exploro.one
+    peer_endpoint_port: 57872
+    connection_id: tokyo1-hkg1
+  tokyo1-lax1:
+    self_private_key_file: /root/ansible/plan/keys/tokyo1-lax1.key
+    self_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
+    peer_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
+    self_listen_port: 57871
+    peer_endpoint_host: lax1.exploro.one
+    peer_endpoint_port: 57871
+    connection_id: tokyo1-lax1

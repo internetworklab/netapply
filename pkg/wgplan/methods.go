@@ -1,0 +1,134 @@
+package wgplan
+
+import (
+	"fmt"
+	"os"
+	"path"
+
+	wgtypes "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
+
+func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string) error {
+
+	for from, conns := range plan.Connections {
+		connIdx := 0
+		for to, conn := range conns {
+			pkObj, err := wgtypes.GeneratePrivateKey()
+			if err != nil {
+				return fmt.Errorf("failed to generate private key: %w", err)
+			}
+
+			privkeyStr := pkObj.String()
+			if plaintextKeys {
+				conn.SelfPrivateKey = &privkeyStr
+			}
+
+			if !noKeysOutput {
+				os.MkdirAll(keysOutDir, 0755)
+				fileName := fmt.Sprintf("%s.key", conn.ConnectionID)
+				filePath := path.Join(keysOutDir, fileName)
+				if err := os.WriteFile(filePath, []byte(privkeyStr), 0644); err != nil {
+					return fmt.Errorf("failed to write key file: %w", err)
+				}
+				conn.SelfPrivateKeyFile = &filePath
+			}
+
+			conn.SelfPublicKey = pkObj.PublicKey().String()
+			if conn.ConnectionID == "" {
+				conn.ConnectionID = fmt.Sprintf("%s-%s", from, to)
+			}
+			if toNode, ok := plan.Nodes[to]; ok {
+				if toNode.EndpointHost != nil {
+					conn.PeerEndpointHost = toNode.EndpointHost
+				}
+			}
+			if fromNode, ok := plan.Nodes[from]; ok {
+				conn.SelfListenPort = fromNode.ListenPortBase + connIdx
+			}
+			connIdx++
+		}
+	}
+
+	getRevConn := func(from, to string) *WGConnection {
+		if conns, ok := plan.Connections[to]; ok {
+			if conn, ok := conns[from]; ok {
+				return conn
+			}
+		}
+		return nil
+	}
+
+	for from, conns := range plan.Connections {
+		for to, conn := range conns {
+			if revConn := getRevConn(from, to); revConn != nil {
+				conn.PeerPublicKey = revConn.SelfPublicKey
+
+				if toNode, ok := plan.Nodes[to]; ok {
+					if toNode.EndpointHost != nil && revConn.SelfListenPort != 0 {
+						conn.PeerEndpointPort = &revConn.SelfListenPort
+					}
+				}
+
+				plan.IndexedConnections[conn.ConnectionID] = conn
+			}
+		}
+	}
+
+	// verifying
+	for from, conns := range plan.Connections {
+		for to, conn := range conns {
+			revConn := getRevConn(from, to)
+			if revConn == nil {
+				return fmt.Errorf("no reverse connection found for %s-%s", from, to)
+			}
+			if conn.PeerPublicKey != revConn.SelfPublicKey {
+				return fmt.Errorf("peer public key mismatch for %s-%s: %s != %s", from, to, conn.PeerPublicKey, revConn.SelfPublicKey)
+			}
+			if conn.SelfPublicKey != revConn.PeerPublicKey {
+				return fmt.Errorf("self public key mismatch for %s-%s: %s != %s", from, to, conn.SelfPublicKey, revConn.PeerPublicKey)
+			}
+
+			fromNode, ok := plan.Nodes[from]
+			if !ok {
+				return fmt.Errorf("from node %s not found", from)
+			}
+
+			toNode, ok := plan.Nodes[to]
+			if !ok {
+				return fmt.Errorf("to node %s not found", to)
+			}
+
+			if fromNode.EndpointHost != nil {
+				if revConn.PeerEndpointHost == nil {
+					return fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
+				}
+				if *revConn.PeerEndpointHost != *fromNode.EndpointHost {
+					return fmt.Errorf("peer endpoint host mismatch for %s-%s: %s != %s", from, to, *revConn.PeerEndpointHost, *fromNode.EndpointHost)
+				}
+				if revConn.PeerEndpointPort == nil {
+					return fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
+				}
+				if *revConn.PeerEndpointPort != conn.SelfListenPort {
+					return fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *revConn.PeerEndpointPort, conn.SelfListenPort)
+				}
+			}
+
+			if toNode.EndpointHost != nil {
+				if conn.PeerEndpointHost == nil {
+					return fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
+				}
+				if *conn.PeerEndpointHost != *toNode.EndpointHost {
+					return fmt.Errorf("peer endpoint host mismatch for %s-%s: %s != %s", from, to, *conn.PeerEndpointHost, *toNode.EndpointHost)
+				}
+				if conn.PeerEndpointPort == nil {
+					return fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
+				}
+				if *conn.PeerEndpointPort != revConn.SelfListenPort {
+					return fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *conn.PeerEndpointPort, revConn.SelfListenPort)
+				}
+			}
+		}
+	}
+
+	return nil
+}
