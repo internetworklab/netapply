@@ -1,4 +1,5 @@
 nodes:
+  ams1:
   hkg1:
     listen_port_base: 57870
     endpoint_host: "hkg1.exploro.one"
@@ -13,23 +14,20 @@ nodes:
     endpoint_host: "tokyo1.exploro.one"
 connections:
   hkg1:
-    lax1:
-      connection_id: "hkg1-lax1"
-    sgp1:
-      connection_id: "hkg1-sgp1"
-    tokyo1:
-      connection_id: "hkg1-tokyo1"
+    lax1: {}
+    sgp1: {}
+    tokyo1: {}
+    ams1: {}
   lax1:
-    hkg1:
-      connection_id: "lax1-hkg1"
-    tokyo1:
-      connection_id: "lax1-tokyo1"
+    hkg1: {}
+    tokyo1: {}
+  ams1:
+    sgp1: {}
+    hkg1: {}
   sgp1:
-    hkg1:
-      connection_id: "sgp1-hkg1"
+    hkg1: {}
+    ams1: {}
   tokyo1:
-    hkg1:
-      connection_id: "tokyo1-hkg1"
-    lax1:
-      connection_id: "tokyo1-lax1"
+    hkg1: {}
+    lax1: {}
 indexed_connections: {}

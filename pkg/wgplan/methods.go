@@ -13,6 +13,12 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 	for from, conns := range plan.Connections {
 		connIdx := 0
 		for to, conn := range conns {
+			var connID string
+			if conn.ConnectionID == nil || *conn.ConnectionID == "" {
+				connID = fmt.Sprintf("%s-%s", from, to)
+				conn.ConnectionID = &connID
+			}
+
 			pkObj, err := wgtypes.GeneratePrivateKey()
 			if err != nil {
 				return fmt.Errorf("failed to generate private key: %w", err)
@@ -25,7 +31,7 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 
 			if !noKeysOutput {
 				os.MkdirAll(keysOutDir, 0755)
-				fileName := fmt.Sprintf("%s.key", conn.ConnectionID)
+				fileName := fmt.Sprintf("%s.key", connID)
 				filePath := path.Join(keysOutDir, fileName)
 				if err := os.WriteFile(filePath, []byte(privkeyStr), 0644); err != nil {
 					return fmt.Errorf("failed to write key file: %w", err)
@@ -34,16 +40,12 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 			}
 
 			conn.SelfPublicKey = pkObj.PublicKey().String()
-			if conn.ConnectionID == "" {
-				conn.ConnectionID = fmt.Sprintf("%s-%s", from, to)
-			}
-			if toNode, ok := plan.Nodes[to]; ok {
-				if toNode.EndpointHost != nil {
-					conn.PeerEndpointHost = toNode.EndpointHost
-				}
-			}
+
 			if fromNode, ok := plan.Nodes[from]; ok {
-				conn.SelfListenPort = fromNode.ListenPortBase + connIdx
+				if fromNode.ListenPortBase != nil {
+					lp := *fromNode.ListenPortBase + connIdx
+					conn.SelfListenPort = &lp
+				}
 			}
 			connIdx++
 		}
@@ -64,12 +66,13 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 				conn.PeerPublicKey = revConn.SelfPublicKey
 
 				if toNode, ok := plan.Nodes[to]; ok {
-					if toNode.EndpointHost != nil && revConn.SelfListenPort != 0 {
-						conn.PeerEndpointPort = &revConn.SelfListenPort
+					if revConn.SelfListenPort != nil {
+						conn.PeerEndpointHost = toNode.EndpointHost
+						conn.PeerEndpointPort = revConn.SelfListenPort
 					}
 				}
 
-				plan.IndexedConnections[conn.ConnectionID] = conn
+				plan.IndexedConnections[*conn.ConnectionID] = conn
 			}
 		}
 	}
@@ -98,7 +101,7 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 				return fmt.Errorf("to node %s not found", to)
 			}
 
-			if fromNode.EndpointHost != nil {
+			if fromNode.EndpointHost != nil && fromNode.ListenPortBase != nil {
 				if revConn.PeerEndpointHost == nil {
 					return fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
 				}
@@ -108,12 +111,12 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 				if revConn.PeerEndpointPort == nil {
 					return fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
 				}
-				if *revConn.PeerEndpointPort != conn.SelfListenPort {
+				if *revConn.PeerEndpointPort != *conn.SelfListenPort {
 					return fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *revConn.PeerEndpointPort, conn.SelfListenPort)
 				}
 			}
 
-			if toNode.EndpointHost != nil {
+			if toNode.EndpointHost != nil && toNode.ListenPortBase != nil {
 				if conn.PeerEndpointHost == nil {
 					return fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
 				}
@@ -123,7 +126,7 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 				if conn.PeerEndpointPort == nil {
 					return fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
 				}
-				if *conn.PeerEndpointPort != revConn.SelfListenPort {
+				if *conn.PeerEndpointPort != *revConn.SelfListenPort {
 					return fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *conn.PeerEndpointPort, revConn.SelfListenPort)
 				}
 			}

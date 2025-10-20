@@ -1,8 +1,8 @@
 package wgplan
 
 type WGNode struct {
-	ListenPortBase int     `yaml:"listen_port_base"`
-	EndpointHost   *string `yaml:"endpoint_host"`
+	ListenPortBase *int    `yaml:"listen_port_base,omitempty"`
+	EndpointHost   *string `yaml:"endpoint_host,omitempty"`
 }
 
 type WGConnection struct {
@@ -13,12 +13,12 @@ type WGConnection struct {
 
 	PeerPublicKey string `yaml:"peer_public_key,omitempty"`
 
-	SelfListenPort int `yaml:"self_listen_port,omitempty"`
+	SelfListenPort *int `yaml:"self_listen_port,omitempty"`
 
 	PeerEndpointHost *string `yaml:"peer_endpoint_host,omitempty"`
 	PeerEndpointPort *int    `yaml:"peer_endpoint_port,omitempty"`
 
-	ConnectionID string `yaml:"connection_id,omitempty"`
+	ConnectionID *string `yaml:"connection_id,omitempty"`
 }
 
 type WGPlan struct {
