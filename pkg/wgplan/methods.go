@@ -10,14 +10,21 @@ import (
 
 func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string) error {
 
+	connections := make(map[string]map[string]*WGConnection)
+
 	for from, conns := range plan.Connections {
 		connIdx := 0
-		for to, conn := range conns {
-			var connID string
-			if conn.ConnectionID == nil || *conn.ConnectionID == "" {
-				connID = fmt.Sprintf("%s-%s", from, to)
+		for to, connraw := range conns {
+			var conn *WGConnection = connraw
+			if conn == nil {
+				conn = new(WGConnection)
+				connID := fmt.Sprintf("%s-%s", from, to)
 				conn.ConnectionID = &connID
 			}
+			if _, ok := connections[from]; !ok {
+				connections[from] = make(map[string]*WGConnection)
+			}
+			connections[from][to] = conn
 
 			pkObj, err := wgtypes.GeneratePrivateKey()
 			if err != nil {
@@ -31,7 +38,7 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 
 			if !noKeysOutput {
 				os.MkdirAll(keysOutDir, 0755)
-				fileName := fmt.Sprintf("%s.key", connID)
+				fileName := fmt.Sprintf("%s.key", *conn.ConnectionID)
 				filePath := path.Join(keysOutDir, fileName)
 				if err := os.WriteFile(filePath, []byte(privkeyStr), 0644); err != nil {
 					return fmt.Errorf("failed to write key file: %w", err)
@@ -50,6 +57,8 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 			connIdx++
 		}
 	}
+
+	plan.Connections = connections
 
 	getRevConn := func(from, to string) *WGConnection {
 		if conns, ok := plan.Connections[to]; ok {

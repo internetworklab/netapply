@@ -14,20 +14,20 @@ nodes:
     endpoint_host: "tokyo1.exploro.one"
 connections:
   hkg1:
-    lax1: {}
-    sgp1: {}
-    tokyo1: {}
-    ams1: {}
+    lax1:
+    sgp1:
+    tokyo1:
+    ams1:
   lax1:
-    hkg1: {}
-    tokyo1: {}
+    hkg1:
+    tokyo1:
   ams1:
-    sgp1: {}
-    hkg1: {}
+    sgp1:
+    hkg1:
   sgp1:
-    hkg1: {}
-    ams1: {}
+    hkg1:
+    ams1:
   tokyo1:
-    hkg1: {}
-    lax1: {}
+    hkg1:
+    lax1:
 indexed_connections: {}
