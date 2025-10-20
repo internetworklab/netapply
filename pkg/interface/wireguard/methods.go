@@ -610,18 +610,6 @@ func parseSectionHeader(line string) string {
 	return strings.TrimSpace(sectionName)
 }
 
-const WGINIKeyListenPort string = "ListenPort"
-const WGINIKeyPrivateKey string = "PrivateKey"
-const WGINIKeyAllowedIPs string = "AllowedIPs"
-const WGINIKeyEndpoint string = "Endpoint"
-const WGINIKeyPublicKey string = "PublicKey"
-const WGINIKeyPresharedKey string = "PresharedKey"
-const WGINIKeyPersistentKeepalive string = "PersistentKeepalive"
-
-const WGAdditionalKeyLinkLocal = "linklocal"
-const WGAdditionalKeyPeerLinkLocal = "peerlinklocal"
-const WGAdditionalKeyVRF = "vrf"
-
 func parsePeerSection(peerSection map[string]string) (*WireGuardPeerConfig, error) {
 	wgPeerCfg := new(WireGuardPeerConfig)
 
