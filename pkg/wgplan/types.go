@@ -3,6 +3,7 @@ package wgplan
 type WGNode struct {
 	ListenPortBase *int    `yaml:"listen_port_base,omitempty"`
 	EndpointHost   *string `yaml:"endpoint_host,omitempty"`
+	LocalIP        *string `yaml:"local_ip,omitempty"`
 }
 
 type WGConnection struct {
@@ -19,6 +20,9 @@ type WGConnection struct {
 	PeerEndpointPort *int    `yaml:"peer_endpoint_port,omitempty"`
 
 	ConnectionID *string `yaml:"connection_id,omitempty"`
+
+	LocalIP *string `yaml:"local_ip,omitempty"`
+	PeerIP  *string `yaml:"peer_ip,omitempty"`
 }
 
 type WGPlan struct {

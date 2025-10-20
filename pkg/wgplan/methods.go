@@ -66,6 +66,7 @@ func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys map[string]string,
 			conn.SelfPublicKey = pkObj.PublicKey().String()
 
 			if fromNode, ok := plan.Nodes[from]; ok {
+				conn.LocalIP = fromNode.LocalIP
 				if fromNode.ListenPortBase != nil {
 					lp := *fromNode.ListenPortBase + connIdx
 					conn.SelfListenPort = &lp
@@ -81,6 +82,7 @@ func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys map[string]string,
 			if revConn != nil {
 				conn.PeerPublicKey = revConn.SelfPublicKey
 				if toNode, ok := plan.Nodes[to]; ok {
+					conn.PeerIP = toNode.LocalIP
 					if revConn.SelfListenPort != nil {
 						conn.PeerEndpointHost = toNode.EndpointHost
 						conn.PeerEndpointPort = revConn.SelfListenPort
