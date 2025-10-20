@@ -68,7 +68,6 @@ func (c *GenerateCmd) Run() error {
 type PopulateCmd struct {
 	PlanFile    string `required:"" help:"The plan file to use"`
 	TargetGlobs string `required:"" help:"The target globs to use to search for the targets"`
-	BaseDir     string `help:"The base directory to use to search for the targets" default:"."`
 	DryRun      bool   `help:"Do not actually populate the plan" default:"false"`
 }
 
