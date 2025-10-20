@@ -24,5 +24,5 @@ type WGConnection struct {
 type WGPlan struct {
 	Nodes              map[string]WGNode                   `yaml:"nodes"`
 	Connections        map[string]map[string]*WGConnection `yaml:"connections"`
-	IndexedConnections map[string]*WGConnection            `yaml:"indexed_connections"`
+	IndexedConnections map[string]*WGConnection            `yaml:"indexed_connections,omitempty"`
 }

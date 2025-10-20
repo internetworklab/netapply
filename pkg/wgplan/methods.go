@@ -2,18 +2,31 @@ package wgplan
 
 import (
 	"fmt"
-	"os"
-	"path"
 
 	wgtypes "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string) error {
+func getFromMap(m map[string]map[string]*WGConnection, from, to string) *WGConnection {
+	if conns, ok := m[from]; ok {
+		if conn, ok := conns[to]; ok {
+			return conn
+		}
+	}
+	return nil
+}
+
+func setToMap(m map[string]map[string]*WGConnection, from, to string, conn *WGConnection) {
+	if _, ok := m[from]; !ok {
+		m[from] = make(map[string]*WGConnection)
+	}
+	m[from][to] = conn
+}
+
+func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys map[string]string, err error) {
+	privateKeys = make(map[string]string)
 
 	connections := make(map[string]map[string]*WGConnection)
-
 	for from, conns := range plan.Connections {
-		connIdx := 0
 		for to, connraw := range conns {
 			var conn *WGConnection = connraw
 			if conn == nil {
@@ -21,29 +34,33 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 				connID := fmt.Sprintf("%s-%s", from, to)
 				conn.ConnectionID = &connID
 			}
-			if _, ok := connections[from]; !ok {
-				connections[from] = make(map[string]*WGConnection)
+			setToMap(connections, from, to, conn)
+			var revConn *WGConnection = getFromMap(plan.Connections, to, from)
+			if revConn == nil {
+				// automatically creates the reverse link
+				revConn = new(WGConnection)
+				connID := fmt.Sprintf("%s-%s", to, from)
+				revConn.ConnectionID = &connID
 			}
-			connections[from][to] = conn
+			setToMap(connections, to, from, revConn)
+		}
+	}
+	plan.Connections = connections
+
+	for from, conns := range plan.Connections {
+		connIdx := 0
+		for _, conn := range conns {
 
 			pkObj, err := wgtypes.GeneratePrivateKey()
 			if err != nil {
-				return fmt.Errorf("failed to generate private key: %w", err)
+				return nil, fmt.Errorf("failed to generate private key: %w", err)
 			}
 
 			privkeyStr := pkObj.String()
+			privateKeys[*conn.ConnectionID] = privkeyStr
+
 			if plaintextKeys {
 				conn.SelfPrivateKey = &privkeyStr
-			}
-
-			if !noKeysOutput {
-				os.MkdirAll(keysOutDir, 0755)
-				fileName := fmt.Sprintf("%s.key", *conn.ConnectionID)
-				filePath := path.Join(keysOutDir, fileName)
-				if err := os.WriteFile(filePath, []byte(privkeyStr), 0644); err != nil {
-					return fmt.Errorf("failed to write key file: %w", err)
-				}
-				conn.SelfPrivateKeyFile = &filePath
 			}
 
 			conn.SelfPublicKey = pkObj.PublicKey().String()
@@ -58,30 +75,17 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 		}
 	}
 
-	plan.Connections = connections
-
-	getRevConn := func(from, to string) *WGConnection {
-		if conns, ok := plan.Connections[to]; ok {
-			if conn, ok := conns[from]; ok {
-				return conn
-			}
-		}
-		return nil
-	}
-
 	for from, conns := range plan.Connections {
 		for to, conn := range conns {
-			if revConn := getRevConn(from, to); revConn != nil {
+			revConn := getFromMap(plan.Connections, to, from)
+			if revConn != nil {
 				conn.PeerPublicKey = revConn.SelfPublicKey
-
 				if toNode, ok := plan.Nodes[to]; ok {
 					if revConn.SelfListenPort != nil {
 						conn.PeerEndpointHost = toNode.EndpointHost
 						conn.PeerEndpointPort = revConn.SelfListenPort
 					}
 				}
-
-				plan.IndexedConnections[*conn.ConnectionID] = conn
 			}
 		}
 	}
@@ -89,58 +93,67 @@ func (plan *WGPlan) Generate(plaintextKeys, noKeysOutput bool, keysOutDir string
 	// verifying
 	for from, conns := range plan.Connections {
 		for to, conn := range conns {
-			revConn := getRevConn(from, to)
+			revConn := getFromMap(plan.Connections, to, from)
 			if revConn == nil {
-				return fmt.Errorf("no reverse connection found for %s-%s", from, to)
+				return nil, fmt.Errorf("no reverse connection found for %s-%s", from, to)
 			}
 			if conn.PeerPublicKey != revConn.SelfPublicKey {
-				return fmt.Errorf("peer public key mismatch for %s-%s: %s != %s", from, to, conn.PeerPublicKey, revConn.SelfPublicKey)
+				return nil, fmt.Errorf("peer public key mismatch for %s-%s: %s != %s", from, to, conn.PeerPublicKey, revConn.SelfPublicKey)
 			}
 			if conn.SelfPublicKey != revConn.PeerPublicKey {
-				return fmt.Errorf("self public key mismatch for %s-%s: %s != %s", from, to, conn.SelfPublicKey, revConn.PeerPublicKey)
+				return nil, fmt.Errorf("self public key mismatch for %s-%s: %s != %s", from, to, conn.SelfPublicKey, revConn.PeerPublicKey)
 			}
 
 			fromNode, ok := plan.Nodes[from]
 			if !ok {
-				return fmt.Errorf("from node %s not found", from)
+				return nil, fmt.Errorf("from node %s not found", from)
 			}
 
 			toNode, ok := plan.Nodes[to]
 			if !ok {
-				return fmt.Errorf("to node %s not found", to)
+				return nil, fmt.Errorf("to node %s not found", to)
 			}
 
 			if fromNode.EndpointHost != nil && fromNode.ListenPortBase != nil {
 				if revConn.PeerEndpointHost == nil {
-					return fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
+					return nil, fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
 				}
 				if *revConn.PeerEndpointHost != *fromNode.EndpointHost {
-					return fmt.Errorf("peer endpoint host mismatch for %s-%s: %s != %s", from, to, *revConn.PeerEndpointHost, *fromNode.EndpointHost)
+					return nil, fmt.Errorf("peer endpoint host mismatch for %s-%s: %s != %s", from, to, *revConn.PeerEndpointHost, *fromNode.EndpointHost)
 				}
 				if revConn.PeerEndpointPort == nil {
-					return fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
+					return nil, fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
 				}
 				if *revConn.PeerEndpointPort != *conn.SelfListenPort {
-					return fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *revConn.PeerEndpointPort, conn.SelfListenPort)
+					return nil, fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *revConn.PeerEndpointPort, conn.SelfListenPort)
 				}
 			}
 
 			if toNode.EndpointHost != nil && toNode.ListenPortBase != nil {
 				if conn.PeerEndpointHost == nil {
-					return fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
+					return nil, fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
 				}
 				if *conn.PeerEndpointHost != *toNode.EndpointHost {
-					return fmt.Errorf("peer endpoint host mismatch for %s-%s: %s != %s", from, to, *conn.PeerEndpointHost, *toNode.EndpointHost)
+					return nil, fmt.Errorf("peer endpoint host mismatch for %s-%s: %s != %s", from, to, *conn.PeerEndpointHost, *toNode.EndpointHost)
 				}
 				if conn.PeerEndpointPort == nil {
-					return fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
+					return nil, fmt.Errorf("peer endpoint port is nil for %s-%s", from, to)
 				}
 				if *conn.PeerEndpointPort != *revConn.SelfListenPort {
-					return fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *conn.PeerEndpointPort, revConn.SelfListenPort)
+					return nil, fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *conn.PeerEndpointPort, revConn.SelfListenPort)
 				}
 			}
 		}
 	}
 
-	return nil
+	if plan.IndexedConnections == nil {
+		plan.IndexedConnections = make(map[string]*WGConnection)
+	}
+	for _, conns := range plan.Connections {
+		for _, conn := range conns {
+			plan.IndexedConnections[*conn.ConnectionID] = conn
+		}
+	}
+
+	return privateKeys, nil
 }

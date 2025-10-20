@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 
@@ -52,8 +53,23 @@ func (c *GenerateCmd) Run() error {
 		return fmt.Errorf("failed to get plan: %w", err)
 	}
 
-	if err := plan.Generate(c.PlaintextKeys, c.NoKeysOutput, c.KeysOutDir); err != nil {
+	privkeys, err := plan.Generate(c.PlaintextKeys)
+	if err != nil {
 		return fmt.Errorf("failed to generate plan: %w", err)
+	}
+
+	if !c.NoKeysOutput {
+		os.MkdirAll(c.KeysOutDir, 0755)
+		for connID, privkey := range privkeys {
+			fileName := fmt.Sprintf("%s.key", connID)
+			filePath := path.Join(c.KeysOutDir, fileName)
+			if err := os.WriteFile(filePath, []byte(privkey), 0644); err != nil {
+				return fmt.Errorf("failed to write key file %s: %w", filePath, err)
+			}
+			if conn, ok := plan.IndexedConnections[connID]; ok {
+				conn.SelfPrivateKeyFile = &filePath
+			}
+		}
 	}
 
 	enc := yaml.NewEncoder(os.Stdout)
