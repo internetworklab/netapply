@@ -1,5 +1,4 @@
 nodes:
-  ams1:
   hkg1:
     listen_port_base: 57870
     endpoint_host: "hkg1.exploro.one"
@@ -7,20 +6,37 @@ nodes:
     listen_port_base: 57870
     endpoint_host: "lax1.exploro.one"
   sgp1:
-    listen_port_base: 57870
-    endpoint_host: "sgp1.exploro.one"
+  ams1:
+  dallas1:
   tokyo1:
     listen_port_base: 57870
     endpoint_host: "tokyo1.exploro.one"
+  fra1:
+    listen_port_base: 57870
+    endpoint_host: "frank1.exploro.one"
+  nyc1:
+    listen_port_base: 57870
+    endpoint_host: "nyc1.exploro.one"
+  wien1:
+    listen_port_base: 57870
+    endpoint_host: "wien1.exploro.one"
 connections:
+  ams1:
+    wien1:
+  wien1:
+    sgp1:
+    fra1:
   hkg1:
     lax1:
     sgp1:
     tokyo1:
-    ams1:
   lax1:
     hkg1:
     tokyo1:
   sgp1:
-    hkg1:
-    ams1:
+    fra1:
+  nyc1:
+    lax1:
+    dallas1:
+    fra1:
+    wien1:

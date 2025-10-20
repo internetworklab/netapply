@@ -114,6 +114,20 @@ func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys map[string]string,
 				return nil, fmt.Errorf("to node %s not found", to)
 			}
 
+			var fromNodeIsNAT bool = false
+			if fromNode.EndpointHost == nil || fromNode.ListenPortBase == nil {
+				fromNodeIsNAT = true
+			}
+
+			var toNodeIsNAT bool = false
+			if toNode.EndpointHost == nil || toNode.ListenPortBase == nil {
+				toNodeIsNAT = true
+			}
+
+			if fromNodeIsNAT && toNodeIsNAT {
+				return nil, fmt.Errorf("both nodes %s and %s are NAT nodes", from, to)
+			}
+
 			if fromNode.EndpointHost != nil && fromNode.ListenPortBase != nil {
 				if revConn.PeerEndpointHost == nil {
 					return nil, fmt.Errorf("peer endpoint host is nil for %s-%s", from, to)
