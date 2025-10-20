@@ -145,6 +145,7 @@ func (c *PopulateCmd) Run() error {
 
 				wgCfg.Peers = []pkginterfacewireguard.WireGuardPeerConfig{*peerCfg}
 				updatedWGCfgs = append(updatedWGCfgs, wgCfg)
+				log.Printf("Populated connection %s in file: %s", connID, path)
 			}
 		}
 		nodeCfg.Resources.WireGuard.WireGuardConfigs = updatedWGCfgs
