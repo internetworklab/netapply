@@ -14,133 +14,133 @@ nodes:
 connections:
   hkg1:
     lax1:
-      self_private_key_file: /root/ansible/plan/keys/hkg1-lax1.key
-      self_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
-      peer_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
-      self_listen_port: 57870
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-lax1.key
+      self_public_key: uuoOzfXU+MDiQ3ZZCrw1ITWc5ebl5UeftVrRvlm/Hlg=
+      peer_public_key: 5S1Cjo/7GCtKRYTU5Y10QfZS4gTxUrK1XVrSl1EV6kw=
+      self_listen_port: 57872
       peer_endpoint_host: lax1.exploro.one
       peer_endpoint_port: 57870
       connection_id: hkg1-lax1
     sgp1:
-      self_private_key_file: /root/ansible/plan/keys/hkg1-sgp1.key
-      self_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
-      peer_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
-      self_listen_port: 57871
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-sgp1.key
+      self_public_key: 8wtp6reI4iEVM8nZWtkaM24NW73y2SAlB1auuCwA7DQ=
+      peer_public_key: EnBEPqThcmN20Cxo+UfrVeShTER1zSYBroiT3Zc6NFk=
+      self_listen_port: 57870
       peer_endpoint_host: sgp1.exploro.one
       peer_endpoint_port: 57870
       connection_id: hkg1-sgp1
     tokyo1:
-      self_private_key_file: /root/ansible/plan/keys/hkg1-tokyo1.key
-      self_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
-      peer_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
-      self_listen_port: 57872
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-tokyo1.key
+      self_public_key: kZY0ryGKzyUOrGfuPwK0gGcgwYU9Bwip2udqga5tORo=
+      peer_public_key: 5u6BiuXMyEkQoTJes6e6A/f+DkoI4ngKo5FFQXqnWiU=
+      self_listen_port: 57871
       peer_endpoint_host: tokyo1.exploro.one
       peer_endpoint_port: 57870
       connection_id: hkg1-tokyo1
   lax1:
     hkg1:
-      self_private_key_file: /root/ansible/plan/keys/lax1-hkg1.key
-      self_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
-      peer_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-hkg1.key
+      self_public_key: 5S1Cjo/7GCtKRYTU5Y10QfZS4gTxUrK1XVrSl1EV6kw=
+      peer_public_key: uuoOzfXU+MDiQ3ZZCrw1ITWc5ebl5UeftVrRvlm/Hlg=
       self_listen_port: 57870
       peer_endpoint_host: hkg1.exploro.one
-      peer_endpoint_port: 57870
+      peer_endpoint_port: 57872
       connection_id: lax1-hkg1
     tokyo1:
-      self_private_key_file: /root/ansible/plan/keys/lax1-tokyo1.key
-      self_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
-      peer_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-tokyo1.key
+      self_public_key: pkcP6QUMBiYMZmgI7QpF3O7S2Au727HDyvV+WE0DZTU=
+      peer_public_key: 9EiPhF5OcErGCq/WBbP37FhWgPgeQCRl4kZ2wcpt+RA=
       self_listen_port: 57871
       peer_endpoint_host: tokyo1.exploro.one
       peer_endpoint_port: 57871
       connection_id: lax1-tokyo1
   sgp1:
     hkg1:
-      self_private_key_file: /root/ansible/plan/keys/sgp1-hkg1.key
-      self_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
-      peer_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-hkg1.key
+      self_public_key: EnBEPqThcmN20Cxo+UfrVeShTER1zSYBroiT3Zc6NFk=
+      peer_public_key: 8wtp6reI4iEVM8nZWtkaM24NW73y2SAlB1auuCwA7DQ=
       self_listen_port: 57870
       peer_endpoint_host: hkg1.exploro.one
-      peer_endpoint_port: 57871
+      peer_endpoint_port: 57870
       connection_id: sgp1-hkg1
   tokyo1:
     hkg1:
-      self_private_key_file: /root/ansible/plan/keys/tokyo1-hkg1.key
-      self_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
-      peer_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tokyo1-hkg1.key
+      self_public_key: 5u6BiuXMyEkQoTJes6e6A/f+DkoI4ngKo5FFQXqnWiU=
+      peer_public_key: kZY0ryGKzyUOrGfuPwK0gGcgwYU9Bwip2udqga5tORo=
       self_listen_port: 57870
       peer_endpoint_host: hkg1.exploro.one
-      peer_endpoint_port: 57872
+      peer_endpoint_port: 57871
       connection_id: tokyo1-hkg1
     lax1:
-      self_private_key_file: /root/ansible/plan/keys/tokyo1-lax1.key
-      self_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
-      peer_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
+      self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tokyo1-lax1.key
+      self_public_key: 9EiPhF5OcErGCq/WBbP37FhWgPgeQCRl4kZ2wcpt+RA=
+      peer_public_key: pkcP6QUMBiYMZmgI7QpF3O7S2Au727HDyvV+WE0DZTU=
       self_listen_port: 57871
       peer_endpoint_host: lax1.exploro.one
       peer_endpoint_port: 57871
       connection_id: tokyo1-lax1
 indexed_connections:
   hkg1-lax1:
-    self_private_key_file: /root/ansible/plan/keys/hkg1-lax1.key
-    self_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
-    peer_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
-    self_listen_port: 57870
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-lax1.key
+    self_public_key: uuoOzfXU+MDiQ3ZZCrw1ITWc5ebl5UeftVrRvlm/Hlg=
+    peer_public_key: 5S1Cjo/7GCtKRYTU5Y10QfZS4gTxUrK1XVrSl1EV6kw=
+    self_listen_port: 57872
     peer_endpoint_host: lax1.exploro.one
     peer_endpoint_port: 57870
     connection_id: hkg1-lax1
   hkg1-sgp1:
-    self_private_key_file: /root/ansible/plan/keys/hkg1-sgp1.key
-    self_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
-    peer_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
-    self_listen_port: 57871
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-sgp1.key
+    self_public_key: 8wtp6reI4iEVM8nZWtkaM24NW73y2SAlB1auuCwA7DQ=
+    peer_public_key: EnBEPqThcmN20Cxo+UfrVeShTER1zSYBroiT3Zc6NFk=
+    self_listen_port: 57870
     peer_endpoint_host: sgp1.exploro.one
     peer_endpoint_port: 57870
     connection_id: hkg1-sgp1
   hkg1-tokyo1:
-    self_private_key_file: /root/ansible/plan/keys/hkg1-tokyo1.key
-    self_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
-    peer_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
-    self_listen_port: 57872
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-tokyo1.key
+    self_public_key: kZY0ryGKzyUOrGfuPwK0gGcgwYU9Bwip2udqga5tORo=
+    peer_public_key: 5u6BiuXMyEkQoTJes6e6A/f+DkoI4ngKo5FFQXqnWiU=
+    self_listen_port: 57871
     peer_endpoint_host: tokyo1.exploro.one
     peer_endpoint_port: 57870
     connection_id: hkg1-tokyo1
   lax1-hkg1:
-    self_private_key_file: /root/ansible/plan/keys/lax1-hkg1.key
-    self_public_key: usSw8pgkfMISvRtXfiK8i8rnG2ZNXfQ77BI4NR43ehc=
-    peer_public_key: erCpKquYtCUFYIOwtnJ0T+F7kLkpF7fw9Q7V2uZ4m2U=
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-hkg1.key
+    self_public_key: 5S1Cjo/7GCtKRYTU5Y10QfZS4gTxUrK1XVrSl1EV6kw=
+    peer_public_key: uuoOzfXU+MDiQ3ZZCrw1ITWc5ebl5UeftVrRvlm/Hlg=
     self_listen_port: 57870
     peer_endpoint_host: hkg1.exploro.one
-    peer_endpoint_port: 57870
+    peer_endpoint_port: 57872
     connection_id: lax1-hkg1
   lax1-tokyo1:
-    self_private_key_file: /root/ansible/plan/keys/lax1-tokyo1.key
-    self_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
-    peer_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-tokyo1.key
+    self_public_key: pkcP6QUMBiYMZmgI7QpF3O7S2Au727HDyvV+WE0DZTU=
+    peer_public_key: 9EiPhF5OcErGCq/WBbP37FhWgPgeQCRl4kZ2wcpt+RA=
     self_listen_port: 57871
     peer_endpoint_host: tokyo1.exploro.one
     peer_endpoint_port: 57871
     connection_id: lax1-tokyo1
   sgp1-hkg1:
-    self_private_key_file: /root/ansible/plan/keys/sgp1-hkg1.key
-    self_public_key: 34fYzsPG3JxIj4Wo9/rKfzzFlb+aNNBQ1jzKa42mjyc=
-    peer_public_key: FAy006geqb798wCYNXU8+oP45RkyV4BQBw7AJlm34EM=
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-hkg1.key
+    self_public_key: EnBEPqThcmN20Cxo+UfrVeShTER1zSYBroiT3Zc6NFk=
+    peer_public_key: 8wtp6reI4iEVM8nZWtkaM24NW73y2SAlB1auuCwA7DQ=
+    self_listen_port: 57870
+    peer_endpoint_host: hkg1.exploro.one
+    peer_endpoint_port: 57870
+    connection_id: sgp1-hkg1
+  tokyo1-hkg1:
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tokyo1-hkg1.key
+    self_public_key: 5u6BiuXMyEkQoTJes6e6A/f+DkoI4ngKo5FFQXqnWiU=
+    peer_public_key: kZY0ryGKzyUOrGfuPwK0gGcgwYU9Bwip2udqga5tORo=
     self_listen_port: 57870
     peer_endpoint_host: hkg1.exploro.one
     peer_endpoint_port: 57871
-    connection_id: sgp1-hkg1
-  tokyo1-hkg1:
-    self_private_key_file: /root/ansible/plan/keys/tokyo1-hkg1.key
-    self_public_key: o7f1ZFgqaoHVNQdgrD6LZUjJDoq8eWfHGIMOxcnciAU=
-    peer_public_key: Rc0Wpd2hG4TVfRVAAYJ06r9KLCeqQXVDH7KwjgyXfWI=
-    self_listen_port: 57870
-    peer_endpoint_host: hkg1.exploro.one
-    peer_endpoint_port: 57872
     connection_id: tokyo1-hkg1
   tokyo1-lax1:
-    self_private_key_file: /root/ansible/plan/keys/tokyo1-lax1.key
-    self_public_key: +SDxPn9ohzGuRkinUOe1G6VgBRkrZGjj6anJ2bu57TM=
-    peer_public_key: 0LTpPkIc3br7iQCk8qWvyDwcIYiBzzIBxIeuQf9U9EQ=
+    self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tokyo1-lax1.key
+    self_public_key: 9EiPhF5OcErGCq/WBbP37FhWgPgeQCRl4kZ2wcpt+RA=
+    peer_public_key: pkcP6QUMBiYMZmgI7QpF3O7S2Au727HDyvV+WE0DZTU=
     self_listen_port: 57871
     peer_endpoint_host: lax1.exploro.one
     peer_endpoint_port: 57871
