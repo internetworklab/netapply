@@ -11,41 +11,41 @@ nodes:
     local_ip: 10.3.48.1
   ams1:
     local_ip: 10.3.82.1
-  dallas1:
+  dal1:
     local_ip: 10.3.99.1
-  tokyo1:
+  tyo1:
     listen_port_base: 57870
-    endpoint_host: "tokyo1.exploro.one"
+    endpoint_host: "tyo1.exploro.one"
     local_ip: 10.3.16.1
-  frank1:
+  fra1:
     listen_port_base: 57870
-    endpoint_host: "frank1.exploro.one"
+    endpoint_host: "fra1.exploro.one"
     local_ip: 10.3.80.1
   nyc1:
     listen_port_base: 57870
     endpoint_host: "nyc1.exploro.one"
     local_ip: 10.3.96.1
-  wien1:
+  vie1:
     listen_port_base: 57870
-    endpoint_host: "wien1.exploro.one"
+    endpoint_host: "vie1.exploro.one"
     local_ip: 10.3.82.1
 connections:
   ams1:
-    wien1:
-  wien1:
+    vie1:
+  vie1:
     sgp1:
-    frank1:
+    fra1:
   hkg1:
     lax1:
     sgp1:
-    tokyo1:
+    tyo1:
   lax1:
     hkg1:
-    tokyo1:
+    tyo1:
   sgp1:
-    frank1:
+    fra1:
   nyc1:
     lax1:
-    dallas1:
-    frank1:
-    wien1:
+    dal1:
+    fra1:
+    vie1:
