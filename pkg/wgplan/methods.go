@@ -33,6 +33,20 @@ type PrivateKeysMap = map[string]string
 func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys PrivateKeysMap, err error) {
 	privateKeys = make(PrivateKeysMap)
 
+	if plan.Nodes == nil {
+		return nil, fmt.Errorf("nodes is nil")
+	}
+
+	localIPsMap := make(map[string]string)
+	for nodename, node := range plan.Nodes {
+		if node.LocalIP != nil {
+			if anotherNode, ok := localIPsMap[*node.LocalIP]; ok && anotherNode != nodename {
+				return nil, fmt.Errorf("node %s is trying to use local ip %s, but it is already used by another node %s", nodename, *node.LocalIP, anotherNode)
+			}
+			localIPsMap[*node.LocalIP] = nodename
+		}
+	}
+
 	connections := make(map[string]map[string]*WGConnection)
 	for from, conns := range plan.Connections {
 		for to, connraw := range conns {
