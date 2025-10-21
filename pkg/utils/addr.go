@@ -39,3 +39,32 @@ func IsIPNetListNotEqu(lhs, rhs []net.IPNet) bool {
 
 	return false
 }
+
+// For IPv4, append /32 VLSM to make it a CIDR with full 32 bits mask,
+// For IPv6, append /128 VLSM to make it a CIDR with full 128 bits mask.
+func WithFullMask(ip *string) *string {
+	if ip == nil || *ip == "" {
+		return nil
+	}
+
+	ipObj := net.ParseIP(*ip)
+	if ipObj == nil {
+		return nil
+	}
+
+	ip4 := ipObj.To4()
+	if ip4 != nil {
+		ipnet := &net.IPNet{
+			IP:   ip4,
+			Mask: net.CIDRMask(32, 32),
+		}
+		cidr := ipnet.String()
+		return &cidr
+	}
+	ipnet := &net.IPNet{
+		IP:   ipObj,
+		Mask: net.CIDRMask(128, 128),
+	}
+	cidr := ipnet.String()
+	return &cidr
+}

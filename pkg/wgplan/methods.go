@@ -8,6 +8,7 @@ import (
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	wgtypes "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -226,30 +227,6 @@ func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys PrivateKeysMap, er
 	return privateKeys, nil
 }
 
-func withDefaultMask(ip *string) *string {
-	if ip == nil || *ip == "" {
-		return nil
-	}
-
-	ipObj := net.ParseIP(*ip)
-	if ipObj == nil {
-		return nil
-	}
-
-	defaultMask := ipObj.DefaultMask()
-	if defaultMask == nil {
-		defaultMask = net.CIDRMask(128, 128)
-	}
-
-	ipnet := &net.IPNet{
-		IP:   ipObj,
-		Mask: defaultMask,
-	}
-	ipnetstr := ipnet.String()
-
-	return &ipnetstr
-}
-
 func (plan *WGPlan) ToWgConfs(privateKeys PrivateKeysMap) (map[string][]*pkginterfacewireguard.WireGuardConfig, error) {
 	wgConfs := make(map[string][]*pkginterfacewireguard.WireGuardConfig)
 	for nodename := range plan.Nodes {
@@ -277,7 +254,7 @@ func (plan *WGPlan) ToWgConfs(privateKeys PrivateKeysMap) (map[string][]*pkginte
 					peerCfg.Endpoint = &ep
 				}
 				if conn.LocalIP != nil && conn.PeerIP != nil {
-					peerIPCIDR := withDefaultMask(conn.PeerIP)
+					peerIPCIDR := pkgutils.WithFullMask(conn.PeerIP)
 					if peerIPCIDR == nil {
 						return nil, fmt.Errorf("peer ip %s is invalid", *conn.PeerIP)
 					}

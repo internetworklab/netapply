@@ -18,12 +18,13 @@ import (
 )
 
 type GenerateCmd struct {
-	PlanFile       string `required:"" help:"The plan file to use"`
-	KeysOutDir     string `help:"The directory to write the keys to" default:"keys"`
-	PlaintextKeys  bool   `help:"Write the keys in plaintext to to the YAML output" default:"false"`
-	NoKeysOutput   bool   `help:"Do not write the private keys to directory"`
-	NoPlanOutput   bool   `help:"Do not write the plan to output" default:"false"`
-	WgConfsOutFile string `help:"The file to write the WireGuard configs to" default:""`
+	PlanFile             string `required:"" help:"The plan file to use"`
+	KeysOutDir           string `help:"The directory to write the keys to" default:"keys"`
+	PlaintextKeys        bool   `help:"Write the keys in plaintext to to the YAML output" default:"false"`
+	NoKeysOutput         bool   `help:"Do not write the private keys to directory"`
+	NoPlanOutput         bool   `help:"Do not write the plan to output" default:"false"`
+	WgConfsOutFile       string `help:"The file to write the WireGuard configs to" default:""`
+	WriteToNodeDirectory string `help:"Write NodeConfigs to node directory" default:""`
 }
 
 const useIndent = 2
@@ -47,6 +48,11 @@ func getPlanInput(planFile string) (*pkgwgplan.WGPlan, error) {
 		return nil, fmt.Errorf("failed to decode plan: %w", err)
 	}
 	return plan, nil
+}
+
+func insertWGConfsOrCreateNodeConfig(wgConfs []*pkginterfacewireguard.WireGuardConfig, nodeCfgPath string) error {
+	// todo
+	return nil
 }
 
 func (c *GenerateCmd) Run() error {
@@ -84,22 +90,34 @@ func (c *GenerateCmd) Run() error {
 		}
 	}
 
-	if c.WgConfsOutFile != "" {
-		var f *os.File
-		var err error
-		f, err = os.Create(c.WgConfsOutFile)
-		if err != nil {
-			return fmt.Errorf("failed to create WireGuard configs output file for writing: %w", err)
-		}
-		defer f.Close()
-		wgConfs, err := plan.ToWgConfs(privkeys)
+	if c.WgConfsOutFile != "" || c.WriteToNodeDirectory != "" {
+		wgConfsMap, err := plan.ToWgConfs(privkeys)
 		if err != nil {
 			return fmt.Errorf("failed to convert plan to WireGuard configs: %w", err)
 		}
-		enc := yaml.NewEncoder(f)
-		enc.SetIndent(useIndent)
-		if err := enc.Encode(wgConfs); err != nil {
-			return fmt.Errorf("failed to encode WireGuard configs to file: %w", err)
+		if c.WgConfsOutFile != "" {
+			var f *os.File
+			var err error
+			f, err = os.Create(c.WgConfsOutFile)
+			if err != nil {
+				return fmt.Errorf("failed to create WireGuard configs output file for writing: %w", err)
+			}
+			defer f.Close()
+
+			enc := yaml.NewEncoder(f)
+			enc.SetIndent(useIndent)
+			if err := enc.Encode(wgConfsMap); err != nil {
+				return fmt.Errorf("failed to encode WireGuard configs to file: %w", err)
+			}
+		}
+		if c.WriteToNodeDirectory != "" {
+			os.MkdirAll(c.WriteToNodeDirectory, 0755)
+			for nodename, wgConfs := range wgConfsMap {
+				os.MkdirAll(path.Join(c.WriteToNodeDirectory, nodename), 0755)
+				if err := insertWGConfsOrCreateNodeConfig(wgConfs, path.Join(c.WriteToNodeDirectory, nodename)); err != nil {
+					return fmt.Errorf("failed to insert WireGuard configs into node config: %w", err)
+				}
+			}
 		}
 	}
 
