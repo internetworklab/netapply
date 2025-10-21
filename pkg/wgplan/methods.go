@@ -3,6 +3,11 @@ package wgplan
 import (
 	"fmt"
 
+	"net"
+	"strconv"
+
+	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
 	wgtypes "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
@@ -22,8 +27,11 @@ func setToMap(m map[string]map[string]*WGConnection, from, to string, conn *WGCo
 	m[from][to] = conn
 }
 
-func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys map[string]string, err error) {
-	privateKeys = make(map[string]string)
+// Map connection ID to private key
+type PrivateKeysMap = map[string]string
+
+func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys PrivateKeysMap, err error) {
+	privateKeys = make(PrivateKeysMap)
 
 	connections := make(map[string]map[string]*WGConnection)
 	for from, conns := range plan.Connections {
@@ -172,4 +180,74 @@ func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys map[string]string,
 	}
 
 	return privateKeys, nil
+}
+
+func withDefaultMask(ip *string) *string {
+	if ip == nil || *ip == "" {
+		return nil
+	}
+
+	ipObj := net.ParseIP(*ip)
+	if ipObj == nil {
+		return nil
+	}
+
+	defaultMask := ipObj.DefaultMask()
+	if defaultMask == nil {
+		defaultMask = net.CIDRMask(128, 128)
+	}
+
+	ipnet := &net.IPNet{
+		IP:   ipObj,
+		Mask: defaultMask,
+	}
+	ipnetstr := ipnet.String()
+
+	return &ipnetstr
+}
+
+func (plan *WGPlan) ToWgConfs(privateKeys PrivateKeysMap) (map[string][]*pkginterfacewireguard.WireGuardConfig, error) {
+	wgConfs := make(map[string][]*pkginterfacewireguard.WireGuardConfig)
+	for nodename := range plan.Nodes {
+		if _, ok := wgConfs[nodename]; !ok {
+			wgConfs[nodename] = make([]*pkginterfacewireguard.WireGuardConfig, 0)
+		}
+		if conns, ok := plan.Connections[nodename]; ok {
+			for to, conn := range conns {
+				wgConf := &pkginterfacewireguard.WireGuardConfig{}
+				wgConf.Name = fmt.Sprintf("w-%s-%s", nodename, to)
+				privk, found := privateKeys[*conn.ConnectionID]
+				if !found {
+					return nil, fmt.Errorf("private key not found for connection %s-%s", nodename, to)
+				}
+				wgConf.PrivateKey = privk
+				if conn.SelfListenPort != nil {
+					wgConf.ListenPort = conn.SelfListenPort
+				}
+				peerCfg := &pkginterfacewireguard.WireGuardPeerConfig{
+					PublicKey:  conn.PeerPublicKey,
+					AllowedIPs: []string{"0.0.0.0/0", "::/0"},
+				}
+				if conn.PeerEndpointHost != nil && conn.PeerEndpointPort != nil {
+					ep := net.JoinHostPort(*conn.PeerEndpointHost, strconv.Itoa(*conn.PeerEndpointPort))
+					peerCfg.Endpoint = &ep
+				}
+				if conn.LocalIP != nil && conn.PeerIP != nil {
+					peerIPCIDR := withDefaultMask(conn.PeerIP)
+					if peerIPCIDR == nil {
+						return nil, fmt.Errorf("peer ip %s is invalid", *conn.PeerIP)
+					}
+					addrCfg := &pkginterfacecommon.AddressConfig{
+						Local: conn.LocalIP,
+						Peer:  peerIPCIDR,
+					}
+					wgConf.Addresses = []pkginterfacecommon.AddressConfig{*addrCfg}
+				}
+
+				wgConf.Peers = []pkginterfacewireguard.WireGuardPeerConfig{*peerCfg}
+				wgConfs[nodename] = append(wgConfs[nodename], wgConf)
+			}
+		}
+	}
+	return wgConfs, nil
 }

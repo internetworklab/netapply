@@ -18,13 +18,17 @@ import (
 )
 
 type GenerateCmd struct {
-	PlanFile      string `required:"" help:"The plan file to use"`
-	KeysOutDir    string `help:"The directory to write the keys to" default:"keys"`
-	PlaintextKeys bool   `help:"Write the keys in plaintext to to the YAML output" default:"false"`
-	NoKeysOutput  bool   `help:"Do not write the private keys to directory"`
+	PlanFile       string `required:"" help:"The plan file to use"`
+	KeysOutDir     string `help:"The directory to write the keys to" default:"keys"`
+	PlaintextKeys  bool   `help:"Write the keys in plaintext to to the YAML output" default:"false"`
+	NoKeysOutput   bool   `help:"Do not write the private keys to directory"`
+	NoPlanOutput   bool   `help:"Do not write the plan to output" default:"false"`
+	WgConfsOutFile string `help:"The file to write the WireGuard configs to" default:""`
 }
 
-func getPlan(planFile string) (*pkgwgplan.WGPlan, error) {
+const useIndent = 2
+
+func getPlanInput(planFile string) (*pkgwgplan.WGPlan, error) {
 	var f *os.File
 	var err error
 
@@ -48,7 +52,7 @@ func getPlan(planFile string) (*pkgwgplan.WGPlan, error) {
 func (c *GenerateCmd) Run() error {
 	planFile := c.PlanFile
 
-	plan, err := getPlan(planFile)
+	plan, err := getPlanInput(planFile)
 	if err != nil {
 		return fmt.Errorf("failed to get plan: %w", err)
 	}
@@ -72,10 +76,31 @@ func (c *GenerateCmd) Run() error {
 		}
 	}
 
-	enc := yaml.NewEncoder(os.Stdout)
-	enc.SetIndent(2)
-	if err := enc.Encode(plan); err != nil {
-		return fmt.Errorf("failed to encode plan: %w", err)
+	if !c.NoPlanOutput {
+		enc := yaml.NewEncoder(os.Stdout)
+		enc.SetIndent(useIndent)
+		if err := enc.Encode(plan); err != nil {
+			return fmt.Errorf("failed to encode plan: %w", err)
+		}
+	}
+
+	if c.WgConfsOutFile != "" {
+		var f *os.File
+		var err error
+		f, err = os.Create(c.WgConfsOutFile)
+		if err != nil {
+			return fmt.Errorf("failed to create WireGuard configs output file for writing: %w", err)
+		}
+		defer f.Close()
+		wgConfs, err := plan.ToWgConfs(privkeys)
+		if err != nil {
+			return fmt.Errorf("failed to convert plan to WireGuard configs: %w", err)
+		}
+		enc := yaml.NewEncoder(f)
+		enc.SetIndent(useIndent)
+		if err := enc.Encode(wgConfs); err != nil {
+			return fmt.Errorf("failed to encode WireGuard configs to file: %w", err)
+		}
 	}
 
 	return nil
@@ -101,7 +126,7 @@ func (c *PopulateCmd) Run() error {
 		return nil
 	}
 
-	plan, err := getPlan(c.PlanFile)
+	plan, err := getPlanInput(c.PlanFile)
 	if err != nil {
 		return fmt.Errorf("failed to get plan: %w", err)
 	}
