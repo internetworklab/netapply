@@ -28,7 +28,7 @@ nodes:
   vie1:
     listen_port_base: 57870
     endpoint_host: "vie1.exploro.one"
-    local_ip: 10.3.82.1
+    local_ip: 10.3.81.1
 connections:
   ams1:
     vie1:
