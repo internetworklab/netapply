@@ -1,0 +1,51 @@
+resources:
+  wireguard:
+    containers: []
+    wireguard_configs:
+      - name: w-nyc1-lax1
+        privatekey: cA2aQznuDUXc4ePYij4/DjiT4PtrgU6JqgSbIShsiXk=
+        peers:
+          - publickey: cyk2NZNS4SNL+GvJiD/COwTlrFHbpd+i1ReQEidpQFo=
+            endpoint: lax1.exploro.one:57870
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.64.1/32
+            local: 10.3.96.1
+        listen_port: 57870
+      - name: w-nyc1-dal1
+        privatekey: 4IPP6osB2qru0H30NOVPw4FMLSkEXainwPpeqyIImlo=
+        peers:
+          - publickey: wzGgvwk1dDNq5P/ftKdoDg6RPR3OFKZlHCJCPOuB6Fw=
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.99.1/32
+            local: 10.3.96.1
+        listen_port: 57871
+      - name: w-nyc1-fra1
+        privatekey: yBKbXaTb/hPLC6jUHLPl+X3F8SpWCJq1t+Ckv0gR/mk=
+        peers:
+          - publickey: W+c2UylkAcsaqQ3Pd6bWzOSHwOxBqg/+V4WKvTLxI00=
+            endpoint: fra1.exploro.one:57870
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.80.1/32
+            local: 10.3.96.1
+        listen_port: 57872
+      - name: w-nyc1-vie1
+        privatekey: QAfI1fzBl4d7YC4lLUD+IyaaobCpFZ2wI/pT9MNlOnE=
+        peers:
+          - publickey: Ei/2h3zbe4Joa8elE1K7ATj0csQSwI20XW10L8om7wU=
+            endpoint: vie1.exploro.one:57870
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.81.1/32
+            local: 10.3.96.1
+        listen_port: 57873

@@ -1,0 +1,17 @@
+resources:
+  wireguard:
+    containers:
+      - c1
+      - c2
+    wireguard_configs:
+      - name: w-ams1-vie1
+        privatekey: eFhfRiUqtfGwCVxgm/xcAv3lWgeMPQiymK+mAhEouEc=
+        peers:
+          - publickey: XeJjOVluDbsPRVU3i7cSaNE3FpiElAl7o0+O5m2sf3c=
+            endpoint: vie1.exploro.one:57871
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.81.1/32
+            local: 10.3.82.1

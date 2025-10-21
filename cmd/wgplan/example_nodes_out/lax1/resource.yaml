@@ -1,0 +1,40 @@
+resources:
+  wireguard:
+    containers: []
+    wireguard_configs:
+      - name: w-lax1-nyc1
+        privatekey: GGPhMWw+UmcK4oToTsZmvKU0pTl+0Gd3rFJOZ+soln0=
+        peers:
+          - publickey: gk7SWgPHDZFUVhLCYWYagNaeWB021ziVeoqd7RRG13U=
+            endpoint: nyc1.exploro.one:57870
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.96.1/32
+            local: 10.3.64.1
+        listen_port: 57870
+      - name: w-lax1-hkg1
+        privatekey: KNlZtpNnksXsYGfAGfQMi/LA2VDvodZyqF9SODKCEHY=
+        peers:
+          - publickey: BRbIiKohiXaGa6z1tSbYkdTqpUMwJBXr8JI9bEOGnDo=
+            endpoint: hkg1.exploro.one:57870
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.32.1/32
+            local: 10.3.64.1
+        listen_port: 57871
+      - name: w-lax1-tyo1
+        privatekey: aI54YYjPAe3EbE9+rDaPY+U/PjKIe0pUmt3LwSWiknU=
+        peers:
+          - publickey: W/4epJkWEq9QmvW+jcr8bDx7r9IkEXzX2yr+t6RelGY=
+            endpoint: tyo1.exploro.one:57871
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.16.1/32
+            local: 10.3.64.1
+        listen_port: 57872

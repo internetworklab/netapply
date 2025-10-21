@@ -32,10 +32,10 @@ nodes:
 connections:
   ams1:
     vie1:
-      self_private_key: eIJvjT8nj0mDtP79WS/hnaFAfoN0n95yBEZ36CmJr3c=
+      self_private_key: eFhfRiUqtfGwCVxgm/xcAv3lWgeMPQiymK+mAhEouEc=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/ams1-vie1.key
-      self_public_key: KYDpnYxwunov/WEZ4h/82fGM8AGNLCq+/dqoVaM9fnE=
-      peer_public_key: ngIG1Zmo01quLtTJ2BXMdrF3mGew+I0VWzP/cMv3qVw=
+      self_public_key: xGnvg/itd2Tk92vFCcj84mGpqQog1wV3UjqjbQiq3Fk=
+      peer_public_key: XeJjOVluDbsPRVU3i7cSaNE3FpiElAl7o0+O5m2sf3c=
       peer_endpoint_host: vie1.exploro.one
       peer_endpoint_port: 57871
       connection_id: ams1-vie1
@@ -43,10 +43,10 @@ connections:
       peer_ip: 10.3.81.1
   dal1:
     nyc1:
-      self_private_key: iEDdafX6+Sj+toFZ3Tj9CRawqjEMrf4NhUd3nl39uEw=
+      self_private_key: eNnoAAAHBIfQolQnAaz+3XenxtHhz62xzaFTnKjJG20=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/dal1-nyc1.key
-      self_public_key: OR9gyB2F1qiOTKNqKzHoDEM7HnfbK2p2Ued0ReSHJis=
-      peer_public_key: 3XKUahysCJ9/NYQCt/6Cx7uL8hs55bLsGJactxe2vXU=
+      self_public_key: wzGgvwk1dDNq5P/ftKdoDg6RPR3OFKZlHCJCPOuB6Fw=
+      peer_public_key: d1/8a6Kjw7AJ/+gkoBEKGAOp85aOY3i172TQPDRpiD0=
       peer_endpoint_host: nyc1.exploro.one
       peer_endpoint_port: 57871
       connection_id: dal1-nyc1
@@ -54,31 +54,31 @@ connections:
       peer_ip: 10.3.96.1
   fra1:
     nyc1:
-      self_private_key: qEbYbZqPwonsewVCX5tUitRPYRfSp1RrK4CRaSaB9mQ=
+      self_private_key: +DSDlWb7wLTdC0/620xBBZCX+lf2QIjjpoECI+ep+nU=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/fra1-nyc1.key
-      self_public_key: J23Czgl0A5oYT2hB8hnw9k/Gf1SbTdIM1+wNd4cAOmk=
-      peer_public_key: TrNmakGd6sBOnOSSFlUVoVsyqB3L7ar81CnzzQOh6gE=
-      self_listen_port: 57871
+      self_public_key: W+c2UylkAcsaqQ3Pd6bWzOSHwOxBqg/+V4WKvTLxI00=
+      peer_public_key: amuKC4iMAsivEDzlmNBsJb67OsDrCHDi8YmS4E+Z81E=
+      self_listen_port: 57870
       peer_endpoint_host: nyc1.exploro.one
       peer_endpoint_port: 57872
       connection_id: fra1-nyc1
       local_ip: 10.3.80.1
       peer_ip: 10.3.96.1
     sgp1:
-      self_private_key: UNYPf3Gtx5bGMraKincTStp/trc9raFoM/TchvrL2nc=
+      self_private_key: QF99fbPgESDDLXmBsLhb8FsVOpcTpR6NF+aHn9AWJmI=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/fra1-sgp1.key
-      self_public_key: JlaQ/Nur3Vnh9Kf+uwtKdA11SEq8MZNLEo2xqxV6kzU=
-      peer_public_key: /iiOkH5Ksofq2iSxE3Lke6Kdi4WbbnIAglkgdKCz43w=
-      self_listen_port: 57870
+      self_public_key: jSsqTnH1cjyfvNDSgwSNu6c/sIjhtoFalE8LEJ50iSU=
+      peer_public_key: PloPk8Y7g5CZjZW5gwsmt6wr6bL5NZXzDcr2qd9zLms=
+      self_listen_port: 57872
       connection_id: fra1-sgp1
       local_ip: 10.3.80.1
       peer_ip: 10.3.48.1
     vie1:
-      self_private_key: sJNLF+umlqf/3clN6k7ty/28Dv2FL4zzwXuIFgGCgGY=
+      self_private_key: MHM6ChUtyGyyzcO8y/FOfYYj4+2Os79DFEClxYRmxUI=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/fra1-vie1.key
-      self_public_key: AVpy9NCH1ltCzmFgHS54QSQI82ajyRNKo4GZFu8970U=
-      peer_public_key: YUTs3BIdX35E0D/taYm+e2+/LxgGw4wz2gJVQEftxCE=
-      self_listen_port: 57872
+      self_public_key: SLP1D28I0yksM+DToV77c72q88AyigzZp2wuXeB0ZHo=
+      peer_public_key: mx5Scz+ZQX4v8MC8c9WBFO4xtqmwihL9iNJ+OSi0Q2U=
+      self_listen_port: 57871
       peer_endpoint_host: vie1.exploro.one
       peer_endpoint_port: 57873
       connection_id: fra1-vie1
@@ -86,30 +86,30 @@ connections:
       peer_ip: 10.3.81.1
   hkg1:
     lax1:
-      self_private_key: cHIQI1MDg6KaUSD4EhclfYPVJMdPwjocmoaLLpecqlw=
+      self_private_key: mKoADm1jJ1uPKcO65DdxFRaqk2uKnIqkzHjCjfQWAGY=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-lax1.key
-      self_public_key: ryfA1pY+SQddk8jSibNeYS4ohPMmnKBGPpubq3GXl2s=
-      peer_public_key: 8a+id9U2szKPTZFhhEJTTdINl48jBAp83I3l+I/eSnM=
+      self_public_key: BRbIiKohiXaGa6z1tSbYkdTqpUMwJBXr8JI9bEOGnDo=
+      peer_public_key: fAti3AfO1kcOMnAgQeayTCJV5yYvIx8/qSv69A6qEhA=
       self_listen_port: 57870
       peer_endpoint_host: lax1.exploro.one
-      peer_endpoint_port: 57870
+      peer_endpoint_port: 57871
       connection_id: hkg1-lax1
       local_ip: 10.3.32.1
       peer_ip: 10.3.64.1
     sgp1:
-      self_private_key: gGtHSt1XOdPcbBXTT0ICejanB6VOCS10Sdu2vaKrJHA=
+      self_private_key: COlZZGmGjB+QpQFHkA0Hwj6EzG5s4iz3cbViBZfLl3Y=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-sgp1.key
-      self_public_key: wDYphufFSuCT3PdzrcHtCfOadhF83O650Izy1OWZjlQ=
-      peer_public_key: NS+9WWmqQYApdCRqIOdmnzZm9zSVtOT0YTLXRhl/uTk=
+      self_public_key: 2UpfWAZepE1SDEeDXgUrw4mWdGtRBDOI51gJfTbN2hg=
+      peer_public_key: zS9vhlEaNEh55jHEqfs2LREG2WbazPdIR/SpyPPzG0I=
       self_listen_port: 57871
       connection_id: hkg1-sgp1
       local_ip: 10.3.32.1
       peer_ip: 10.3.48.1
     tyo1:
-      self_private_key: 8L7Nc/r7otw/CXeqO/0W9B+46y+bODAiYBJdbARV1nM=
+      self_private_key: SADBM3sB9PoRnm11lwmvm2+QqbKYCys6eWgRG1XkE10=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-tyo1.key
-      self_public_key: 3iS69EAY2aUeKVekXUWTsh/TFFpJHDnLvZp8/qZveFY=
-      peer_public_key: lP93CzqSegjDQ43XjNnNxqzXVqoeO3JHbrcIqo3mfRM=
+      self_public_key: wgpDFKsL+ZE/ZEJsNoy4X5l4XAoPTAKd+GybZIjJDHE=
+      peer_public_key: pB0R0/6y/VLYTJblDj/mwlUH6JRrBKVH0iB0D/zVhy4=
       self_listen_port: 57872
       peer_endpoint_host: tyo1.exploro.one
       peer_endpoint_port: 57870
@@ -118,33 +118,33 @@ connections:
       peer_ip: 10.3.16.1
   lax1:
     hkg1:
-      self_private_key: wBCFqihXVlT3GjwrJNuIuwMEP02BzQed26CHhj/ykG0=
+      self_private_key: KNlZtpNnksXsYGfAGfQMi/LA2VDvodZyqF9SODKCEHY=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-hkg1.key
-      self_public_key: 8a+id9U2szKPTZFhhEJTTdINl48jBAp83I3l+I/eSnM=
-      peer_public_key: ryfA1pY+SQddk8jSibNeYS4ohPMmnKBGPpubq3GXl2s=
-      self_listen_port: 57870
+      self_public_key: fAti3AfO1kcOMnAgQeayTCJV5yYvIx8/qSv69A6qEhA=
+      peer_public_key: BRbIiKohiXaGa6z1tSbYkdTqpUMwJBXr8JI9bEOGnDo=
+      self_listen_port: 57871
       peer_endpoint_host: hkg1.exploro.one
       peer_endpoint_port: 57870
       connection_id: lax1-hkg1
       local_ip: 10.3.64.1
       peer_ip: 10.3.32.1
     nyc1:
-      self_private_key: OPQebu/sPAogJwib5rakdLY4yI57TArMEH9YySlRSm8=
+      self_private_key: GGPhMWw+UmcK4oToTsZmvKU0pTl+0Gd3rFJOZ+soln0=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-nyc1.key
-      self_public_key: Ewn40C6h1viNNRznBgHmZCmZBXvHVeMtUT20Sb8Tmjo=
-      peer_public_key: p6r7jZDC5qtlTMa4uzNJS15rY7rOHOPXA3gXU8L12UE=
-      self_listen_port: 57872
+      self_public_key: cyk2NZNS4SNL+GvJiD/COwTlrFHbpd+i1ReQEidpQFo=
+      peer_public_key: gk7SWgPHDZFUVhLCYWYagNaeWB021ziVeoqd7RRG13U=
+      self_listen_port: 57870
       peer_endpoint_host: nyc1.exploro.one
       peer_endpoint_port: 57870
       connection_id: lax1-nyc1
       local_ip: 10.3.64.1
       peer_ip: 10.3.96.1
     tyo1:
-      self_private_key: SMwutRASOamSIYH87pJqkVThoIbBGdo1w9Fa6FoJAHo=
+      self_private_key: aI54YYjPAe3EbE9+rDaPY+U/PjKIe0pUmt3LwSWiknU=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-tyo1.key
-      self_public_key: zdPvQ4TC8KbYNsXXDI65qoMgXtTWJ+n/N7wHHN96KGU=
-      peer_public_key: 6k8XcPuorV4nGZAB0CI0pQzapiSvs/sT3nV8OPPHhwo=
-      self_listen_port: 57871
+      self_public_key: HTWSfBS9G3S35MNuA6Q5OwuLupNQCz2c+hrS8E23WgI=
+      peer_public_key: W/4epJkWEq9QmvW+jcr8bDx7r9IkEXzX2yr+t6RelGY=
+      self_listen_port: 57872
       peer_endpoint_host: tyo1.exploro.one
       peer_endpoint_port: 57871
       connection_id: lax1-tyo1
@@ -152,41 +152,41 @@ connections:
       peer_ip: 10.3.16.1
   nyc1:
     dal1:
-      self_private_key: EAwDBSp/Z8EocK9hhkFnvPj1zyRiFMVumCLyirj6o2U=
+      self_private_key: 4IPP6osB2qru0H30NOVPw4FMLSkEXainwPpeqyIImlo=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-dal1.key
-      self_public_key: 3XKUahysCJ9/NYQCt/6Cx7uL8hs55bLsGJactxe2vXU=
-      peer_public_key: OR9gyB2F1qiOTKNqKzHoDEM7HnfbK2p2Ued0ReSHJis=
+      self_public_key: d1/8a6Kjw7AJ/+gkoBEKGAOp85aOY3i172TQPDRpiD0=
+      peer_public_key: wzGgvwk1dDNq5P/ftKdoDg6RPR3OFKZlHCJCPOuB6Fw=
       self_listen_port: 57871
       connection_id: nyc1-dal1
       local_ip: 10.3.96.1
       peer_ip: 10.3.99.1
     fra1:
-      self_private_key: 2N5yOANRFB/jUYpXpT5I01fA9NbwC+dTkaez15TcVl0=
+      self_private_key: yBKbXaTb/hPLC6jUHLPl+X3F8SpWCJq1t+Ckv0gR/mk=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-fra1.key
-      self_public_key: TrNmakGd6sBOnOSSFlUVoVsyqB3L7ar81CnzzQOh6gE=
-      peer_public_key: J23Czgl0A5oYT2hB8hnw9k/Gf1SbTdIM1+wNd4cAOmk=
+      self_public_key: amuKC4iMAsivEDzlmNBsJb67OsDrCHDi8YmS4E+Z81E=
+      peer_public_key: W+c2UylkAcsaqQ3Pd6bWzOSHwOxBqg/+V4WKvTLxI00=
       self_listen_port: 57872
       peer_endpoint_host: fra1.exploro.one
-      peer_endpoint_port: 57871
+      peer_endpoint_port: 57870
       connection_id: nyc1-fra1
       local_ip: 10.3.96.1
       peer_ip: 10.3.80.1
     lax1:
-      self_private_key: 8An/3LiXNt4obUFOgR/idFWPRLpX5Hb4WVul3PMAMW0=
+      self_private_key: cA2aQznuDUXc4ePYij4/DjiT4PtrgU6JqgSbIShsiXk=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-lax1.key
-      self_public_key: p6r7jZDC5qtlTMa4uzNJS15rY7rOHOPXA3gXU8L12UE=
-      peer_public_key: Ewn40C6h1viNNRznBgHmZCmZBXvHVeMtUT20Sb8Tmjo=
+      self_public_key: gk7SWgPHDZFUVhLCYWYagNaeWB021ziVeoqd7RRG13U=
+      peer_public_key: cyk2NZNS4SNL+GvJiD/COwTlrFHbpd+i1ReQEidpQFo=
       self_listen_port: 57870
       peer_endpoint_host: lax1.exploro.one
-      peer_endpoint_port: 57872
+      peer_endpoint_port: 57870
       connection_id: nyc1-lax1
       local_ip: 10.3.96.1
       peer_ip: 10.3.64.1
     vie1:
-      self_private_key: 6D+PPJ5cuH+t0bsW1JcfRC7cVsLmQcqf3ZPYJ+giNVc=
+      self_private_key: QAfI1fzBl4d7YC4lLUD+IyaaobCpFZ2wI/pT9MNlOnE=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-vie1.key
-      self_public_key: 3W+1UkZF7uHpOco0ZOtG0dl1rCg97P+QwdGgS4mYBQY=
-      peer_public_key: GI59H1B3QS8xeZ81eORmecRnn9hyNNo+SoPjUT2NKjM=
+      self_public_key: B+/HKmf3H+qbwoDbHzrMH5b/DSeexkmNejNs2J0r4AY=
+      peer_public_key: Ei/2h3zbe4Joa8elE1K7ATj0csQSwI20XW10L8om7wU=
       self_listen_port: 57873
       peer_endpoint_host: vie1.exploro.one
       peer_endpoint_port: 57870
@@ -195,30 +195,30 @@ connections:
       peer_ip: 10.3.81.1
   sgp1:
     fra1:
-      self_private_key: wKHYpsn5l2AXV4X8oETQ3bbAQiZejLzUPdh21YCop3U=
+      self_private_key: +NSMi6lUx1QVDKbqwI4juzp3U2u2R+Vf6h5x/nTTenk=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-fra1.key
-      self_public_key: /iiOkH5Ksofq2iSxE3Lke6Kdi4WbbnIAglkgdKCz43w=
-      peer_public_key: JlaQ/Nur3Vnh9Kf+uwtKdA11SEq8MZNLEo2xqxV6kzU=
+      self_public_key: PloPk8Y7g5CZjZW5gwsmt6wr6bL5NZXzDcr2qd9zLms=
+      peer_public_key: jSsqTnH1cjyfvNDSgwSNu6c/sIjhtoFalE8LEJ50iSU=
       peer_endpoint_host: fra1.exploro.one
-      peer_endpoint_port: 57870
+      peer_endpoint_port: 57872
       connection_id: sgp1-fra1
       local_ip: 10.3.48.1
       peer_ip: 10.3.80.1
     hkg1:
-      self_private_key: ADdXuacGFavPRLWcLnxGCdE1qTLdRXr0WqGHIrumH38=
+      self_private_key: 8P+zTyUMp0vdF7KdTY0mF/cXgeREORSzuwtuydhDWmI=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-hkg1.key
-      self_public_key: NS+9WWmqQYApdCRqIOdmnzZm9zSVtOT0YTLXRhl/uTk=
-      peer_public_key: wDYphufFSuCT3PdzrcHtCfOadhF83O650Izy1OWZjlQ=
+      self_public_key: zS9vhlEaNEh55jHEqfs2LREG2WbazPdIR/SpyPPzG0I=
+      peer_public_key: 2UpfWAZepE1SDEeDXgUrw4mWdGtRBDOI51gJfTbN2hg=
       peer_endpoint_host: hkg1.exploro.one
       peer_endpoint_port: 57871
       connection_id: sgp1-hkg1
       local_ip: 10.3.48.1
       peer_ip: 10.3.32.1
     vie1:
-      self_private_key: aMvaInaQAvx1MhDCrSdyDC6GejAJdVET9H71+SltnkI=
+      self_private_key: yPqUn6P0Kq1zTOiXe0uO3ziaDw8rb6KoQOntMV9zGWk=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-vie1.key
-      self_public_key: ZhTSbIm8pb/xH91jeDDHjZagtNIUfIc8VplSQTc823Q=
-      peer_public_key: 6oq34Y8NYrdYMjpOroMeUIU5eyEoINI533Umq+7hrCk=
+      self_public_key: Bd+6Bsq5dhWX6H88w+NFILd+x69p1AFX0TM/9Mc6Lyg=
+      peer_public_key: R6gqDOgwObS0vmi8hgeHuzGsZotLNCU7rLnN/1pHgAg=
       peer_endpoint_host: vie1.exploro.one
       peer_endpoint_port: 57872
       connection_id: sgp1-vie1
@@ -226,10 +226,10 @@ connections:
       peer_ip: 10.3.81.1
   tyo1:
     hkg1:
-      self_private_key: 0Nr3ANDemK7602mUh7AmZmp6XNIrGzggZ6ZDrFC9AFo=
+      self_private_key: kAY1E+makqPqU0dLpKCimXr6sPfnSVyPZyEqQpFMuko=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tyo1-hkg1.key
-      self_public_key: lP93CzqSegjDQ43XjNnNxqzXVqoeO3JHbrcIqo3mfRM=
-      peer_public_key: 3iS69EAY2aUeKVekXUWTsh/TFFpJHDnLvZp8/qZveFY=
+      self_public_key: pB0R0/6y/VLYTJblDj/mwlUH6JRrBKVH0iB0D/zVhy4=
+      peer_public_key: wgpDFKsL+ZE/ZEJsNoy4X5l4XAoPTAKd+GybZIjJDHE=
       self_listen_port: 57870
       peer_endpoint_host: hkg1.exploro.one
       peer_endpoint_port: 57872
@@ -237,42 +237,42 @@ connections:
       local_ip: 10.3.16.1
       peer_ip: 10.3.32.1
     lax1:
-      self_private_key: 6Cd6UMvkzKGzYXzBNNxORu/nlNcsyUbwJhdjMY5vrnA=
+      self_private_key: SBCGXUuv1BJGssx4P2enHjqv5PZ+nWJ8m4qV3+w+zGo=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tyo1-lax1.key
-      self_public_key: 6k8XcPuorV4nGZAB0CI0pQzapiSvs/sT3nV8OPPHhwo=
-      peer_public_key: zdPvQ4TC8KbYNsXXDI65qoMgXtTWJ+n/N7wHHN96KGU=
+      self_public_key: W/4epJkWEq9QmvW+jcr8bDx7r9IkEXzX2yr+t6RelGY=
+      peer_public_key: HTWSfBS9G3S35MNuA6Q5OwuLupNQCz2c+hrS8E23WgI=
       self_listen_port: 57871
       peer_endpoint_host: lax1.exploro.one
-      peer_endpoint_port: 57871
+      peer_endpoint_port: 57872
       connection_id: tyo1-lax1
       local_ip: 10.3.16.1
       peer_ip: 10.3.64.1
   vie1:
     ams1:
-      self_private_key: cF2FkdzLH2sG5I/btQtDNw7sSJcELdia6DbX66v+03A=
+      self_private_key: UPeRd1gyopeSI0zmtn/yn6UuEwH0WnGS/61h6oven1U=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-ams1.key
-      self_public_key: ngIG1Zmo01quLtTJ2BXMdrF3mGew+I0VWzP/cMv3qVw=
-      peer_public_key: KYDpnYxwunov/WEZ4h/82fGM8AGNLCq+/dqoVaM9fnE=
+      self_public_key: XeJjOVluDbsPRVU3i7cSaNE3FpiElAl7o0+O5m2sf3c=
+      peer_public_key: xGnvg/itd2Tk92vFCcj84mGpqQog1wV3UjqjbQiq3Fk=
       self_listen_port: 57871
       connection_id: vie1-ams1
       local_ip: 10.3.81.1
       peer_ip: 10.3.82.1
     fra1:
-      self_private_key: UODZxScknJvYg/knc1kJZl22lso+YQsuRPdaB1iJfms=
+      self_private_key: oGYDRiOQwhVCkQ4OmoV2m5sYfTaPCsKg3vipt1w+nmI=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-fra1.key
-      self_public_key: YUTs3BIdX35E0D/taYm+e2+/LxgGw4wz2gJVQEftxCE=
-      peer_public_key: AVpy9NCH1ltCzmFgHS54QSQI82ajyRNKo4GZFu8970U=
+      self_public_key: mx5Scz+ZQX4v8MC8c9WBFO4xtqmwihL9iNJ+OSi0Q2U=
+      peer_public_key: SLP1D28I0yksM+DToV77c72q88AyigzZp2wuXeB0ZHo=
       self_listen_port: 57873
       peer_endpoint_host: fra1.exploro.one
-      peer_endpoint_port: 57872
+      peer_endpoint_port: 57871
       connection_id: vie1-fra1
       local_ip: 10.3.81.1
       peer_ip: 10.3.80.1
     nyc1:
-      self_private_key: eHMJOAmOqRmUVIguCBqwiIVNLC23ZJuHkzht9bsfSnA=
+      self_private_key: SKgowCiTbfsjRjhlGYShp1iDycbNkURtHhRrDcducng=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-nyc1.key
-      self_public_key: GI59H1B3QS8xeZ81eORmecRnn9hyNNo+SoPjUT2NKjM=
-      peer_public_key: 3W+1UkZF7uHpOco0ZOtG0dl1rCg97P+QwdGgS4mYBQY=
+      self_public_key: Ei/2h3zbe4Joa8elE1K7ATj0csQSwI20XW10L8om7wU=
+      peer_public_key: B+/HKmf3H+qbwoDbHzrMH5b/DSeexkmNejNs2J0r4AY=
       self_listen_port: 57870
       peer_endpoint_host: nyc1.exploro.one
       peer_endpoint_port: 57873
@@ -280,91 +280,91 @@ connections:
       local_ip: 10.3.81.1
       peer_ip: 10.3.96.1
     sgp1:
-      self_private_key: WODNRK9rmB6DgtlxuageOiTx/qKfVEaSxYemzEBQgGg=
+      self_private_key: kP11OzhMXFRzYf6NoOwIlN5mf8i9svKVmogwjeGItG0=
       self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-sgp1.key
-      self_public_key: 6oq34Y8NYrdYMjpOroMeUIU5eyEoINI533Umq+7hrCk=
-      peer_public_key: ZhTSbIm8pb/xH91jeDDHjZagtNIUfIc8VplSQTc823Q=
+      self_public_key: R6gqDOgwObS0vmi8hgeHuzGsZotLNCU7rLnN/1pHgAg=
+      peer_public_key: Bd+6Bsq5dhWX6H88w+NFILd+x69p1AFX0TM/9Mc6Lyg=
       self_listen_port: 57872
       connection_id: vie1-sgp1
       local_ip: 10.3.81.1
       peer_ip: 10.3.48.1
 indexed_connections:
   ams1-vie1:
-    self_private_key: eIJvjT8nj0mDtP79WS/hnaFAfoN0n95yBEZ36CmJr3c=
+    self_private_key: eFhfRiUqtfGwCVxgm/xcAv3lWgeMPQiymK+mAhEouEc=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/ams1-vie1.key
-    self_public_key: KYDpnYxwunov/WEZ4h/82fGM8AGNLCq+/dqoVaM9fnE=
-    peer_public_key: ngIG1Zmo01quLtTJ2BXMdrF3mGew+I0VWzP/cMv3qVw=
+    self_public_key: xGnvg/itd2Tk92vFCcj84mGpqQog1wV3UjqjbQiq3Fk=
+    peer_public_key: XeJjOVluDbsPRVU3i7cSaNE3FpiElAl7o0+O5m2sf3c=
     peer_endpoint_host: vie1.exploro.one
     peer_endpoint_port: 57871
     connection_id: ams1-vie1
     local_ip: 10.3.82.1
     peer_ip: 10.3.81.1
   dal1-nyc1:
-    self_private_key: iEDdafX6+Sj+toFZ3Tj9CRawqjEMrf4NhUd3nl39uEw=
+    self_private_key: eNnoAAAHBIfQolQnAaz+3XenxtHhz62xzaFTnKjJG20=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/dal1-nyc1.key
-    self_public_key: OR9gyB2F1qiOTKNqKzHoDEM7HnfbK2p2Ued0ReSHJis=
-    peer_public_key: 3XKUahysCJ9/NYQCt/6Cx7uL8hs55bLsGJactxe2vXU=
+    self_public_key: wzGgvwk1dDNq5P/ftKdoDg6RPR3OFKZlHCJCPOuB6Fw=
+    peer_public_key: d1/8a6Kjw7AJ/+gkoBEKGAOp85aOY3i172TQPDRpiD0=
     peer_endpoint_host: nyc1.exploro.one
     peer_endpoint_port: 57871
     connection_id: dal1-nyc1
     local_ip: 10.3.99.1
     peer_ip: 10.3.96.1
   fra1-nyc1:
-    self_private_key: qEbYbZqPwonsewVCX5tUitRPYRfSp1RrK4CRaSaB9mQ=
+    self_private_key: +DSDlWb7wLTdC0/620xBBZCX+lf2QIjjpoECI+ep+nU=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/fra1-nyc1.key
-    self_public_key: J23Czgl0A5oYT2hB8hnw9k/Gf1SbTdIM1+wNd4cAOmk=
-    peer_public_key: TrNmakGd6sBOnOSSFlUVoVsyqB3L7ar81CnzzQOh6gE=
-    self_listen_port: 57871
+    self_public_key: W+c2UylkAcsaqQ3Pd6bWzOSHwOxBqg/+V4WKvTLxI00=
+    peer_public_key: amuKC4iMAsivEDzlmNBsJb67OsDrCHDi8YmS4E+Z81E=
+    self_listen_port: 57870
     peer_endpoint_host: nyc1.exploro.one
     peer_endpoint_port: 57872
     connection_id: fra1-nyc1
     local_ip: 10.3.80.1
     peer_ip: 10.3.96.1
   fra1-sgp1:
-    self_private_key: UNYPf3Gtx5bGMraKincTStp/trc9raFoM/TchvrL2nc=
+    self_private_key: QF99fbPgESDDLXmBsLhb8FsVOpcTpR6NF+aHn9AWJmI=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/fra1-sgp1.key
-    self_public_key: JlaQ/Nur3Vnh9Kf+uwtKdA11SEq8MZNLEo2xqxV6kzU=
-    peer_public_key: /iiOkH5Ksofq2iSxE3Lke6Kdi4WbbnIAglkgdKCz43w=
-    self_listen_port: 57870
+    self_public_key: jSsqTnH1cjyfvNDSgwSNu6c/sIjhtoFalE8LEJ50iSU=
+    peer_public_key: PloPk8Y7g5CZjZW5gwsmt6wr6bL5NZXzDcr2qd9zLms=
+    self_listen_port: 57872
     connection_id: fra1-sgp1
     local_ip: 10.3.80.1
     peer_ip: 10.3.48.1
   fra1-vie1:
-    self_private_key: sJNLF+umlqf/3clN6k7ty/28Dv2FL4zzwXuIFgGCgGY=
+    self_private_key: MHM6ChUtyGyyzcO8y/FOfYYj4+2Os79DFEClxYRmxUI=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/fra1-vie1.key
-    self_public_key: AVpy9NCH1ltCzmFgHS54QSQI82ajyRNKo4GZFu8970U=
-    peer_public_key: YUTs3BIdX35E0D/taYm+e2+/LxgGw4wz2gJVQEftxCE=
-    self_listen_port: 57872
+    self_public_key: SLP1D28I0yksM+DToV77c72q88AyigzZp2wuXeB0ZHo=
+    peer_public_key: mx5Scz+ZQX4v8MC8c9WBFO4xtqmwihL9iNJ+OSi0Q2U=
+    self_listen_port: 57871
     peer_endpoint_host: vie1.exploro.one
     peer_endpoint_port: 57873
     connection_id: fra1-vie1
     local_ip: 10.3.80.1
     peer_ip: 10.3.81.1
   hkg1-lax1:
-    self_private_key: cHIQI1MDg6KaUSD4EhclfYPVJMdPwjocmoaLLpecqlw=
+    self_private_key: mKoADm1jJ1uPKcO65DdxFRaqk2uKnIqkzHjCjfQWAGY=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-lax1.key
-    self_public_key: ryfA1pY+SQddk8jSibNeYS4ohPMmnKBGPpubq3GXl2s=
-    peer_public_key: 8a+id9U2szKPTZFhhEJTTdINl48jBAp83I3l+I/eSnM=
+    self_public_key: BRbIiKohiXaGa6z1tSbYkdTqpUMwJBXr8JI9bEOGnDo=
+    peer_public_key: fAti3AfO1kcOMnAgQeayTCJV5yYvIx8/qSv69A6qEhA=
     self_listen_port: 57870
     peer_endpoint_host: lax1.exploro.one
-    peer_endpoint_port: 57870
+    peer_endpoint_port: 57871
     connection_id: hkg1-lax1
     local_ip: 10.3.32.1
     peer_ip: 10.3.64.1
   hkg1-sgp1:
-    self_private_key: gGtHSt1XOdPcbBXTT0ICejanB6VOCS10Sdu2vaKrJHA=
+    self_private_key: COlZZGmGjB+QpQFHkA0Hwj6EzG5s4iz3cbViBZfLl3Y=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-sgp1.key
-    self_public_key: wDYphufFSuCT3PdzrcHtCfOadhF83O650Izy1OWZjlQ=
-    peer_public_key: NS+9WWmqQYApdCRqIOdmnzZm9zSVtOT0YTLXRhl/uTk=
+    self_public_key: 2UpfWAZepE1SDEeDXgUrw4mWdGtRBDOI51gJfTbN2hg=
+    peer_public_key: zS9vhlEaNEh55jHEqfs2LREG2WbazPdIR/SpyPPzG0I=
     self_listen_port: 57871
     connection_id: hkg1-sgp1
     local_ip: 10.3.32.1
     peer_ip: 10.3.48.1
   hkg1-tyo1:
-    self_private_key: 8L7Nc/r7otw/CXeqO/0W9B+46y+bODAiYBJdbARV1nM=
+    self_private_key: SADBM3sB9PoRnm11lwmvm2+QqbKYCys6eWgRG1XkE10=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/hkg1-tyo1.key
-    self_public_key: 3iS69EAY2aUeKVekXUWTsh/TFFpJHDnLvZp8/qZveFY=
-    peer_public_key: lP93CzqSegjDQ43XjNnNxqzXVqoeO3JHbrcIqo3mfRM=
+    self_public_key: wgpDFKsL+ZE/ZEJsNoy4X5l4XAoPTAKd+GybZIjJDHE=
+    peer_public_key: pB0R0/6y/VLYTJblDj/mwlUH6JRrBKVH0iB0D/zVhy4=
     self_listen_port: 57872
     peer_endpoint_host: tyo1.exploro.one
     peer_endpoint_port: 57870
@@ -372,74 +372,74 @@ indexed_connections:
     local_ip: 10.3.32.1
     peer_ip: 10.3.16.1
   lax1-hkg1:
-    self_private_key: wBCFqihXVlT3GjwrJNuIuwMEP02BzQed26CHhj/ykG0=
+    self_private_key: KNlZtpNnksXsYGfAGfQMi/LA2VDvodZyqF9SODKCEHY=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-hkg1.key
-    self_public_key: 8a+id9U2szKPTZFhhEJTTdINl48jBAp83I3l+I/eSnM=
-    peer_public_key: ryfA1pY+SQddk8jSibNeYS4ohPMmnKBGPpubq3GXl2s=
-    self_listen_port: 57870
+    self_public_key: fAti3AfO1kcOMnAgQeayTCJV5yYvIx8/qSv69A6qEhA=
+    peer_public_key: BRbIiKohiXaGa6z1tSbYkdTqpUMwJBXr8JI9bEOGnDo=
+    self_listen_port: 57871
     peer_endpoint_host: hkg1.exploro.one
     peer_endpoint_port: 57870
     connection_id: lax1-hkg1
     local_ip: 10.3.64.1
     peer_ip: 10.3.32.1
   lax1-nyc1:
-    self_private_key: OPQebu/sPAogJwib5rakdLY4yI57TArMEH9YySlRSm8=
+    self_private_key: GGPhMWw+UmcK4oToTsZmvKU0pTl+0Gd3rFJOZ+soln0=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-nyc1.key
-    self_public_key: Ewn40C6h1viNNRznBgHmZCmZBXvHVeMtUT20Sb8Tmjo=
-    peer_public_key: p6r7jZDC5qtlTMa4uzNJS15rY7rOHOPXA3gXU8L12UE=
-    self_listen_port: 57872
+    self_public_key: cyk2NZNS4SNL+GvJiD/COwTlrFHbpd+i1ReQEidpQFo=
+    peer_public_key: gk7SWgPHDZFUVhLCYWYagNaeWB021ziVeoqd7RRG13U=
+    self_listen_port: 57870
     peer_endpoint_host: nyc1.exploro.one
     peer_endpoint_port: 57870
     connection_id: lax1-nyc1
     local_ip: 10.3.64.1
     peer_ip: 10.3.96.1
   lax1-tyo1:
-    self_private_key: SMwutRASOamSIYH87pJqkVThoIbBGdo1w9Fa6FoJAHo=
+    self_private_key: aI54YYjPAe3EbE9+rDaPY+U/PjKIe0pUmt3LwSWiknU=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/lax1-tyo1.key
-    self_public_key: zdPvQ4TC8KbYNsXXDI65qoMgXtTWJ+n/N7wHHN96KGU=
-    peer_public_key: 6k8XcPuorV4nGZAB0CI0pQzapiSvs/sT3nV8OPPHhwo=
-    self_listen_port: 57871
+    self_public_key: HTWSfBS9G3S35MNuA6Q5OwuLupNQCz2c+hrS8E23WgI=
+    peer_public_key: W/4epJkWEq9QmvW+jcr8bDx7r9IkEXzX2yr+t6RelGY=
+    self_listen_port: 57872
     peer_endpoint_host: tyo1.exploro.one
     peer_endpoint_port: 57871
     connection_id: lax1-tyo1
     local_ip: 10.3.64.1
     peer_ip: 10.3.16.1
   nyc1-dal1:
-    self_private_key: EAwDBSp/Z8EocK9hhkFnvPj1zyRiFMVumCLyirj6o2U=
+    self_private_key: 4IPP6osB2qru0H30NOVPw4FMLSkEXainwPpeqyIImlo=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-dal1.key
-    self_public_key: 3XKUahysCJ9/NYQCt/6Cx7uL8hs55bLsGJactxe2vXU=
-    peer_public_key: OR9gyB2F1qiOTKNqKzHoDEM7HnfbK2p2Ued0ReSHJis=
+    self_public_key: d1/8a6Kjw7AJ/+gkoBEKGAOp85aOY3i172TQPDRpiD0=
+    peer_public_key: wzGgvwk1dDNq5P/ftKdoDg6RPR3OFKZlHCJCPOuB6Fw=
     self_listen_port: 57871
     connection_id: nyc1-dal1
     local_ip: 10.3.96.1
     peer_ip: 10.3.99.1
   nyc1-fra1:
-    self_private_key: 2N5yOANRFB/jUYpXpT5I01fA9NbwC+dTkaez15TcVl0=
+    self_private_key: yBKbXaTb/hPLC6jUHLPl+X3F8SpWCJq1t+Ckv0gR/mk=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-fra1.key
-    self_public_key: TrNmakGd6sBOnOSSFlUVoVsyqB3L7ar81CnzzQOh6gE=
-    peer_public_key: J23Czgl0A5oYT2hB8hnw9k/Gf1SbTdIM1+wNd4cAOmk=
+    self_public_key: amuKC4iMAsivEDzlmNBsJb67OsDrCHDi8YmS4E+Z81E=
+    peer_public_key: W+c2UylkAcsaqQ3Pd6bWzOSHwOxBqg/+V4WKvTLxI00=
     self_listen_port: 57872
     peer_endpoint_host: fra1.exploro.one
-    peer_endpoint_port: 57871
+    peer_endpoint_port: 57870
     connection_id: nyc1-fra1
     local_ip: 10.3.96.1
     peer_ip: 10.3.80.1
   nyc1-lax1:
-    self_private_key: 8An/3LiXNt4obUFOgR/idFWPRLpX5Hb4WVul3PMAMW0=
+    self_private_key: cA2aQznuDUXc4ePYij4/DjiT4PtrgU6JqgSbIShsiXk=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-lax1.key
-    self_public_key: p6r7jZDC5qtlTMa4uzNJS15rY7rOHOPXA3gXU8L12UE=
-    peer_public_key: Ewn40C6h1viNNRznBgHmZCmZBXvHVeMtUT20Sb8Tmjo=
+    self_public_key: gk7SWgPHDZFUVhLCYWYagNaeWB021ziVeoqd7RRG13U=
+    peer_public_key: cyk2NZNS4SNL+GvJiD/COwTlrFHbpd+i1ReQEidpQFo=
     self_listen_port: 57870
     peer_endpoint_host: lax1.exploro.one
-    peer_endpoint_port: 57872
+    peer_endpoint_port: 57870
     connection_id: nyc1-lax1
     local_ip: 10.3.96.1
     peer_ip: 10.3.64.1
   nyc1-vie1:
-    self_private_key: 6D+PPJ5cuH+t0bsW1JcfRC7cVsLmQcqf3ZPYJ+giNVc=
+    self_private_key: QAfI1fzBl4d7YC4lLUD+IyaaobCpFZ2wI/pT9MNlOnE=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/nyc1-vie1.key
-    self_public_key: 3W+1UkZF7uHpOco0ZOtG0dl1rCg97P+QwdGgS4mYBQY=
-    peer_public_key: GI59H1B3QS8xeZ81eORmecRnn9hyNNo+SoPjUT2NKjM=
+    self_public_key: B+/HKmf3H+qbwoDbHzrMH5b/DSeexkmNejNs2J0r4AY=
+    peer_public_key: Ei/2h3zbe4Joa8elE1K7ATj0csQSwI20XW10L8om7wU=
     self_listen_port: 57873
     peer_endpoint_host: vie1.exploro.one
     peer_endpoint_port: 57870
@@ -447,40 +447,40 @@ indexed_connections:
     local_ip: 10.3.96.1
     peer_ip: 10.3.81.1
   sgp1-fra1:
-    self_private_key: wKHYpsn5l2AXV4X8oETQ3bbAQiZejLzUPdh21YCop3U=
+    self_private_key: +NSMi6lUx1QVDKbqwI4juzp3U2u2R+Vf6h5x/nTTenk=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-fra1.key
-    self_public_key: /iiOkH5Ksofq2iSxE3Lke6Kdi4WbbnIAglkgdKCz43w=
-    peer_public_key: JlaQ/Nur3Vnh9Kf+uwtKdA11SEq8MZNLEo2xqxV6kzU=
+    self_public_key: PloPk8Y7g5CZjZW5gwsmt6wr6bL5NZXzDcr2qd9zLms=
+    peer_public_key: jSsqTnH1cjyfvNDSgwSNu6c/sIjhtoFalE8LEJ50iSU=
     peer_endpoint_host: fra1.exploro.one
-    peer_endpoint_port: 57870
+    peer_endpoint_port: 57872
     connection_id: sgp1-fra1
     local_ip: 10.3.48.1
     peer_ip: 10.3.80.1
   sgp1-hkg1:
-    self_private_key: ADdXuacGFavPRLWcLnxGCdE1qTLdRXr0WqGHIrumH38=
+    self_private_key: 8P+zTyUMp0vdF7KdTY0mF/cXgeREORSzuwtuydhDWmI=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-hkg1.key
-    self_public_key: NS+9WWmqQYApdCRqIOdmnzZm9zSVtOT0YTLXRhl/uTk=
-    peer_public_key: wDYphufFSuCT3PdzrcHtCfOadhF83O650Izy1OWZjlQ=
+    self_public_key: zS9vhlEaNEh55jHEqfs2LREG2WbazPdIR/SpyPPzG0I=
+    peer_public_key: 2UpfWAZepE1SDEeDXgUrw4mWdGtRBDOI51gJfTbN2hg=
     peer_endpoint_host: hkg1.exploro.one
     peer_endpoint_port: 57871
     connection_id: sgp1-hkg1
     local_ip: 10.3.48.1
     peer_ip: 10.3.32.1
   sgp1-vie1:
-    self_private_key: aMvaInaQAvx1MhDCrSdyDC6GejAJdVET9H71+SltnkI=
+    self_private_key: yPqUn6P0Kq1zTOiXe0uO3ziaDw8rb6KoQOntMV9zGWk=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/sgp1-vie1.key
-    self_public_key: ZhTSbIm8pb/xH91jeDDHjZagtNIUfIc8VplSQTc823Q=
-    peer_public_key: 6oq34Y8NYrdYMjpOroMeUIU5eyEoINI533Umq+7hrCk=
+    self_public_key: Bd+6Bsq5dhWX6H88w+NFILd+x69p1AFX0TM/9Mc6Lyg=
+    peer_public_key: R6gqDOgwObS0vmi8hgeHuzGsZotLNCU7rLnN/1pHgAg=
     peer_endpoint_host: vie1.exploro.one
     peer_endpoint_port: 57872
     connection_id: sgp1-vie1
     local_ip: 10.3.48.1
     peer_ip: 10.3.81.1
   tyo1-hkg1:
-    self_private_key: 0Nr3ANDemK7602mUh7AmZmp6XNIrGzggZ6ZDrFC9AFo=
+    self_private_key: kAY1E+makqPqU0dLpKCimXr6sPfnSVyPZyEqQpFMuko=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tyo1-hkg1.key
-    self_public_key: lP93CzqSegjDQ43XjNnNxqzXVqoeO3JHbrcIqo3mfRM=
-    peer_public_key: 3iS69EAY2aUeKVekXUWTsh/TFFpJHDnLvZp8/qZveFY=
+    self_public_key: pB0R0/6y/VLYTJblDj/mwlUH6JRrBKVH0iB0D/zVhy4=
+    peer_public_key: wgpDFKsL+ZE/ZEJsNoy4X5l4XAoPTAKd+GybZIjJDHE=
     self_listen_port: 57870
     peer_endpoint_host: hkg1.exploro.one
     peer_endpoint_port: 57872
@@ -488,41 +488,41 @@ indexed_connections:
     local_ip: 10.3.16.1
     peer_ip: 10.3.32.1
   tyo1-lax1:
-    self_private_key: 6Cd6UMvkzKGzYXzBNNxORu/nlNcsyUbwJhdjMY5vrnA=
+    self_private_key: SBCGXUuv1BJGssx4P2enHjqv5PZ+nWJ8m4qV3+w+zGo=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/tyo1-lax1.key
-    self_public_key: 6k8XcPuorV4nGZAB0CI0pQzapiSvs/sT3nV8OPPHhwo=
-    peer_public_key: zdPvQ4TC8KbYNsXXDI65qoMgXtTWJ+n/N7wHHN96KGU=
+    self_public_key: W/4epJkWEq9QmvW+jcr8bDx7r9IkEXzX2yr+t6RelGY=
+    peer_public_key: HTWSfBS9G3S35MNuA6Q5OwuLupNQCz2c+hrS8E23WgI=
     self_listen_port: 57871
     peer_endpoint_host: lax1.exploro.one
-    peer_endpoint_port: 57871
+    peer_endpoint_port: 57872
     connection_id: tyo1-lax1
     local_ip: 10.3.16.1
     peer_ip: 10.3.64.1
   vie1-ams1:
-    self_private_key: cF2FkdzLH2sG5I/btQtDNw7sSJcELdia6DbX66v+03A=
+    self_private_key: UPeRd1gyopeSI0zmtn/yn6UuEwH0WnGS/61h6oven1U=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-ams1.key
-    self_public_key: ngIG1Zmo01quLtTJ2BXMdrF3mGew+I0VWzP/cMv3qVw=
-    peer_public_key: KYDpnYxwunov/WEZ4h/82fGM8AGNLCq+/dqoVaM9fnE=
+    self_public_key: XeJjOVluDbsPRVU3i7cSaNE3FpiElAl7o0+O5m2sf3c=
+    peer_public_key: xGnvg/itd2Tk92vFCcj84mGpqQog1wV3UjqjbQiq3Fk=
     self_listen_port: 57871
     connection_id: vie1-ams1
     local_ip: 10.3.81.1
     peer_ip: 10.3.82.1
   vie1-fra1:
-    self_private_key: UODZxScknJvYg/knc1kJZl22lso+YQsuRPdaB1iJfms=
+    self_private_key: oGYDRiOQwhVCkQ4OmoV2m5sYfTaPCsKg3vipt1w+nmI=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-fra1.key
-    self_public_key: YUTs3BIdX35E0D/taYm+e2+/LxgGw4wz2gJVQEftxCE=
-    peer_public_key: AVpy9NCH1ltCzmFgHS54QSQI82ajyRNKo4GZFu8970U=
+    self_public_key: mx5Scz+ZQX4v8MC8c9WBFO4xtqmwihL9iNJ+OSi0Q2U=
+    peer_public_key: SLP1D28I0yksM+DToV77c72q88AyigzZp2wuXeB0ZHo=
     self_listen_port: 57873
     peer_endpoint_host: fra1.exploro.one
-    peer_endpoint_port: 57872
+    peer_endpoint_port: 57871
     connection_id: vie1-fra1
     local_ip: 10.3.81.1
     peer_ip: 10.3.80.1
   vie1-nyc1:
-    self_private_key: eHMJOAmOqRmUVIguCBqwiIVNLC23ZJuHkzht9bsfSnA=
+    self_private_key: SKgowCiTbfsjRjhlGYShp1iDycbNkURtHhRrDcducng=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-nyc1.key
-    self_public_key: GI59H1B3QS8xeZ81eORmecRnn9hyNNo+SoPjUT2NKjM=
-    peer_public_key: 3W+1UkZF7uHpOco0ZOtG0dl1rCg97P+QwdGgS4mYBQY=
+    self_public_key: Ei/2h3zbe4Joa8elE1K7ATj0csQSwI20XW10L8om7wU=
+    peer_public_key: B+/HKmf3H+qbwoDbHzrMH5b/DSeexkmNejNs2J0r4AY=
     self_listen_port: 57870
     peer_endpoint_host: nyc1.exploro.one
     peer_endpoint_port: 57873
@@ -530,10 +530,10 @@ indexed_connections:
     local_ip: 10.3.81.1
     peer_ip: 10.3.96.1
   vie1-sgp1:
-    self_private_key: WODNRK9rmB6DgtlxuageOiTx/qKfVEaSxYemzEBQgGg=
+    self_private_key: kP11OzhMXFRzYf6NoOwIlN5mf8i9svKVmogwjeGItG0=
     self_private_key_file: /root/projects/netapply/cmd/wgplan/keys/vie1-sgp1.key
-    self_public_key: 6oq34Y8NYrdYMjpOroMeUIU5eyEoINI533Umq+7hrCk=
-    peer_public_key: ZhTSbIm8pb/xH91jeDDHjZagtNIUfIc8VplSQTc823Q=
+    self_public_key: R6gqDOgwObS0vmi8hgeHuzGsZotLNCU7rLnN/1pHgAg=
+    peer_public_key: Bd+6Bsq5dhWX6H88w+NFILd+x69p1AFX0TM/9Mc6Lyg=
     self_listen_port: 57872
     connection_id: vie1-sgp1
     local_ip: 10.3.81.1

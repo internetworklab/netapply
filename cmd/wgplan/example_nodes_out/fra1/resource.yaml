@@ -1,0 +1,39 @@
+resources:
+  wireguard:
+    containers: []
+    wireguard_configs:
+      - name: w-fra1-sgp1
+        privatekey: QF99fbPgESDDLXmBsLhb8FsVOpcTpR6NF+aHn9AWJmI=
+        peers:
+          - publickey: PloPk8Y7g5CZjZW5gwsmt6wr6bL5NZXzDcr2qd9zLms=
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.48.1/32
+            local: 10.3.80.1
+        listen_port: 57872
+      - name: w-fra1-nyc1
+        privatekey: +DSDlWb7wLTdC0/620xBBZCX+lf2QIjjpoECI+ep+nU=
+        peers:
+          - publickey: amuKC4iMAsivEDzlmNBsJb67OsDrCHDi8YmS4E+Z81E=
+            endpoint: nyc1.exploro.one:57872
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.96.1/32
+            local: 10.3.80.1
+        listen_port: 57870
+      - name: w-fra1-vie1
+        privatekey: MHM6ChUtyGyyzcO8y/FOfYYj4+2Os79DFEClxYRmxUI=
+        peers:
+          - publickey: mx5Scz+ZQX4v8MC8c9WBFO4xtqmwihL9iNJ+OSi0Q2U=
+            endpoint: vie1.exploro.one:57873
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.81.1/32
+            local: 10.3.80.1
+        listen_port: 57871
