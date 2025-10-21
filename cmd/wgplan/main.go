@@ -50,8 +50,49 @@ func getPlanInput(planFile string) (*pkgwgplan.WGPlan, error) {
 	return plan, nil
 }
 
-func insertWGConfsOrCreateNodeConfig(wgConfs []*pkginterfacewireguard.WireGuardConfig, nodeCfgPath string) error {
-	// todo
+func insertWGConfsOrCreateNodeConfig(wgConfPtrs []*pkginterfacewireguard.WireGuardConfig, nodeCfgPath string) error {
+	wgCfgs := make([]pkginterfacewireguard.WireGuardConfig, 0)
+	for _, wgConfPtr := range wgConfPtrs {
+		if wgConfPtr == nil {
+			continue
+		}
+		wgCfgs = append(wgCfgs, *wgConfPtr)
+	}
+
+	_, err := os.Stat(nodeCfgPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			nodeCfg := new(pkgmodels.NodeConfig)
+			nodeCfg.Resources = new(pkgmodels.ResourcesConfig)
+			nodeCfg.Resources.WireGuard = new(pkginterfacewireguard.WireGuardConfigurationList)
+			nodeCfg.Resources.WireGuard.WireGuardConfigs = wgCfgs
+			if err := yaml.NewEncoder(os.Stdout).Encode(nodeCfg); err != nil {
+				return fmt.Errorf("failed to encode node config: %w", err)
+			}
+		}
+		return fmt.Errorf("failed to stat node config: %w", err)
+	}
+
+	f, err := os.Open(nodeCfgPath)
+	if err != nil {
+		return fmt.Errorf("failed to open node config: %w", err)
+	}
+	defer f.Close()
+	nodeCfg := new(pkgmodels.NodeConfig)
+	if err := yaml.NewDecoder(f).Decode(nodeCfg); err != nil {
+		return fmt.Errorf("failed to decode node config: %w", err)
+	}
+
+	if nodeCfg.Resources == nil {
+		nodeCfg.Resources = new(pkgmodels.ResourcesConfig)
+	}
+	if nodeCfg.Resources.WireGuard == nil {
+		nodeCfg.Resources.WireGuard = new(pkginterfacewireguard.WireGuardConfigurationList)
+	}
+	nodeCfg.Resources.WireGuard.WireGuardConfigs = wgCfgs
+	if err := yaml.NewEncoder(f).Encode(nodeCfg); err != nil {
+		return fmt.Errorf("failed to encode node config: %w", err)
+	}
 	return nil
 }
 
