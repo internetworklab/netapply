@@ -167,6 +167,36 @@ func (plan *WGPlan) Generate(plaintextKeys bool) (privateKeys PrivateKeysMap, er
 					return nil, fmt.Errorf("peer endpoint port mismatch for %s-%s: %d != %d", from, to, *conn.PeerEndpointPort, revConn.SelfListenPort)
 				}
 			}
+
+			if fromNode.LocalIP != nil {
+				if conn.LocalIP == nil {
+					return nil, fmt.Errorf("local ip is nil for %s-%s", from, to)
+				}
+				if *conn.LocalIP != *fromNode.LocalIP {
+					return nil, fmt.Errorf("local ip mismatch for %s-%s: %s != %s", from, to, *conn.LocalIP, *fromNode.LocalIP)
+				}
+				if revConn.PeerIP == nil {
+					return nil, fmt.Errorf("peer ip is nil for %s-%s", from, to)
+				}
+				if *revConn.PeerIP != *fromNode.LocalIP {
+					return nil, fmt.Errorf("peer ip mismatch for %s-%s: %s != %s", from, to, *revConn.PeerIP, *toNode.LocalIP)
+				}
+			}
+
+			if toNode.LocalIP != nil {
+				if conn.PeerIP == nil {
+					return nil, fmt.Errorf("peer ip is nil for %s-%s", from, to)
+				}
+				if *conn.PeerIP != *toNode.LocalIP {
+					return nil, fmt.Errorf("peer ip mismatch for %s-%s: %s != %s", from, to, *conn.PeerIP, *toNode.LocalIP)
+				}
+				if revConn.LocalIP == nil {
+					return nil, fmt.Errorf("local ip is nil for %s-%s", from, to)
+				}
+				if *revConn.LocalIP != *toNode.LocalIP {
+					return nil, fmt.Errorf("peer local ip mismatch for %s-%s: %s != %s", from, to, *revConn.LocalIP, *toNode.LocalIP)
+				}
+			}
 		}
 	}
 

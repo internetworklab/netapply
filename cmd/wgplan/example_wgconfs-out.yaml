@@ -1,9 +1,9 @@
 ams1:
   - name: w-ams1-wien1
-    privatekey: 0IRSDuj0qFK6l49K7QC43LJ4AIWsn5AAowHDfsFnHHQ=
+    privatekey: sOOehq+v3TqXHh3KlP0yJmq7bx924GHMI8sNhkR2png=
     peers:
-      - publickey: 1lTVVXTEddw4gstnXJcyPGV2nZsw7QlHE60dVNu4QxU=
-        endpoint: wien1.exploro.one:57870
+      - publickey: 6L2tL753uZGWP4exis9V5YII3t4etrx3xHM3AwZWwxs=
+        endpoint: wien1.exploro.one:57872
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -12,10 +12,10 @@ ams1:
         local: 10.3.82.1
 dallas1:
   - name: w-dallas1-nyc1
-    privatekey: 8K/bTxNeDQOj5xZ4o0/yAtN/uaoElGpwpWVFQOzEmk8=
+    privatekey: WGFLq+KcqgYj3BeMu9DQzNWF4qUEq0Q3A+/rwHnMpl0=
     peers:
-      - publickey: cWm/VjcnRPcFSxc6H8xk4fS/baTyIU5weEO8NHZrYCQ=
-        endpoint: nyc1.exploro.one:57873
+      - publickey: UYNeOmJtvvA6NplLoDdXpr4WazngZ6inxbPUfQ1xTDc=
+        endpoint: nyc1.exploro.one:57872
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -24,10 +24,10 @@ dallas1:
         local: 10.3.99.1
 frank1:
   - name: w-frank1-wien1
-    privatekey: qHcCsIX6xGyIGJQt0xuEaeD+s9sihJhYafPVTm86cG0=
+    privatekey: gE+uYYOc25fcB+7xB/iixiaN8wegjiTNUtSpk7ptBUs=
     peers:
-      - publickey: eRXp7SUnhT9vNlqrHxUajeD6+dzk1G/9k+zIu4qjphw=
-        endpoint: wien1.exploro.one:57872
+      - publickey: gng6EyXlFGmHSahSDaUuC4Ndu8ePXv1XNFl2ffZiJlA=
+        endpoint: wien1.exploro.one:57870
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -36,9 +36,9 @@ frank1:
         local: 10.3.80.1
     listen_port: 57870
   - name: w-frank1-sgp1
-    privatekey: mCKKQyTcwo32rP/p3IEkRnjml0n9g1uLIRJkJ5uZLFk=
+    privatekey: 2Hwv69Svgg2l+jNINANCMnmlXWf7HixNBH18vBvX4UM=
     peers:
-      - publickey: oF1LmKI1liM/Cyhqn7uLoIkAzaZN+ZO8skGAw5rupkg=
+      - publickey: jkmm0OoCfDFjJmzU5ToGSrWDPNxyN9zLSzAuhZpguTA=
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -47,10 +47,10 @@ frank1:
         local: 10.3.80.1
     listen_port: 57871
   - name: w-frank1-nyc1
-    privatekey: eG56zqaNEjaWqaAIuqgMjigW3HXen40yO327oX0/0UA=
+    privatekey: oAQgl1ayNvAFpmpbYBJIH0NQDhzVf3GjdqhmcHF31ng=
     peers:
-      - publickey: le1rpQtc2U2XsZwTWIFIic1R/b1gBSuENGgDvMuJvgM=
-        endpoint: nyc1.exploro.one:57870
+      - publickey: AVIwRrYndBAVolU1Ac/9f0WhJh9iJuuEF6RyCM6I+y8=
+        endpoint: nyc1.exploro.one:57873
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -60,32 +60,32 @@ frank1:
     listen_port: 57872
 hkg1:
   - name: w-hkg1-lax1
-    privatekey: cIMayCVRwoTYx+mHZHOxfOxHa3ylQV+QwH2ezF7tk3c=
+    privatekey: SLSj0bbWevPVNVSXuC8LOi4EhqhPJaAXBDaLQ/dOMnc=
     peers:
-      - publickey: XmzHZaajRUgjqcZjPxxwZOiJGuVSYysmfL2CRJIzGhI=
-        endpoint: lax1.exploro.one:57871
+      - publickey: Bwgbq/toQRtt5I5pIXpOLPCrrNgyUZKXQAQAjO4dtBw=
+        endpoint: lax1.exploro.one:57870
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.64.1/8
         local: 10.3.32.1
-    listen_port: 57870
+    listen_port: 57872
   - name: w-hkg1-sgp1
-    privatekey: AH3CtONZ4GIZ+XU9cvsbunE2Pjk5AIKwUnhxq/d9Yks=
+    privatekey: cGiRBMdZGBYoAMigpbZ0F1Hertsm49SBSsLCfO+/LHI=
     peers:
-      - publickey: V2hdckTsAXVghJ0oxAwrP6LLLX/S2OO6RXLApTtkOx8=
+      - publickey: liCpdQz2Nr4S/1ipdliewlIG7F9mGJ+wq2vLFsnMXVM=
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.48.1/8
         local: 10.3.32.1
-    listen_port: 57871
+    listen_port: 57870
   - name: w-hkg1-tokyo1
-    privatekey: sPU8djF42YXXre5qKEVGGm5QwDMZKyMO5g5XRalrxHs=
+    privatekey: YARew6fxLK5lWS2f9AkIYtZvqEZEI08gBShDO+oevlE=
     peers:
-      - publickey: GIahN0osiEIuXwC7i7fre8UsbhFkSJePRZvUb0rrKBo=
+      - publickey: ZVObE9+j0pZd/4GDaVgzrb8HVzjNv+wc7bE88R+Phgc=
         endpoint: tokyo1.exploro.one:57870
         allowedips:
           - 0.0.0.0/0
@@ -93,12 +93,24 @@ hkg1:
     addresses:
       - peer: 10.3.16.1/8
         local: 10.3.32.1
-    listen_port: 57872
+    listen_port: 57871
 lax1:
-  - name: w-lax1-tokyo1
-    privatekey: OExzFzKnJa/OqSGpGOlxs6673Pgh0Bk3QfmhXnPML0k=
+  - name: w-lax1-hkg1
+    privatekey: SNbk+cm5JJft9Xiu8Jy2lP2x52svbAlUR7mv4Cp0a1c=
     peers:
-      - publickey: z9lkbvBHE/DHllnYtos8NLJ9MJdbmdJCYFfcXctpLVM=
+      - publickey: 1RdE1JDEFWYm82SEwmKEGzRARzyBrWqvw3sxGRiJewE=
+        endpoint: hkg1.exploro.one:57872
+        allowedips:
+          - 0.0.0.0/0
+          - ::/0
+    addresses:
+      - peer: 10.3.32.1/8
+        local: 10.3.64.1
+    listen_port: 57870
+  - name: w-lax1-tokyo1
+    privatekey: SFY81aeeMknh2osrzbDk3BuFCSVt6fNNGge1u/GMD2I=
+    peers:
+      - publickey: 4uTiD/Cv/QSEF6JwTgMyVw/bbKfsHvDfu+5OyPghHmA=
         endpoint: tokyo1.exploro.one:57871
         allowedips:
           - 0.0.0.0/0
@@ -106,71 +118,47 @@ lax1:
     addresses:
       - peer: 10.3.16.1/8
         local: 10.3.64.1
-    listen_port: 57872
+    listen_port: 57871
   - name: w-lax1-nyc1
-    privatekey: +JbW8IG19PAFjcAPMQBqaFCjaoSkiJjdBFlCnryBxWg=
+    privatekey: oFRQoua1xOlx3Swh6G0RpRq72uPs7wF/J0BcpO7sIl4=
     peers:
-      - publickey: ev1vx5tqge6l9GwbWGQnUbXYSJT3ZY2KA726960QrVI=
-        endpoint: nyc1.exploro.one:57872
+      - publickey: B7A3xh3yhxs7jXhaPAcoNGqd5P12IvwNVLNuXslI1Ag=
+        endpoint: nyc1.exploro.one:57871
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.96.1/8
         local: 10.3.64.1
-    listen_port: 57870
-  - name: w-lax1-hkg1
-    privatekey: 6KuUu5mIJSSAW0J86jQS+p+OXWsD5b3MmjFr1WWpwFc=
-    peers:
-      - publickey: xOrE5k8gVVYz1QtgglDQoCVIGXuw6yQ9ShyESLeCqw8=
-        endpoint: hkg1.exploro.one:57870
-        allowedips:
-          - 0.0.0.0/0
-          - ::/0
-    addresses:
-      - peer: 10.3.32.1/8
-        local: 10.3.64.1
-    listen_port: 57871
+    listen_port: 57872
 nyc1:
-  - name: w-nyc1-wien1
-    privatekey: 4EoVT/Orq16GAa5Fp4jW6x2+1Wbm+HqsDqrMsWFazWE=
-    peers:
-      - publickey: YJwuRe3BB1KJ2b/wr1q5qLFq3YjgUybPCfEcZCVkXR4=
-        endpoint: wien1.exploro.one:57873
-        allowedips:
-          - 0.0.0.0/0
-          - ::/0
-    addresses:
-      - peer: 10.3.82.1/8
-        local: 10.3.96.1
-    listen_port: 57871
   - name: w-nyc1-lax1
-    privatekey: 8N37Hq0hNRUz60eUZpvFD8m9/+2jWOG8sd5T9VLceks=
+    privatekey: SHKErJGbZppJQmpU0IDVuoXfxb7vD0VomAzmOsZBtXM=
     peers:
-      - publickey: V/QYyuTtT91O8Z2kdT5vp39kk9UMm/NWmN+WFISA9E4=
-        endpoint: lax1.exploro.one:57870
+      - publickey: H7ei1lUYAlqVXmwnW/37C71yp3y7mNLDvMeVJBarnjs=
+        endpoint: lax1.exploro.one:57872
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.64.1/8
         local: 10.3.96.1
-    listen_port: 57872
+    listen_port: 57871
   - name: w-nyc1-dallas1
-    privatekey: UId1OjGwXdwgiSYBBumfftenfVQZdj49MUb4JVsBlUU=
+    privatekey: YKOEVmMj/wTIt21V4cxntiAo+BeofqMKKcOL4zJUj3Q=
     peers:
-      - publickey: BFIx0s+kCspLI1w38RGwIaNanpbuxVCHqEiRn5KzEUQ=
+      - publickey: Lb8Ij5JFrqiF/fJ7HRZjBrviGo+vKxGUfsU4DQHsmAY=
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.99.1/8
         local: 10.3.96.1
-    listen_port: 57873
+    listen_port: 57872
   - name: w-nyc1-frank1
-    privatekey: aMgDBflMAXJZL2HDZOayaZ0P74KH++nCaNTcF3lnJkQ=
+    privatekey: sNGKVO+qDypeiDalfEZBsOoyLTQu51rw52NxMeccAXE=
     peers:
-      - publickey: cPL/HAsBgdcrZlFczLn4LC858xmgllh54we5bmVkHQo=
+      - publickey: 888TMAwnNwWgYJk3oagNAMVrMRaNYjZ/0Df0fFb5ig8=
         endpoint: frank1.exploro.one:57872
         allowedips:
           - 0.0.0.0/0
@@ -178,13 +166,25 @@ nyc1:
     addresses:
       - peer: 10.3.80.1/8
         local: 10.3.96.1
+    listen_port: 57873
+  - name: w-nyc1-wien1
+    privatekey: mHg0ervwjVuWUgPsS7eC49veOcgXoXSae8Z+mB8du0A=
+    peers:
+      - publickey: 9T53vq/khXTqZlm82z0nu5k3vaCRYyxEJZn/ruQ+6XQ=
+        endpoint: wien1.exploro.one:57871
+        allowedips:
+          - 0.0.0.0/0
+          - ::/0
+    addresses:
+      - peer: 10.3.82.1/8
+        local: 10.3.96.1
     listen_port: 57870
 sgp1:
   - name: w-sgp1-wien1
-    privatekey: WHkB5Md40TDX2oF2Pw6j40yc0WJkwSYs6ddDw4k1e08=
+    privatekey: ADqmS+xozETxilTyFj6hTXzqvrCK3Cg124sb5aSjc1k=
     peers:
-      - publickey: LOeosBZTLVGTuzWqAp6xtu40yv+0tvUcL63vn3emfSU=
-        endpoint: wien1.exploro.one:57871
+      - publickey: WW4TaYAYmiFTXrV0ixr+YkMcy8tmo+dnm4Rtjr5aiGo=
+        endpoint: wien1.exploro.one:57873
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -192,10 +192,10 @@ sgp1:
       - peer: 10.3.82.1/8
         local: 10.3.48.1
   - name: w-sgp1-hkg1
-    privatekey: CK+1imwp+dsnSqebNs2LYv3D451gEMh8mkQhss+qzEo=
+    privatekey: 4M44PqLt808kGrhy/RLk9tm0MxkM31z2QCDoVH5PZXc=
     peers:
-      - publickey: Jmgf/Sfz/VHhPZZi2pdRZhw7g5Kvkr4r9Dtz4IS3+0Y=
-        endpoint: hkg1.exploro.one:57871
+      - publickey: Jtr+nsJPpVQuB1sm3Lo9Kk/feyuj/eK6yHLIo8OSKH4=
+        endpoint: hkg1.exploro.one:57870
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -203,9 +203,9 @@ sgp1:
       - peer: 10.3.32.1/8
         local: 10.3.48.1
   - name: w-sgp1-frank1
-    privatekey: KHWmucGUK0mg8UXbAsH9tjyEt3T3xvXW6VaboI5Wwns=
+    privatekey: eKGFhghM0Bmy95oOxn19N1tSGAXlxg19EOKESFhopF4=
     peers:
-      - publickey: x2XvGRxcOXLm/wPkmoxlMnJME/vadTMySXXgTJ9nhiU=
+      - publickey: WjbQeQTr3lmO4QuAedFciiXF2mgpp7K/gkJQBvoh1SA=
         endpoint: frank1.exploro.one:57871
         allowedips:
           - 0.0.0.0/0
@@ -215,10 +215,10 @@ sgp1:
         local: 10.3.48.1
 tokyo1:
   - name: w-tokyo1-hkg1
-    privatekey: eHqOf5l8Tlsyu+yxg572AWOh3XaeM2b9iu51NrrIz18=
+    privatekey: YLQdcZ/q8jhSYbQIE5BnUBkwx/JPfE84QkpRtsFdWXI=
     peers:
-      - publickey: QW3xoCiyFCSNIKuYilp9ohqBfRrOepTcVmq5rDi5o0I=
-        endpoint: hkg1.exploro.one:57872
+      - publickey: Z3rEHJdLb8TA0S3WB8XuEPqxiHJsW85pszwdBkP7biU=
+        endpoint: hkg1.exploro.one:57871
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -227,10 +227,10 @@ tokyo1:
         local: 10.3.16.1
     listen_port: 57870
   - name: w-tokyo1-lax1
-    privatekey: EK858ew5t0owlbZ6QWAxHQsrg/4bBuCiuF59rj3kVk0=
+    privatekey: eHclYrH51ZnWDCTysXVwzTwXDaabVJjcSLoGN7RcZXA=
     peers:
-      - publickey: f6aQ9BJZc3WYevSbF4m8KHTId5Jih7HBkyvytDALgSo=
-        endpoint: lax1.exploro.one:57872
+      - publickey: KrORCnVk2oQLwoD0btbDf2UjaSvCcF7eDHmsA+Sfnkg=
+        endpoint: lax1.exploro.one:57871
         allowedips:
           - 0.0.0.0/0
           - ::/0
@@ -239,32 +239,21 @@ tokyo1:
         local: 10.3.16.1
     listen_port: 57871
 wien1:
-  - name: w-wien1-ams1
-    privatekey: CKzaWCRLtHmc7Dz912iaI686/Q4IK4Xka2XGoORrK0E=
-    peers:
-      - publickey: vGV9iUQmDlSCEEWBT3dpBrxS4omoyopJAHL8Emg1jQA=
-        allowedips:
-          - 0.0.0.0/0
-          - ::/0
-    addresses:
-      - peer: 10.3.82.1/8
-        local: 10.3.82.1
-    listen_port: 57870
   - name: w-wien1-sgp1
-    privatekey: eEgsuP0yVbY2Drd6SLcuwvNQkCQnFvFtDYIPH8HDkGU=
+    privatekey: +OsDOfUQNqNNEdccO7mV0wArtv6ay4jL62US8b4xHF4=
     peers:
-      - publickey: G5JD70CdLrLS26mOzzvYP/Bplic1hMrJrtEypvbyb30=
+      - publickey: OmWvgkzag8nwn6+XWZV6sbMg3a0W+J969tnADote1Cg=
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.48.1/8
         local: 10.3.82.1
-    listen_port: 57871
+    listen_port: 57873
   - name: w-wien1-frank1
-    privatekey: QFxfMHBtYud82CqgtEVbZUChipkPetku4ekXf51PBHg=
+    privatekey: 8JBvJJIXd30EDZSwnFh4RckvaWEHI9SLPMjCFka8aUE=
     peers:
-      - publickey: PTzA9af2XJsNjIyYrP8TTIFDVEEE9eyYLBuEUdK/ayw=
+      - publickey: ILjMmUlGOwwuAy+gF1pNuPaSwNfddqSseTusiRM5Jig=
         endpoint: frank1.exploro.one:57870
         allowedips:
           - 0.0.0.0/0
@@ -272,16 +261,27 @@ wien1:
     addresses:
       - peer: 10.3.80.1/8
         local: 10.3.82.1
-    listen_port: 57872
+    listen_port: 57870
   - name: w-wien1-nyc1
-    privatekey: qPnr1r7I3s1+X5/eHwxsWKfnUNG3jgl5ZdU13uioMVc=
+    privatekey: wNwoVZhwwXaYQMngwVlyEicWGOJWaFBN1x8jdf5kqFQ=
     peers:
-      - publickey: g5578ytvKC0YCrtI2Ud3APdxN2hBbFSJskFzNYlkiXs=
-        endpoint: nyc1.exploro.one:57871
+      - publickey: OQuD9thPOfNP0BXvQLk4ZUQuUvsZdiNbxL8ZfI3ce0U=
+        endpoint: nyc1.exploro.one:57870
         allowedips:
           - 0.0.0.0/0
           - ::/0
     addresses:
       - peer: 10.3.96.1/8
         local: 10.3.82.1
-    listen_port: 57873
+    listen_port: 57871
+  - name: w-wien1-ams1
+    privatekey: uGGVjLEf/DfNgZkHxR6iaKMqnZlsmR6u0iHiD8C4QE4=
+    peers:
+      - publickey: 0C1LDVqqpd+bPgr+Nb1mnkNkVA7DsAFn54R/AWcbnB8=
+        allowedips:
+          - 0.0.0.0/0
+          - ::/0
+    addresses:
+      - peer: 10.3.82.1/8
+        local: 10.3.82.1
+    listen_port: 57872
