@@ -703,6 +703,7 @@ func eINIWGAdapterSecondPass(interfaceSection map[string]string, peerSections []
 	peerll, peerllok := wgConf.Additionals[WGAdditionalKeyPeerLinkLocal]
 	if llok && peerllok && ll != "" && peerll != "" {
 		// both have local side ip and peer side ip set
+		// that is, both local side ip and peer side ip are present.
 		addrconf := pkginterfacecommon.AddressConfig{
 			Local: &ll,
 			Peer:  &peerll,
@@ -712,20 +713,19 @@ func eINIWGAdapterSecondPass(interfaceSection map[string]string, peerSections []
 		}
 		wgConf.Addresses = append(wgConf.Addresses, addrconf)
 	} else if llok || ll != "" {
+		// only local side ip is present
 		_, ipnet, err := net.ParseCIDR(ll)
 		if err != nil {
 			ip := net.ParseIP(ll)
 			if ip == nil {
 				return nil, fmt.Errorf("failed to parse local ip: %w", err)
 			}
-			ipnet = &net.IPNet{
-				IP:   ip,
-				Mask: ip.DefaultMask(),
+
+			fullMaskNet := pkgutils.WithFullMaskIPNet(ip)
+			if fullMaskNet == nil {
+				return nil, fmt.Errorf("failed to get full mask ip net: %w", err)
 			}
-			if ipnet.Mask == nil {
-				ipnet.Mask = net.CIDRMask(64, 64)
-			}
-			cidr := ipnet.String()
+			cidr := fullMaskNet.String()
 			addrconf := pkginterfacecommon.AddressConfig{
 				CIDR: &cidr,
 			}

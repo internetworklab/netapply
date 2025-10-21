@@ -17,12 +17,18 @@ func parseCIDR(cidr string) (net.IP, *net.IPNet, error) {
 	if ip == nil {
 		return nil, nil, fmt.Errorf("failed to parse cidr: %w", err)
 	}
+
+	ip4 := ip.To4()
+	if ip4 != nil {
+		ipnet = &net.IPNet{
+			IP:   ip4,
+			Mask: net.CIDRMask(32, 32),
+		}
+		return ip4, ipnet, nil
+	}
 	ipnet = &net.IPNet{
 		IP:   ip,
-		Mask: ip.DefaultMask(),
-	}
-	if ipnet.Mask == nil {
-		ipnet.Mask = net.CIDRMask(128, 128)
+		Mask: net.CIDRMask(128, 128),
 	}
 	return ip, ipnet, nil
 }

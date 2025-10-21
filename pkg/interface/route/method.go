@@ -12,6 +12,7 @@ import (
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
 )
@@ -55,16 +56,11 @@ func (r *RouteConfig) GetInterfaceName() string {
 		if ip == nil {
 			return InvalidDestination
 		}
-		fullMuskNet := &net.IPNet{
-			IP: ip,
+		fullMaskNet := pkgutils.WithFullMaskIPNet(ip)
+		if fullMaskNet == nil {
+			return InvalidDestination
 		}
-		mask := ip.DefaultMask()
-		fullMuskNet.Mask = mask
-		if mask == nil {
-			// mask is nil if it's not a valid IPv4 addr
-			fullMuskNet.Mask = net.CIDRMask(128, 128)
-		}
-		return getResourceKey(r.TableId, *fullMuskNet)
+		return getResourceKey(r.TableId, *fullMaskNet)
 	}
 	// Deal with normal a.b.c.d/x or A:B::C:D/y CIDR notation
 	return getResourceKey(r.TableId, *ipNet)
