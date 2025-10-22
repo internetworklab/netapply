@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"os"
@@ -51,6 +50,22 @@ func getPlanInput(planFile string) (*pkgwgplan.WGPlan, error) {
 	return plan, nil
 }
 
+func readNodeCfg(path string) (*pkgmodels.NodeConfig, error) {
+	f, err := os.Open(path)
+	nodeCfg := new(pkgmodels.NodeConfig)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to open node config: %w", err)
+		}
+		return nodeCfg, nil
+	}
+	defer f.Close()
+	if err := yaml.NewDecoder(f).Decode(nodeCfg); err != nil {
+		return nil, fmt.Errorf("failed to decode node config: %w", err)
+	}
+	return nodeCfg, nil
+}
+
 func insertWGConfsOrCreateNodeConfig(wgConfPtrs []*pkginterfacewireguard.WireGuardConfig, nodeCfgDirPath string) error {
 	wgCfgs := make([]pkginterfacewireguard.WireGuardConfig, 0)
 	for _, wgConfPtr := range wgConfPtrs {
@@ -61,43 +76,9 @@ func insertWGConfsOrCreateNodeConfig(wgConfPtrs []*pkginterfacewireguard.WireGua
 	}
 
 	nodeCfgPath := path.Join(nodeCfgDirPath, "resource.yaml")
-	_, err := os.Stat(nodeCfgPath)
+	nodeCfg, err := readNodeCfg(nodeCfgPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			nodeCfg := new(pkgmodels.NodeConfig)
-			nodeCfg.Resources = new(pkgmodels.ResourcesConfig)
-			nodeCfg.Resources.WireGuard = new(pkginterfacewireguard.WireGuardConfigurationList)
-			nodeCfg.Resources.WireGuard.WireGuardConfigs = wgCfgs
-
-			f, err := os.Create(nodeCfgPath)
-			if err != nil {
-				return fmt.Errorf("failed to create node config: %w", err)
-			}
-			defer f.Close()
-
-			enc := yaml.NewEncoder(f)
-			enc.SetIndent(useIndent)
-			if err := enc.Encode(nodeCfg); err != nil {
-				return fmt.Errorf("failed to encode node config: %w", err)
-			}
-			return nil
-		}
-		return fmt.Errorf("failed to stat node config: %w", err)
-	}
-
-	f, err := os.OpenFile(nodeCfgPath, os.O_RDWR, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open node config: %w", err)
-	}
-	defer f.Close()
-	nodeCfg := new(pkgmodels.NodeConfig)
-	if err := yaml.NewDecoder(f).Decode(nodeCfg); err != nil {
-		return fmt.Errorf("failed to decode node config: %w", err)
-	}
-
-	_, err = f.Seek(0, io.SeekStart)
-	if err != nil {
-		return fmt.Errorf("failed to seek to start of node config: %w", err)
+		return fmt.Errorf("failed to read node config: %w", err)
 	}
 
 	if nodeCfg.Resources == nil {
@@ -106,7 +87,14 @@ func insertWGConfsOrCreateNodeConfig(wgConfPtrs []*pkginterfacewireguard.WireGua
 	if nodeCfg.Resources.WireGuard == nil {
 		nodeCfg.Resources.WireGuard = new(pkginterfacewireguard.WireGuardConfigurationList)
 	}
-	nodeCfg.Resources.WireGuard.WireGuardConfigs = wgCfgs
+	nodeCfg.Resources.WireGuard.WireGuardConfigs = make([]pkginterfacewireguard.WireGuardConfig, 0)
+	nodeCfg.Resources.WireGuard.WireGuardConfigs = append(nodeCfg.Resources.WireGuard.WireGuardConfigs, wgCfgs...)
+
+	f, err := os.Create(nodeCfgPath)
+	if err != nil {
+		return fmt.Errorf("failed to create node config: %w", err)
+	}
+	defer f.Close()
 	enc := yaml.NewEncoder(f)
 	enc.SetIndent(useIndent)
 	if err := enc.Encode(nodeCfg); err != nil {
