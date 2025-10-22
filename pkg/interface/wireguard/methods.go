@@ -274,6 +274,22 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
 
+	endpointCheckingMask := make(map[string]bool)
+
+	specPeerConfigs := make([]wgtypes.PeerConfig, 0)
+	for _, peer := range wgConf.Peers {
+		peercfg, err := peer.ToWGTypesPeer(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
+		}
+
+		if peer.ForceRecheckEndpoint != nil && *peer.ForceRecheckEndpoint {
+			endpointCheckingMask[peercfg.PublicKey.String()] = true
+		}
+
+		specPeerConfigs = append(specPeerConfigs, *peercfg)
+	}
+
 	err := pkgdocker.WithNetnsWGCli(ctx, wgConf.ContainerName, func(wgCtrl *wgctrl.Client) error {
 		currentConfig, err := wgCtrl.Device(wgConf.Name)
 		if err != nil {
@@ -282,20 +298,6 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 
 		if currentConfig == nil {
 			return fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, pkgdocker.GetContainerDisplayName(wgConf.ContainerName))
-		}
-
-		endpointCheckingMask := make(map[string]bool)
-		specPeerConfigs := make([]wgtypes.PeerConfig, 0)
-		for _, peer := range wgConf.Peers {
-			peercfg, err := peer.ToWGTypesPeer(ctx)
-			if peer.ForceRecheckEndpoint != nil && *peer.ForceRecheckEndpoint {
-				endpointCheckingMask[peercfg.PublicKey.String()] = true
-			}
-
-			if err != nil {
-				return fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
-			}
-			specPeerConfigs = append(specPeerConfigs, *peercfg)
 		}
 
 		currPeers := make([]*wgtypes.Peer, 0)
