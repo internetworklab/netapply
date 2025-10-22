@@ -3,10 +3,10 @@ resources:
     containers: []
     wireguard_configs:
       - name: w-hkg1-tyo1
-        privatekey: SADBM3sB9PoRnm11lwmvm2+QqbKYCys6eWgRG1XkE10=
+        privatekey: yPK3DHixCJpiFGuV2sWKLbfE7kiq8MbKjq395eAg42I=
         peers:
-          - publickey: pB0R0/6y/VLYTJblDj/mwlUH6JRrBKVH0iB0D/zVhy4=
-            endpoint: tyo1.exploro.one:57870
+          - publickey: 7Ggw8eFllPpdFkQfI+mixSgIJhEiE6iEY2oP6ss4m0A=
+            endpoint: tyo1.exploro.one:57871
             allowedips:
               - 0.0.0.0/0
               - ::/0
@@ -15,9 +15,9 @@ resources:
             local: 10.3.32.1
         listen_port: 57872
       - name: w-hkg1-lax1
-        privatekey: mKoADm1jJ1uPKcO65DdxFRaqk2uKnIqkzHjCjfQWAGY=
+        privatekey: QOM6hlUQTRshTUTFGYja+uFWGxcf4h1OxAbdTboZb0g=
         peers:
-          - publickey: fAti3AfO1kcOMnAgQeayTCJV5yYvIx8/qSv69A6qEhA=
+          - publickey: odC++FnZIqBBMZ7yjXpX5hdY4XMOjKYIpN9yJE9gLzk=
             endpoint: lax1.exploro.one:57871
             allowedips:
               - 0.0.0.0/0
@@ -27,9 +27,9 @@ resources:
             local: 10.3.32.1
         listen_port: 57870
       - name: w-hkg1-sgp1
-        privatekey: COlZZGmGjB+QpQFHkA0Hwj6EzG5s4iz3cbViBZfLl3Y=
+        privatekey: UP7CFO0Zjb/EjVmW4QMw6EsRKKZaWA83daSnlLgJtVc=
         peers:
-          - publickey: zS9vhlEaNEh55jHEqfs2LREG2WbazPdIR/SpyPPzG0I=
+          - publickey: kF5JRZo+QFZp869XjcN4/MZ7xahJjCba53GxTNViP1c=
             allowedips:
               - 0.0.0.0/0
               - ::/0

@@ -3,9 +3,9 @@ resources:
     containers: []
     wireguard_configs:
       - name: w-nyc1-lax1
-        privatekey: cA2aQznuDUXc4ePYij4/DjiT4PtrgU6JqgSbIShsiXk=
+        privatekey: oNyOz5aTzBdCALrLie/qodeDEknhinZL/jvPj+hL90Y=
         peers:
-          - publickey: cyk2NZNS4SNL+GvJiD/COwTlrFHbpd+i1ReQEidpQFo=
+          - publickey: /gIbDsPSGCAk0MVhk3Z9eLVS84HzSRk6bvTTtKAOlV4=
             endpoint: lax1.exploro.one:57870
             allowedips:
               - 0.0.0.0/0
@@ -13,39 +13,39 @@ resources:
         addresses:
           - peer: 10.3.64.1/32
             local: 10.3.96.1
-        listen_port: 57870
+        listen_port: 57871
       - name: w-nyc1-dal1
-        privatekey: 4IPP6osB2qru0H30NOVPw4FMLSkEXainwPpeqyIImlo=
+        privatekey: iJhGS3PxlrStDsRJi5cQdpj1JxbiQkIH9iBcALNwBk8=
         peers:
-          - publickey: wzGgvwk1dDNq5P/ftKdoDg6RPR3OFKZlHCJCPOuB6Fw=
+          - publickey: seq58qCnN5oFF6edHXJ+FLita38eB0a1vR+TIUvy6gQ=
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.99.1/32
             local: 10.3.96.1
-        listen_port: 57871
+        listen_port: 57872
       - name: w-nyc1-fra1
-        privatekey: yBKbXaTb/hPLC6jUHLPl+X3F8SpWCJq1t+Ckv0gR/mk=
+        privatekey: QGRxljIFNHbbn+pqF+n09SocjRFNdeDbhy1vLeXnKXU=
         peers:
-          - publickey: W+c2UylkAcsaqQ3Pd6bWzOSHwOxBqg/+V4WKvTLxI00=
-            endpoint: fra1.exploro.one:57870
+          - publickey: iRBv3vO2oACFxSSrzLNc26a1puQk5bgTwaBOORER1mM=
+            endpoint: fra1.exploro.one:57872
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.80.1/32
             local: 10.3.96.1
-        listen_port: 57872
+        listen_port: 57873
       - name: w-nyc1-vie1
-        privatekey: QAfI1fzBl4d7YC4lLUD+IyaaobCpFZ2wI/pT9MNlOnE=
+        privatekey: mPHTCwD1OvdSat2iNIUdlGQrmn04rOyfPCTZtBlVnnE=
         peers:
-          - publickey: Ei/2h3zbe4Joa8elE1K7ATj0csQSwI20XW10L8om7wU=
-            endpoint: vie1.exploro.one:57870
+          - publickey: O5OtTpU/E5neLO0ro+rVsS+xE4S1LVVBkaW5TH6KVAI=
+            endpoint: vie1.exploro.one:57871
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.81.1/32
             local: 10.3.96.1
-        listen_port: 57873
+        listen_port: 57870

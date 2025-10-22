@@ -2,49 +2,49 @@ resources:
   wireguard:
     containers: []
     wireguard_configs:
-      - name: w-vie1-nyc1
-        privatekey: SKgowCiTbfsjRjhlGYShp1iDycbNkURtHhRrDcducng=
-        peers:
-          - publickey: B+/HKmf3H+qbwoDbHzrMH5b/DSeexkmNejNs2J0r4AY=
-            endpoint: nyc1.exploro.one:57873
-            allowedips:
-              - 0.0.0.0/0
-              - ::/0
-        addresses:
-          - peer: 10.3.96.1/32
-            local: 10.3.81.1
-        listen_port: 57870
       - name: w-vie1-ams1
-        privatekey: UPeRd1gyopeSI0zmtn/yn6UuEwH0WnGS/61h6oven1U=
+        privatekey: +JVWQ0qNOvrQ/j2LyzPwTWxjPnm55G6IME+zuCWJ4H4=
         peers:
-          - publickey: xGnvg/itd2Tk92vFCcj84mGpqQog1wV3UjqjbQiq3Fk=
+          - publickey: tY+lPPfX8ikwt5ocxEpoFCEnCXABhJ9Hc4peH2da2yI=
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.82.1/32
             local: 10.3.81.1
-        listen_port: 57871
+        listen_port: 57872
       - name: w-vie1-sgp1
-        privatekey: kP11OzhMXFRzYf6NoOwIlN5mf8i9svKVmogwjeGItG0=
+        privatekey: iOSvkyRigfgWlwDQYhqE7/qixC9qRS+o2EgunisWGlE=
         peers:
-          - publickey: Bd+6Bsq5dhWX6H88w+NFILd+x69p1AFX0TM/9Mc6Lyg=
+          - publickey: A+DgF2JkNFB4nOx2nNyD7GfToX0XT2jhZw503QHeHTM=
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.48.1/32
             local: 10.3.81.1
-        listen_port: 57872
+        listen_port: 57873
       - name: w-vie1-fra1
-        privatekey: oGYDRiOQwhVCkQ4OmoV2m5sYfTaPCsKg3vipt1w+nmI=
+        privatekey: uMQI/BWXbKcI4poEufPHBnVNj8xkHod0hiAcLL80smw=
         peers:
-          - publickey: SLP1D28I0yksM+DToV77c72q88AyigzZp2wuXeB0ZHo=
-            endpoint: fra1.exploro.one:57871
+          - publickey: HmXsUHj/KV/1MuoUB+CrTILk0PF8pHSWXeVMXeqDYGw=
+            endpoint: fra1.exploro.one:57870
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.80.1/32
             local: 10.3.81.1
-        listen_port: 57873
+        listen_port: 57870
+      - name: w-vie1-nyc1
+        privatekey: IDUPKQtu7W1JhtrjaZKfnsPVlHm4AwbxbFIqXxFl+VM=
+        peers:
+          - publickey: g1a34OR9vo8JXNALcdmTcwgUseILTpXdMpyKIXGoYgE=
+            endpoint: nyc1.exploro.one:57870
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.96.1/32
+            local: 10.3.81.1
+        listen_port: 57871

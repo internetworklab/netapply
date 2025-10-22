@@ -3,10 +3,10 @@ resources:
     containers: []
     wireguard_configs:
       - name: w-dal1-nyc1
-        privatekey: eNnoAAAHBIfQolQnAaz+3XenxtHhz62xzaFTnKjJG20=
+        privatekey: SMwlTXv9OAcHjahsEFzzPLdPgEFScSoSdWJ21ptRB2M=
         peers:
-          - publickey: d1/8a6Kjw7AJ/+gkoBEKGAOp85aOY3i172TQPDRpiD0=
-            endpoint: nyc1.exploro.one:57871
+          - publickey: Z5uCCxZpp5wZCFXNR3nsRC38HYYyWVLD+jrKRcUySAM=
+            endpoint: nyc1.exploro.one:57872
             allowedips:
               - 0.0.0.0/0
               - ::/0

@@ -2,27 +2,27 @@ resources:
   wireguard:
     containers: []
     wireguard_configs:
-      - name: w-tyo1-hkg1
-        privatekey: kAY1E+makqPqU0dLpKCimXr6sPfnSVyPZyEqQpFMuko=
-        peers:
-          - publickey: wgpDFKsL+ZE/ZEJsNoy4X5l4XAoPTAKd+GybZIjJDHE=
-            endpoint: hkg1.exploro.one:57872
-            allowedips:
-              - 0.0.0.0/0
-              - ::/0
-        addresses:
-          - peer: 10.3.32.1/32
-            local: 10.3.16.1
-        listen_port: 57870
       - name: w-tyo1-lax1
-        privatekey: SBCGXUuv1BJGssx4P2enHjqv5PZ+nWJ8m4qV3+w+zGo=
+        privatekey: WK8nRq2JiYKjiJcXRQpGaFn/vjWHTJPQLz9b3hnrTH0=
         peers:
-          - publickey: HTWSfBS9G3S35MNuA6Q5OwuLupNQCz2c+hrS8E23WgI=
+          - publickey: k4KS6VFCvifqe7z4c+1vkkyd2C+NEYOKfmQuoqxcATk=
             endpoint: lax1.exploro.one:57872
             allowedips:
               - 0.0.0.0/0
               - ::/0
         addresses:
           - peer: 10.3.64.1/32
+            local: 10.3.16.1
+        listen_port: 57870
+      - name: w-tyo1-hkg1
+        privatekey: +MuUgq0C5x2h3rz/Vv80GaZpceRMUnA4p8IsAW9YB2o=
+        peers:
+          - publickey: g8HeaQurtjMdo4fODXOTE7AWxNchzUXhMuFWHYNgcXU=
+            endpoint: hkg1.exploro.one:57872
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: 10.3.32.1/32
             local: 10.3.16.1
         listen_port: 57871
