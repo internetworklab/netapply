@@ -7,8 +7,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 
+	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
 	pkgmodels "github.com/internetworklab/netapply/pkg/models"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -18,9 +22,26 @@ import (
 const WGConfigFileExtension = ".conf"
 const WGMaskFileExtension = ".mask"
 
+func extractIfIndex(ifname string) int {
+	re := regexp.MustCompile(`^utun(\d+)$`)
+	matches := re.FindStringSubmatch(ifname)
+	if len(matches) == 0 {
+		// if it's not found, return -1
+		return -1
+	}
+	n, err := strconv.Atoi(matches[1])
+	if err != nil {
+		return -1
+	}
+
+	return n
+}
+
 var (
 	ContainerName string
 	WGConfsDir    string
+	VRF           string
+	VRFTableId    int
 )
 
 func main() {
@@ -90,16 +111,43 @@ func main() {
 		log.Fatalf("failed to walk directory: %v", err)
 	}
 
-	if ContainerName != "" {
-		if nodeCfgs.Resources != nil {
-			if nodeCfgs.Resources.WireGuard != nil {
+	if nodeCfgs.Resources != nil {
+		if nodeCfgs.Resources.WireGuard != nil {
+			if ContainerName != "" {
 				nodeCfgs.Resources.WireGuard.Containers = []string{ContainerName}
 				for i := range nodeCfgs.Resources.WireGuard.WireGuardConfigs {
 					nodeCfgs.Resources.WireGuard.WireGuardConfigs[i].ContainerName = pkgutils.StringPtr(ContainerName)
 				}
 			}
-		}
 
+			if VRF != "" && VRFTableId != 0 {
+				for i := range nodeCfgs.Resources.WireGuard.WireGuardConfigs {
+					nodeCfgs.Resources.WireGuard.WireGuardConfigs[i].VRF = pkgutils.StringPtr(VRF)
+				}
+
+				nodeCfgs.Resources.VRF = new(pkginterfacevrf.VRFConfigurationList)
+				if ContainerName != "" {
+					nodeCfgs.Resources.VRF.Containers = []string{}
+				}
+				vrfs := make([]pkginterfacevrf.VRFConfig, 0)
+				vrf := pkginterfacevrf.VRFConfig{
+					Name:    VRF,
+					TableId: uint32(VRFTableId),
+				}
+				if ContainerName != "" {
+					vrf.ContainerName = pkgutils.StringPtr(ContainerName)
+				}
+				vrfs = append(vrfs, vrf)
+				nodeCfgs.Resources.VRF.VRFs = vrfs
+			}
+
+			// always sort, regardless what
+			wgcfgs := nodeCfgs.Resources.WireGuard.WireGuardConfigs
+			sort.Slice(wgcfgs, func(i, j int) bool {
+				return extractIfIndex(wgcfgs[i].Name) < extractIfIndex(wgcfgs[j].Name)
+			})
+			nodeCfgs.Resources.WireGuard.WireGuardConfigs = wgcfgs
+		}
 	}
 
 	yaml.NewEncoder(os.Stdout).Encode(nodeCfgs)
@@ -111,4 +159,6 @@ func main() {
 func init() {
 	flag.StringVar(&WGConfsDir, "wg-confsd", "wg", "the directory containing the WireGuard config files")
 	flag.StringVar(&ContainerName, "container", "", "the container name")
+	flag.StringVar(&VRF, "vrf", "", "the VRF name")
+	flag.IntVar(&VRFTableId, "vrf-table-id", 0, "the VRF table id")
 }
