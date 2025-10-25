@@ -121,8 +121,15 @@ func main() {
 			}
 
 			if VRF != "" && VRFTableId != 0 {
-				for i := range nodeCfgs.Resources.WireGuard.WireGuardConfigs {
-					nodeCfgs.Resources.WireGuard.WireGuardConfigs[i].VRF = pkgutils.StringPtr(VRF)
+				var wgcfgs []pkginterfacewireguard.WireGuardConfig
+				if nodeCfgs.Resources.WireGuard != nil {
+					wgcfgs = nodeCfgs.Resources.WireGuard.WireGuardConfigs
+				}
+				if wgcfgs != nil {
+					for i := range wgcfgs {
+						wgcfgs[i].VRF = pkgutils.StringPtr(VRF)
+					}
+					nodeCfgs.Resources.WireGuard.WireGuardConfigs = wgcfgs
 				}
 
 				nodeCfgs.Resources.VRF = new(pkginterfacevrf.VRFConfigurationList)
