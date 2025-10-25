@@ -134,7 +134,7 @@ func main() {
 
 				nodeCfgs.Resources.VRF = new(pkginterfacevrf.VRFConfigurationList)
 				if ContainerName != "" {
-					nodeCfgs.Resources.VRF.Containers = []string{}
+					nodeCfgs.Resources.VRF.Containers = []string{ContainerName}
 				}
 				vrfs := make([]pkginterfacevrf.VRFConfig, 0)
 				vrf := pkginterfacevrf.VRFConfig{
