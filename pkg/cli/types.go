@@ -17,8 +17,9 @@ type CLI struct {
 }
 
 type UpCmd struct {
-	Config      string `required:"" help:"Path to the configuration file"`
-	ServiceName string `required:"" help:"Name of the service" short:"s"`
+	Config           string `required:"" help:"Path to the configuration file"`
+	ServiceName      string `required:"" help:"Name of the service" short:"s"`
+	OutputChangeLogs string `help:"Outputs what's just been updated to a file, in YAML format" type:"path"`
 }
 
 type CleanUpCmd struct {
