@@ -274,6 +274,11 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
 
+	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
+	}
+
 	endpointCheckingMask := make(map[string]bool)
 
 	specPeerConfigs := make([]wgtypes.PeerConfig, 0)
@@ -290,7 +295,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		specPeerConfigs = append(specPeerConfigs, *peercfg)
 	}
 
-	err := pkgdocker.WithNetnsWGCli(ctx, wgConf.ContainerName, func(wgCtrl *wgctrl.Client) error {
+	err = pkgdocker.WithNetnsWGCli(ctx, wgConf.ContainerName, func(wgCtrl *wgctrl.Client) error {
 		currentConfig, err := wgCtrl.Device(wgConf.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard device: %w", err)
@@ -308,11 +313,6 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers, endpointCheckingMask)
 		changeSet.PeersToAdd = addedPeers
 		changeSet.PeersToRemove = removedPeers
-
-		wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
-		}
 
 		if wgtypesConf.PrivateKey != nil {
 			if *wgtypesConf.PrivateKey != currentConfig.PrivateKey {
@@ -479,6 +479,11 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 }
 
 func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
+	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
+	}
+
 	return pkgdocker.WithNsHandle(ctx, nil, func(handle *netlink.Handle) error {
 		wgLink := &netlink.Wireguard{
 			LinkAttrs: netlink.LinkAttrs{
@@ -505,11 +510,6 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to create wireguard controller: %w", err)
 		}
 		defer wgCtrl.Close()
-
-		wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
-		}
 
 		if err := wgCtrl.ConfigureDevice(wgConf.Name, *wgtypesConf); err != nil {
 			return fmt.Errorf("failed to configure wireguard device: %w", err)
