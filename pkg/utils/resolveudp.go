@@ -14,9 +14,11 @@ func TryResolveUDPAddrManyTimes(addr string, retries int, retryIntvl time.Durati
 		if err == nil {
 			return udpAddr, nil
 		}
-		log.Printf("failed to resolve udp address %s: %v", addr, err)
-		log.Printf("will retry in %s", retryIntvl)
-		time.Sleep(retryIntvl)
+		if i < retries-1 {
+			log.Printf("failed to resolve udp address %s: %v", addr, err)
+			log.Printf("will retry in %s", retryIntvl)
+			time.Sleep(retryIntvl)
+		}
 	}
 	return nil, fmt.Errorf("failed to resolve udp address %s: %w", addr, err)
 }

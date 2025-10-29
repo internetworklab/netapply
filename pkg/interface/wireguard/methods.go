@@ -396,7 +396,7 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wg
 	}
 
 	if wgPeerConfig.Endpoint != nil {
-		udpAddr, err := pkgutils.TryResolveUDPAddrManyTimes(*wgPeerConfig.Endpoint, 10, 3*time.Second)
+		udpAddr, err := pkgutils.TryResolveUDPAddrManyTimes(*wgPeerConfig.Endpoint, 1, 3*time.Second)
 		if err != nil {
 			log.Printf("failed to resolve udp address %s: %v", *wgPeerConfig.Endpoint, err)
 			peercfg.Endpoint = nil
