@@ -13,6 +13,9 @@ import (
 
 	pkghandler "github.com/internetworklab/netapply/pkg/handler"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
@@ -25,6 +28,10 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 	ctx = pkgutils.SetNodeNameInCtx(ctx, globalCLIConfig.Node)
 	ctx = pkgutils.SetStartedAtInCtx(ctx, uint64(time.Now().Unix()))
 	ctx = pkgutils.SetUnixSocketPathInCtx(ctx, cmd.BindUnixSocket)
+
+	if cmd.BindUnixSocket == "" {
+		return fmt.Errorf("bind unix socket is not set")
+	}
 
 	log.Printf("Serving as a local configurator on %s\n", cmd.BindUnixSocket)
 
@@ -44,10 +51,21 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 		}
 	}()
 
-	handlerRouter := pkghandler.NewRouterHandler(ctx)
+	uri := "mongodb://localhost:27017"
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	if err != nil {
+		return fmt.Errorf("failed to connect to mongodb: %w", err)
+	}
+
+	defer client.Disconnect(context.TODO())
+
+	muxer := http.NewServeMux()
+	muxer.Handle("/collections/", pkghandler.NewCollectionHandler(client))
+	muxer.Handle("/resources/", pkghandler.NewResourceHandler(ctx))
+	muxer.Handle("/basicinfo/", pkghandler.NewBasicInfoHandler(ctx))
 
 	server := &http.Server{
-		Handler: handlerRouter,
+		Handler: muxer,
 	}
 
 	serverErrCh := make(chan error)

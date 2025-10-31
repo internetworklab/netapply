@@ -7,22 +7,27 @@ import (
 )
 
 type WireGuardConfig struct {
-	Name       string `yaml:"name" json:"name"`
-	PrivateKey string `yaml:"privatekey,omitempty" json:"privatekey,omitempty"`
+	Name       string `yaml:"name" json:"name" bson:"name"`
+	PrivateKey string `yaml:"privatekey,omitempty" json:"privatekey,omitempty" bson:"privatekey,omitempty"`
 
 	// If privatekey is not set, privatekey_from will be checked, if privatekey_from is not nil and not empty,
 	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
-	PrivateKeyFrom *string                            `yaml:"privatekey_from,omitempty" json:"privatekey_from,omitempty"`
-	Peers          []WireGuardPeerConfig              `yaml:"peers,omitempty" json:"peers,omitempty"`
-	Addresses      []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
-	ContainerName  *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	ListenPort     *int                               `yaml:"listen_port,omitempty" json:"listen_port,omitempty"`
-	MTU            *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	PrivateKeyFrom *string                            `yaml:"privatekey_from,omitempty" json:"privatekey_from,omitempty" bson:"privatekey_from,omitempty"`
+	Peers          []WireGuardPeerConfig              `yaml:"peers,omitempty" json:"peers,omitempty" bson:"peers,omitempty"`
+	Addresses      []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty" bson:"addresses,omitempty"`
+	ContainerName  *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty" bson:"container_name,omitempty"`
+	ListenPort     *int                               `yaml:"listen_port,omitempty" json:"listen_port,omitempty" bson:"listen_port,omitempty"`
+	MTU            *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty" bson:"mtu,omitempty"`
 
-	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty" bson:"vrf,omitempty"`
 
 	// Use to store metadata or anything that is business-relevant.
-	Additionals map[string]string `yaml:"additionals,omitempty" json:"additionals,omitempty"`
+	Additionals map[string]string `yaml:"additionals,omitempty" json:"additionals,omitempty" bson:"additionals,omitempty"`
+
+	// When storing in database, use Node to distinguish which node the resource belongs to.
+	// And ResourceId serves as the unique ID to distinguish the resource in the global scope.
+	Node       *string `yaml:"node,omitempty" json:"node,omitempty" bson:"node,omitempty"`
+	ResourceId *string `yaml:"resource_id,omitempty" json:"resource_id,omitempty" bson:"resource_id,omitempty"`
 }
 
 type WireGuardInterfaceChangeSet struct {
@@ -43,25 +48,25 @@ type WireGuardInterfaceChangeSet struct {
 }
 
 type WireGuardPeerConfig struct {
-	PublicKey           string `yaml:"publickey,omitempty" json:"publickey,omitempty"`
-	PersistentKeepalive *int   `yaml:"persistent_keepalive,omitempty" json:"persistent_keepalive,omitempty"`
+	PublicKey           string `yaml:"publickey,omitempty" json:"publickey,omitempty" bson:"publickey,omitempty"`
+	PersistentKeepalive *int   `yaml:"persistent_keepalive,omitempty" json:"persistent_keepalive,omitempty" bson:"persistent_keepalive,omitempty"`
 
-	PresharedKey string `yaml:"presharedkey,omitempty" json:"presharedkey,omitempty"`
+	PresharedKey string `yaml:"presharedkey,omitempty" json:"presharedkey,omitempty" bson:"presharedkey,omitempty"`
 
 	// If PresharedKey is not set, PresharedKeyFrom will be checked, if PresharedKeyFrom is not nil and not empty,
 	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
-	PresharedKeyFrom *string `yaml:"presharedkey_from,omitempty" json:"presharedkey_from,omitempty"`
+	PresharedKeyFrom *string `yaml:"presharedkey_from,omitempty" json:"presharedkey_from,omitempty" bson:"presharedkey_from,omitempty"`
 
 	// If PublicKey is not set, PublicKeyFrom will be checked, if PublicKeyFrom is not nil and not empty,
 	// it will be treated as an URL, the URL can be a regular file path, or a HTTP/HTTPS URL.
-	PublicKeyFrom *string `yaml:"publickey_from,omitempty" json:"publickey_from,omitempty"`
+	PublicKeyFrom *string `yaml:"publickey_from,omitempty" json:"publickey_from,omitempty" bson:"publickey_from,omitempty"`
 
-	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty"`
-	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty"`
+	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty" bson:"endpoint,omitempty"`
+	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty" bson:"allowedips,omitempty"`
 
 	// When deploy in intranet, the endpoint might not successfully converge to the endpoint specified in the spec,
 	// Enabling this flag might result in the reconciliation failed to converge.
-	ForceRecheckEndpoint *bool `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty"`
+	ForceRecheckEndpoint *bool `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty" bson:"force_recheck_endpoint,omitempty"`
 }
 
 type WireGuardConfigurationList struct {
