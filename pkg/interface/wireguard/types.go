@@ -28,6 +28,9 @@ type WireGuardConfig struct {
 	// And ResourceId serves as the unique ID to distinguish the resource in the global scope.
 	Node       *string `yaml:"node,omitempty" json:"node,omitempty" bson:"node,omitempty"`
 	ResourceId *string `yaml:"resource_id,omitempty" json:"resource_id,omitempty" bson:"resource_id,omitempty"`
+
+	// For soft-deletion
+	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
 }
 
 type WireGuardInterfaceChangeSet struct {

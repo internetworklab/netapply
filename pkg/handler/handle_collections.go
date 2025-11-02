@@ -120,6 +120,22 @@ func (ch *CollectionHandler) handleWriteWgCollection(ctx context.Context, w http
 	w.WriteHeader(http.StatusOK)
 }
 
+const queryParamIncludeDeleted = "includedeleted"
+
+func applySoftDeletionFilter(filter bson.D, r *http.Request) bson.D {
+	if r.URL.Query().Get(queryParamIncludeDeleted) == "" {
+		return append(filter, bson.E{
+			Key: "$or",
+			Value: []bson.M{
+				{"deleted": false},
+				{"deleted": bson.M{"$exists": false}},
+			},
+		})
+
+	}
+	return filter
+}
+
 func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	collectionName := extractCollectionNameFromRequest(r)
 	coll := ch.client.Database(dbName).Collection(collectionName)
@@ -129,6 +145,8 @@ func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.
 	if nodeName != "" {
 		filter = append(filter, bson.E{Key: "node", Value: nodeName})
 	}
+
+	filter = applySoftDeletionFilter(filter, r)
 
 	cursor, err := coll.Find(ctx, filter)
 	if err != nil {
