@@ -96,6 +96,7 @@ func (ch *CollectionHandler) handleWriteWgCollection(ctx context.Context, w http
 	wgConfigs, err := prepareDocuments(r)
 	if err != nil {
 		RespondWithError(w, err, http.StatusBadRequest)
+		return
 	}
 
 	writeMdls := make([]mongo.WriteModel, 0)
