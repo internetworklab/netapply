@@ -58,48 +58,65 @@ func generateResourceId(nodeName string, ifname string) string {
 	return uuid.New().String()
 }
 
-func (ch *CollectionHandler) handleWriteWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func prepareDocuments(r *http.Request) ([]pkginterfacewireguard.WireGuardConfig, error) {
 	var wgConfigs []pkginterfacewireguard.WireGuardConfig
 	if err := json.NewDecoder(r.Body).Decode(&wgConfigs); err != nil {
-		RespondWithError(w, err, http.StatusBadRequest)
-		return
+		return nil, err
 	}
 
 	nodeName := extractNodeNameFromRequest(r)
 	if nodeName != "" {
 		for i := range wgConfigs {
 			wgConfigs[i].Node = pkgutils.StringPtr(nodeName)
-			if wgConfigs[i].ResourceId == nil || *(wgConfigs[i].ResourceId) == "" {
-				wgConfigs[i].ResourceId = pkgutils.StringPtr(generateResourceId(nodeName, wgConfigs[i].Name))
-			}
+
 		}
 
+	}
+
+	for i := range wgConfigs {
+		nodeName := wgConfigs[i].Node
+		if nodeName == nil || *nodeName == "" {
+			return nil, fmt.Errorf("node name is required")
+		}
+
+		ifName := wgConfigs[i].Name
+		if ifName == "" {
+			return nil, fmt.Errorf("interface name is required")
+		}
+
+		if wgConfigs[i].ResourceId == nil || *(wgConfigs[i].ResourceId) == "" {
+			wgConfigs[i].ResourceId = pkgutils.StringPtr(generateResourceId(*nodeName, ifName))
+		}
+	}
+
+	return wgConfigs, nil
+}
+
+func (ch *CollectionHandler) handleWriteWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	wgConfigs, err := prepareDocuments(r)
+	if err != nil {
+		RespondWithError(w, err, http.StatusBadRequest)
+	}
+
+	writeMdls := make([]mongo.WriteModel, 0)
+	for i := range wgConfigs {
+		replaceMdl := mongo.NewReplaceOneModel()
+		replaceMdl.SetUpsert(true)
+		replaceMdl.SetFilter(bson.D{bson.E{Key: "resource_id", Value: *wgConfigs[i].ResourceId}})
+		replaceMdl.SetReplacement(wgConfigs[i])
+		writeMdls = append(writeMdls, replaceMdl)
 	}
 
 	collectionName := extractCollectionNameFromRequest(r)
 	coll := ch.client.Database(dbName).Collection(collectionName)
 
-	result, err := coll.InsertMany(ctx, wgConfigs)
+	_, err = coll.BulkWrite(ctx, writeMdls)
 	if err != nil {
 		RespondWithError(w, err, http.StatusInternalServerError)
 		return
 	}
 
-	resIds := make([]string, 0)
-	for _, resId := range result.InsertedIDs {
-		if resId, ok := resId.(bson.ObjectID); ok {
-			resIds = append(resIds, resId.Hex())
-		}
-	}
-
-	respResult := struct {
-		InsertedIDs []string `json:"inserted_ids"`
-	}{
-		InsertedIDs: resIds,
-	}
-
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(respResult)
 }
 
 func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -112,7 +129,7 @@ func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.
 		filter = append(filter, bson.E{Key: "node", Value: nodeName})
 	}
 
-	cursor, err := coll.Find(context.TODO(), filter)
+	cursor, err := coll.Find(ctx, filter)
 	if err != nil {
 		RespondWithError(w, err, http.StatusInternalServerError)
 		return
@@ -125,7 +142,7 @@ func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.
 		var wg pkginterfacewireguard.WireGuardConfig
 		err := cursor.Decode(&wg)
 		if err != nil {
-			RespondWithError(w, err, http.StatusInternalServerError)
+			RespondWithError(w, err, http.StatusBadRequest)
 			return
 		}
 		result = append(result, wg)

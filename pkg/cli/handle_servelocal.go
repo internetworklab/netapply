@@ -52,6 +52,10 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 	}()
 
 	uri := "mongodb://localhost:27017"
+	envMongoDBURI := os.Getenv("MONGODB_URI")
+	if envMongoDBURI != "" {
+		uri = envMongoDBURI
+	}
 	client, err := mongo.Connect(options.Client().ApplyURI(uri))
 	if err != nil {
 		return fmt.Errorf("failed to connect to mongodb: %w", err)
