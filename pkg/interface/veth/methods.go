@@ -335,3 +335,7 @@ func (vethPairSpec *VethPairConfig) CheckExist(ctx context.Context) (bool, error
 func (vethPairChangeSet *VethPairChangeSet) GetType() string {
 	return new(netlink.Veth).Type()
 }
+
+func (vethCfgsList *VethPairConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, vethCfgsList, delete)
+}

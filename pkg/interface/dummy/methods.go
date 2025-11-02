@@ -195,3 +195,7 @@ func (dummyConfig *DummyConfig) CheckExist(ctx context.Context) (bool, error) {
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetType() string {
 	return new(netlink.Dummy).Type()
 }
+
+func (dummyCfgsList *DummyConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, dummyCfgsList, delete)
+}

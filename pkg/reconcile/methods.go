@@ -273,7 +273,8 @@ func (dpChangeSet *ResourceListChangeSet) Log() {
 	fmt.Println(tw.Render())
 }
 
-func DetectChangesForProvisionersList(ctx context.Context, provisionersList ResourceProvisionersList) (*ResourceListChangeSet, error) {
+// This method is the most common way for detecting changes for most kind of resources
+func DetectChangesForProvisionersList(ctx context.Context, provisionersList ResourceProvisionersList, delete bool) (*ResourceListChangeSet, error) {
 	if provisionersList == nil {
 		return nil, nil
 	}
@@ -291,9 +292,11 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 	commonSet := make(map[string]map[string]ResourceProvisioner)
 
 	changeSet := new(ResourceListChangeSet)
+
+	// determining what demands to be removed
 	for nsKey, subMap := range currentResourcesMap {
 		for resKey, resCanceller := range subMap {
-			if _, ok := specsMap[nsKey]; !ok {
+			if _, ok := specsMap[nsKey]; !ok && delete {
 				if changeSet.RemovedResources == nil {
 					changeSet.RemovedResources = make(map[string][]ResourceCanceller)
 				}
@@ -304,7 +307,7 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 				continue
 			}
 
-			if _, ok := specsMap[nsKey][resKey]; !ok {
+			if _, ok := specsMap[nsKey][resKey]; !ok && delete {
 				if changeSet.RemovedResources == nil {
 					changeSet.RemovedResources = make(map[string][]ResourceCanceller)
 				}
@@ -323,6 +326,7 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 		}
 	}
 
+	// determining what demands to be added
 	for nsKey, subMap := range specsMap {
 		for resKey, resProvisioner := range subMap {
 			if _, ok := currentResourcesMap[nsKey]; !ok {
@@ -355,6 +359,7 @@ func DetectChangesForProvisionersList(ctx context.Context, provisionersList Reso
 		}
 	}
 
+	// determining what demands to be updated
 	for nsKey, subMap := range commonSet {
 		for resKey, resProvisioner := range subMap {
 			exist, err := resProvisioner.CheckExist(ctx)

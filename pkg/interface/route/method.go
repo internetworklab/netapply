@@ -475,3 +475,8 @@ func (r *RouteObjectChangeSet) GetType() string {
 func (r *RouteConfigurationList) GetType() string {
 	return ResourceTypeRoute
 }
+
+func (r *RouteConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	// todo: implement the DetectChanges receiver of RouteConfigurationList separately
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, r, delete)
+}

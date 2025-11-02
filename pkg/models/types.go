@@ -1,7 +1,6 @@
 package models
 
 import (
-	pkgfrrcontainer "github.com/internetworklab/netapply/pkg/frr/container"
 	pkginterfacebridge "github.com/internetworklab/netapply/pkg/interface/bridge"
 	pkginterfacedummy "github.com/internetworklab/netapply/pkg/interface/dummy"
 	pkginterfaceroute "github.com/internetworklab/netapply/pkg/interface/route"
@@ -40,19 +39,11 @@ type ControlplaneConfig struct {
 }
 
 type NodeConfig struct {
-	FRRContainers []pkgfrrcontainer.FRRContainerConfig `yaml:"frr_containers,omitempty" json:"frr_containers,omitempty"`
-
-	// Currently, the implementation of the controlplane are largely outsourced to (maybe containerized) FRR instance.
-	Controlplane []ControlplaneConfig `yaml:"controlplane,omitempty" json:"controlplane,omitempty"`
 
 	// Resources field are use to define resource-like objects,
 	// which means it can be created, updated, and deleted and the controller knows how to detect its existence as well as its changes (aka reconciliation)
 	// To say, resource-like objects are simply those reconcile-able.
 	Resources *ResourcesConfig `yaml:"resources,omitempty" json:"resources,omitempty"`
-
-	// By default, it would use $CWD/.go-reconciler-state as the stateful directory.
-	// There is a GetStatefulDir method in pkgutils model for it.
-	StatefulDir string `yaml:"stateful_dir,omitempty" json:"stateful_dir,omitempty"`
 }
 
 const DefaultStatefulDirRel = ".go-reconciler-state"

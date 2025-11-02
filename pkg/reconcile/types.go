@@ -39,6 +39,10 @@ type ResourceProvisionersList interface {
 	GetProvisioners() []ResourceProvisioner
 	IndexCurrentResources(ctx context.Context) (map[string]map[string]ResourceCanceller, error)
 	CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]ResourceProvisioner, resource ResourceCanceller) (bool, error)
+
+	// If delete is true, meaning that should ignore those presented in actual state but not in the spec,
+	// its just like the `--delete` flag of the `rsync` command.
+	DetectChanges(ctx context.Context, delete bool) (*ResourceListChangeSet, error)
 }
 
 type ResourceCanceller interface {

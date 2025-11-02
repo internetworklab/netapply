@@ -316,3 +316,7 @@ func (bridgeConfig *BridgeConfig) CheckExist(ctx context.Context) (bool, error) 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
 	return new(netlink.Bridge).Type()
 }
+
+func (bridgeCfgsList *BridgeConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, bridgeCfgsList, delete)
+}

@@ -239,3 +239,7 @@ func (vrfList *VRFConfigurationList) CheckResourceExistInSpec(ctx context.Contex
 	}
 	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
+
+func (vrfList *VRFConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, vrfList, delete)
+}

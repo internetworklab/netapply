@@ -838,3 +838,7 @@ func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) 
 
 	return eINIWGAdapterSecondPass(interfaceSection.SectionData, peerSectionMaps, additionals)
 }
+
+func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, wgCfgsList, delete)
+}

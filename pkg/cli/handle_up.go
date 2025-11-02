@@ -27,7 +27,7 @@ func (cmd *UpCmd) Run(globalCLIConfig *CLI) error {
 	// Start the service
 	log.Printf("Setting up service %s on node %s ...", cmd.ServiceName, globalCLIConfig.Node)
 	ctx = pkgutils.SetServiceNameInCtx(ctx, cmd.ServiceName)
-	if err := nodecfg.Up(ctx); err != nil {
+	if err := nodecfg.Up(ctx, cmd.Delete); err != nil {
 		return fmt.Errorf("failed to start service: %w", err)
 	}
 

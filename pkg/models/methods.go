@@ -8,40 +8,15 @@ import (
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkgfrrvtysh "github.com/internetworklab/netapply/pkg/frr/vtysh"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
-	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
-func (nodeConfig *NodeConfig) Up(ctx context.Context) error {
-	ctx = pkgutils.SetStatefulDirInCtx(ctx, nodeConfig.StatefulDir)
-
-	if nodeConfig.FRRContainers != nil {
-		log.Println("Setting up docker containers ...")
-		for _, dockerContainer := range nodeConfig.FRRContainers {
-			log.Printf("Setting up %s ...", pkgdocker.GetContainerDisplayName(&dockerContainer.ContainerName))
-			if err := dockerContainer.Apply(ctx); err != nil {
-				return fmt.Errorf("failed to create container %s: %w", pkgdocker.GetContainerDisplayName(&dockerContainer.ContainerName), err)
-			}
-		}
-	}
-
+func (nodeConfig *NodeConfig) Up(ctx context.Context, delete bool) error {
 	if nodeConfig.Resources != nil {
 		log.Println("Setting up dataplane ...")
-		if err := nodeConfig.Resources.Reconcile(ctx); err != nil {
+		if err := nodeConfig.Resources.Reconcile(ctx, delete); err != nil {
 			return fmt.Errorf("failed to reconcile dataplane: %w", err)
 		}
-
 	}
-
-	if nodeConfig.Controlplane != nil {
-		log.Println("Setting up controlplane ...")
-		for _, controlPlaneConfig := range nodeConfig.Controlplane {
-			log.Printf("Setting up controlplane for %s ...", pkgdocker.GetContainerDisplayName(controlPlaneConfig.ContainerName))
-			if err := controlPlaneConfig.Apply(ctx); err != nil {
-				return fmt.Errorf("failed to create controlplane: %w", err)
-			}
-		}
-	}
-
 	return nil
 }
 
@@ -52,12 +27,11 @@ func appendNoNil(targets []pkgreconcile.ResourceProvisionersList, target pkgreco
 	return append(targets, target)
 }
 
-func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconcile.ResourceListChangeSet, error) {
+func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 
 	var changeSet *pkgreconcile.ResourceListChangeSet
 
 	reconcileTargets := make([]pkgreconcile.ResourceProvisionersList, 0)
-	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.OpenVPN)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VRF)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.WireGuard)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VXLAN)
@@ -68,7 +42,8 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconci
 
 	for _, reconcileTarget := range reconcileTargets {
 		log.Println("Detecting changes for", reconcileTarget.GetType(), "...")
-		subChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, reconcileTarget)
+		// subChangeSet, err := pkgreconcile.DetectChangesForProvisionersList(ctx, reconcileTarget)
+		subChangeSet, err := reconcileTarget.DetectChanges(ctx, delete)
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect changes for %s: %w", reconcileTarget.GetType(), err)
 		}
@@ -81,9 +56,9 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context) (*pkgreconci
 	return changeSet, nil
 }
 
-func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context) error {
+func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context, delete bool) error {
 	log.Println("Detecting changes for dataplane config ...")
-	changeSet, err := dpConfig.DetectChanges(ctx)
+	changeSet, err := dpConfig.DetectChanges(ctx, delete)
 	if err != nil {
 		return fmt.Errorf("failed to detect changes: %w", err)
 	}
@@ -101,7 +76,7 @@ func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context) error {
 		}
 
 		log.Println("Changeset is applied to dataplane config, detecting changes again ...")
-		changeSet, err = dpConfig.DetectChanges(ctx)
+		changeSet, err = dpConfig.DetectChanges(ctx, delete)
 		if err != nil {
 			return fmt.Errorf("failed to detect changes: %w", err)
 		}

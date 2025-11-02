@@ -18,6 +18,12 @@ type ResourceHandler struct {
 	Mux *http.ServeMux
 }
 
+const paramKeyDelete = "delete"
+
+func extractDeleteFromRequest(r *http.Request) bool {
+	return r.URL.Query().Get(paramKeyDelete) == "true"
+}
+
 func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 
 	nodeConfig := new(pkgmodels.NodeConfig)
@@ -41,7 +47,7 @@ func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := nodeConfig.Up(ctx); err != nil {
+	if err := nodeConfig.Up(ctx, extractDeleteFromRequest(r)); err != nil {
 		RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
@@ -106,7 +112,7 @@ func handleResourceDetectChanges(ctx context.Context, w http.ResponseWriter, r *
 	result := new(ChangeSetSummary)
 
 	if nodeConfig.Resources != nil {
-		changeSet, err := nodeConfig.Resources.DetectChanges(ctx)
+		changeSet, err := nodeConfig.Resources.DetectChanges(ctx, extractDeleteFromRequest(r))
 		if err != nil {
 			RespondWithError(w, err, http.StatusInternalServerError)
 			return

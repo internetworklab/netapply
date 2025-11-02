@@ -205,3 +205,7 @@ func (vxlanConfig *VXLANConfig) CheckExist(ctx context.Context) (bool, error) {
 func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetType() string {
 	return new(netlink.Vxlan).Type()
 }
+
+func (vxlanCfgsList *VXLANConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	return pkgreconcile.DetectChangesForProvisionersList(ctx, vxlanCfgsList, delete)
+}
