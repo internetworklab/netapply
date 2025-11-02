@@ -348,6 +348,9 @@ func (ovpCfgsList *OpenVPN2ConfigurationList) GetProvisioners() []pkgreconcile.R
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, ovpCfg := range ovpCfgsList.Instances {
+		if ovpCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &ovpCfg)
 	}
 	return provisioners
@@ -435,4 +438,8 @@ func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetInterfaceName() stri
 
 func (ovpInterfaceCanceller *OpenVPN2InterfaceCanceller) GetType() string {
 	return new(netlink.Tuntap).Type()
+}
+
+func (ovpInst *OpenVPN2Instance) IsSoftDeleted() bool {
+	return ovpInst.Deleted
 }

@@ -256,6 +256,9 @@ type OpenVPN2Instance struct {
 	TTY *bool `openvpn2:"-" yaml:"tty,omitempty" json:"tty,omitempty"`
 
 	OpenStdin *bool `openvpn2:"-" yaml:"stdin_open,omitempty" json:"stdin_open,omitempty"`
+
+	// Soft deletion support
+	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
 }
 
 type OpenVPN2ConfigurationList struct {

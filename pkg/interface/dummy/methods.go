@@ -154,6 +154,9 @@ func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkgreconcile.Re
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, dummyCfg := range dummyCfgsList.Dummies {
+		if dummyCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &dummyCfg)
 	}
 	return provisioners
@@ -198,4 +201,8 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetType() string {
 
 func (dummyCfgsList *DummyConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, dummyCfgsList, delete)
+}
+
+func (dummyConfig *DummyConfig) IsSoftDeleted() bool {
+	return dummyConfig.Deleted
 }

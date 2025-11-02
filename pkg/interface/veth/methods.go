@@ -298,6 +298,9 @@ func (vethCfgsList *VethPairConfigurationList) GetProvisioners() []pkgreconcile.
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vethCfg := range vethCfgsList.VethPairs {
+		if vethCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &vethCfg)
 	}
 	return provisioners
@@ -338,4 +341,8 @@ func (vethPairChangeSet *VethPairChangeSet) GetType() string {
 
 func (vethCfgsList *VethPairConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, vethCfgsList, delete)
+}
+
+func (vethPairSpec *VethPairConfig) IsSoftDeleted() bool {
+	return vethPairSpec.Deleted
 }

@@ -206,6 +206,9 @@ func (vrfList *VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourcePr
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vrfCfg := range vrfList.VRFs {
+		if vrfCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &vrfCfg)
 	}
 	return provisioners
@@ -242,4 +245,8 @@ func (vrfList *VRFConfigurationList) CheckResourceExistInSpec(ctx context.Contex
 
 func (vrfList *VRFConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, vrfList, delete)
+}
+
+func (vrfConfig *VRFConfig) IsSoftDeleted() bool {
+	return vrfConfig.Deleted
 }

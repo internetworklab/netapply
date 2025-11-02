@@ -463,6 +463,9 @@ func (r *RouteConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvis
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, routeCfg := range r.Routes {
+		if routeCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &routeCfg)
 	}
 	return provisioners
@@ -479,4 +482,8 @@ func (r *RouteConfigurationList) GetType() string {
 func (r *RouteConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	// todo: implement the DetectChanges receiver of RouteConfigurationList separately
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, r, delete)
+}
+
+func (r *RouteConfig) IsSoftDeleted() bool {
+	return r.Deleted
 }

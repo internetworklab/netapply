@@ -569,6 +569,9 @@ func (wgCfgsList *WireGuardConfigurationList) GetProvisioners() []pkgreconcile.R
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, wgCfg := range wgCfgsList.WireGuardConfigs {
+		if wgCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &wgCfg)
 	}
 	return provisioners
@@ -841,4 +844,8 @@ func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) 
 
 func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, wgCfgsList, delete)
+}
+
+func (wgConfig *WireGuardConfig) IsSoftDeleted() bool {
+	return wgConfig.Deleted
 }

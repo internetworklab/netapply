@@ -10,6 +10,9 @@ type VRFConfig struct {
 	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	TableId       uint32                             `yaml:"table_id" json:"table_id"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+
+	// Soft deletion support
+	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
 }
 
 type VRFConfigurationList struct {

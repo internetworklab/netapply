@@ -26,16 +26,21 @@ type ResourceProvisioner interface {
 	// Get the container name for indexing and logging purposes.
 	GetContainerName() *string
 
-	// Check if the interface is exist
-	// If it's not exist, should return (false, nil), error is non-nil only when there is error (and resource-doesnt exist is not an error)
+	// Check if the interface is actually exist in the system,
+	// If it's not exist, should return (false, nil), error is non-nil only when there is error (and resource-doesnt exist is not considered as an error)
 	CheckExist(ctx context.Context) (bool, error)
 
 	// Get type of the interface(resource), so that it can be compared for priority of creation
 	GetType() string
+
+	// Check if the resource has been marked as soft-deleted, mainly called by the upper layer's GetProvisioners function.
+	IsSoftDeleted() bool
 }
 
 type ResourceProvisionersList interface {
 	GetType() string
+
+	// GetProvisioners function shall respect soft-deletion of the resources, if any.
 	GetProvisioners() []ResourceProvisioner
 	IndexCurrentResources(ctx context.Context) (map[string]map[string]ResourceCanceller, error)
 	CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]ResourceProvisioner, resource ResourceCanceller) (bool, error)

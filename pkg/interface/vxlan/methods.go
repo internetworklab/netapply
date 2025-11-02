@@ -164,6 +164,9 @@ func (vxlanCfgsList *VXLANConfigurationList) GetProvisioners() []pkgreconcile.Re
 	}
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, vxlanCfg := range vxlanCfgsList.VXLANConfigs {
+		if vxlanCfg.IsSoftDeleted() {
+			continue
+		}
 		provisioners = append(provisioners, &vxlanCfg)
 	}
 	return provisioners
@@ -208,4 +211,8 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetType() string {
 
 func (vxlanCfgsList *VXLANConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, vxlanCfgsList, delete)
+}
+
+func (vxlanConfig *VXLANConfig) IsSoftDeleted() bool {
+	return vxlanConfig.Deleted
 }

@@ -252,6 +252,10 @@ func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkgreconcile.
 
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, bridgeCfg := range bridgeCfgsList.Bridges {
+		if bridgeCfg.IsSoftDeleted() {
+			continue
+		}
+
 		provisioners = append(provisioners, &bridgeCfg)
 	}
 	return provisioners
@@ -319,4 +323,8 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
 
 func (bridgeCfgsList *BridgeConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
 	return pkgreconcile.DetectChangesForProvisionersList(ctx, bridgeCfgsList, delete)
+}
+
+func (bridgeConfig *BridgeConfig) IsSoftDeleted() bool {
+	return bridgeConfig.Deleted
 }

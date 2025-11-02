@@ -10,6 +10,9 @@ type DummyConfig struct {
 	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 	VRF           *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+
+	// Soft deletion support
+	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
 }
 
 type DummyInterfaceChangeSet struct {

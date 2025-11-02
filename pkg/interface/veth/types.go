@@ -15,6 +15,9 @@ type VethPairConfig struct {
 
 	// A stub veth simply represents the another end of a veth pair, it's not actually created or actually reconciled.
 	Stub bool `yaml:"stub,omitempty" json:"stub,omitempty"`
+
+	// Soft deletion support
+	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
 }
 
 type VethPairPeerChangeSet struct {

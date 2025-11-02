@@ -2,8 +2,7 @@ package cli
 
 // CLI structure for Kong
 type CLI struct {
-	Up         UpCmd         `cmd:"" help:"Start the service with the specified configuration"`
-	CleanUp    CleanUpCmd    `cmd:"" help:"Stop and remove all containers associated with the service"`
+	Up         UpCmd         `cmd:"" help:"Apply the specified configuration"`
 	ServeLocal ServeLocalCmd `cmd:"" help:"Serving as a long-running local configurator process"`
 	Version    VersionCmd    `cmd:"" help:"Show the version of the program"`
 
@@ -19,12 +18,7 @@ type CLI struct {
 type UpCmd struct {
 	Delete           bool   `help:"To delete the resources not presented in the configuration"`
 	Config           string `required:"" help:"Path to the configuration file"`
-	ServiceName      string `required:"" help:"Name of the service" short:"s"`
 	OutputChangeLogs string `help:"Outputs what's just been updated to a file, in YAML format" type:"path"`
-}
-
-type CleanUpCmd struct {
-	ServiceName string `required:"" help:"Name of the service" short:"s"`
 }
 
 type ServeLocalCmd struct {

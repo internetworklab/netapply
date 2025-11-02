@@ -21,6 +21,9 @@ const (
 )
 
 type RouteConfig struct {
+	// Soft deletion support
+	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
+
 	TableId *uint32 `yaml:"table_id,omitempty" json:"table_id,omitempty"`
 
 	ContainerName *string `yaml:"container_name,omitempty" json:"container_name,omitempty"`
