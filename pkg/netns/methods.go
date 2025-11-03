@@ -11,11 +11,42 @@ import (
 )
 
 type NetNsInfo struct {
-	Pid int
+	Pid       *int
+	NetNsPath *string
+}
+
+func toNsHandle(netnsInfo *NetNsInfo) (*vnetns.NsHandle, error) {
+	if netnsInfo != nil {
+		if netnsInfo.Pid != nil {
+			pidHandle, err := vnetns.GetFromPid(*netnsInfo.Pid)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get netns from pid: %w", err)
+			}
+			return &pidHandle, nil
+		} else if netnsInfo.NetNsPath != nil {
+			pathNsHandle, err := vnetns.GetFromPath(*netnsInfo.NetNsPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get netns from path: %w", err)
+			}
+			return &pathNsHandle, nil
+		}
+	}
+	return nil, nil
 }
 
 func WithNsHandle(ctx context.Context, netnsInfo *NetNsInfo, f func(h *netlink.Handle) error) error {
-	if netnsInfo == nil {
+	var nsHandle *vnetns.NsHandle = nil
+
+	nsHandle, err := toNsHandle(netnsInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get netns handle: %w", err)
+	}
+
+	if nsHandle != nil {
+		defer nsHandle.Close()
+	}
+
+	if nsHandle == nil {
 		handle, err := netlink.NewHandle()
 		if err != nil {
 			return fmt.Errorf("failed to create netlink handle: %w", err)
@@ -24,13 +55,7 @@ func WithNsHandle(ctx context.Context, netnsInfo *NetNsInfo, f func(h *netlink.H
 		return f(handle)
 	}
 
-	nsHandle, err := vnetns.GetFromPid(netnsInfo.Pid)
-	if err != nil {
-		return fmt.Errorf("failed to get netns from docker: %w", err)
-	}
-	defer nsHandle.Close()
-
-	handle, err := netlink.NewHandleAt(nsHandle)
+	handle, err := netlink.NewHandleAt(*nsHandle)
 	if err != nil {
 		return fmt.Errorf("failed to create netlink handle: %w", err)
 	}
@@ -45,38 +70,38 @@ func WithNsHandleSafe(ctx context.Context, netnsInfo *NetNsInfo, f func(h *netli
 
 func WithNetnsWGCli(ctx context.Context, netnsInfo *NetNsInfo, hook func(wgCtrlCli *wgctrl.Client) error) error {
 	var wgCtrlCli *wgctrl.Client
-	var err error
 
-	if netnsInfo != nil {
-
-		nsHandle, err := vnetns.GetFromPid(netnsInfo.Pid)
-		if err != nil {
-			return fmt.Errorf("failed to get netns: %s", err.Error())
-		}
-		defer nsHandle.Close()
-
-		hostPid := os.Getpid()
-		hostNsHandle, err := vnetns.GetFromPid(hostPid)
-		if err != nil {
-			return fmt.Errorf("failed to get host netns: %s", err.Error())
-		}
-		defer hostNsHandle.Close()
-
-		vnetns.Set(nsHandle)
-		defer vnetns.Set(hostNsHandle)
-
-		wgCtrlCli, err = wgctrl.New()
-		if err != nil {
-			return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
-		}
-		defer wgCtrlCli.Close()
-	} else {
-		wgCtrlCli, err = wgctrl.New()
-		if err != nil {
-			return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
-		}
-		defer wgCtrlCli.Close()
+	nsHandle, err := toNsHandle(netnsInfo)
+	if err != nil {
+		return fmt.Errorf("failed to get netns handle: %w", err)
 	}
+
+	if nsHandle == nil {
+		wgCtrlCli, err = wgctrl.New()
+		if err != nil {
+			return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
+		}
+		defer wgCtrlCli.Close()
+		return hook(wgCtrlCli)
+	}
+
+	defer nsHandle.Close()
+
+	hostPid := os.Getpid()
+	hostNsHandle, err := vnetns.GetFromPid(hostPid)
+	if err != nil {
+		return fmt.Errorf("failed to get host netns: %s", err.Error())
+	}
+	defer hostNsHandle.Close()
+
+	vnetns.Set(*nsHandle)
+	defer vnetns.Set(hostNsHandle)
+
+	wgCtrlCli, err = wgctrl.New()
+	if err != nil {
+		return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
+	}
+	defer wgCtrlCli.Close()
 
 	return hook(wgCtrlCli)
 }

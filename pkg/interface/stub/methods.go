@@ -71,3 +71,14 @@ func CheckExist(ctx context.Context, nlIf StubNetlinkInterface) (bool, error) {
 
 	return res.Exist, err
 }
+
+type ContainerizableResource interface {
+	GetDockerContainerName(ctx context.Context) *string
+	GetPodmanContainerName(ctx context.Context) *string
+	GetNetNsPath(ctx context.Context) *string
+}
+
+func GetNetNsInfo(ctx context.Context, nlIf ContainerizableResource) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
+}

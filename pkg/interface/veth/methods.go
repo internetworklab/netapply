@@ -10,6 +10,7 @@ import (
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
+	"github.com/vishvananda/netns"
 )
 
 func (vethPair *VethPairChangeSet) GetInterfaceName() string {
@@ -185,10 +186,34 @@ func (vethPairConfig *VethPairConfig) GetInterfaceName() string {
 	return vethPairConfig.Name
 }
 
+// Returns a netlink.NsPid or netlink.NsFd or nil
+func toLinkNetNs(netnsInfo *pkgnetns.NetNsInfo) interface{} {
+	if netnsInfo.Pid != nil {
+		return netlink.NsPid(*netnsInfo.Pid)
+	} else if netnsInfo.NetNsPath != nil {
+		hdl, err := netns.GetFromPath(*netnsInfo.NetNsPath)
+		if err != nil {
+			panic("can't get netns (aka netns fd) handle from path")
+		}
+		return netlink.NsFd(hdl)
+	}
+	return nil
+}
+
 func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 	if vethPairConfig.Stub {
 		// stub interface never actually creates or reconciles
 		return nil
+	}
+
+	primaryNetnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	secondaryNetnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get secondary netns info: %w", err)
 	}
 
 	return pkgnetns.WithNsHandleSafe(ctx, nil, func(handle *netlink.Handle) error {
@@ -203,20 +228,12 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			PeerName: vethPairConfig.Peer.Name,
 		}
 
-		if vethPairConfig.ContainerName != nil {
-			netnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get netns info: %w", err)
-			}
-			link.Namespace = netlink.NsPid(netnsInfo.Pid)
+		if primaryNetnsInfo != nil {
+			link.Namespace = toLinkNetNs(primaryNetnsInfo)
 		}
 
-		if vethPairConfig.Peer.ContainerName != nil {
-			netnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get netns info: %w", err)
-			}
-			link.PeerNamespace = netlink.NsPid(netnsInfo.Pid)
+		if secondaryNetnsInfo != nil {
+			link.PeerNamespace = toLinkNetNs(secondaryNetnsInfo)
 		}
 
 		err := handle.LinkAdd(link)

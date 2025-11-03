@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
@@ -320,8 +321,7 @@ func (bridgeConfig *BridgeConfig) GetType() string {
 }
 
 func (bridgeConfig *BridgeConfig) CheckExist(ctx context.Context) (bool, error) {
-	// todo
-	return false, nil
+	return pkginterfacestub.CheckExist(ctx, bridgeConfig)
 }
 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
@@ -337,7 +337,20 @@ func (bridgeConfig *BridgeConfig) IsSoftDeleted() bool {
 	return bridgeConfig.Deleted
 }
 
-func (bridgeConfig *BridgeConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+func (bridgeConfig *BridgeConfig) GetDockerContainerName(ctx context.Context) *string {
+	return bridgeConfig.ContainerName
+}
+
+func (bridgeConfig *BridgeConfig) GetPodmanContainerName(ctx context.Context) *string {
 	// todo
-	return nil, nil
+	return nil
+}
+
+func (bridgeConfig *BridgeConfig) GetNetNsPath(ctx context.Context) *string {
+	// todo
+	return nil
+}
+
+func (bridgeConfig *BridgeConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	return pkginterfacestub.GetNetNsInfo(ctx, bridgeConfig)
 }
