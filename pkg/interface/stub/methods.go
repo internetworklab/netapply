@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
+	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -72,13 +74,68 @@ func CheckExist(ctx context.Context, nlIf StubNetlinkInterface) (bool, error) {
 	return res.Exist, err
 }
 
-type ContainerizableResource interface {
-	GetDockerContainerName(ctx context.Context) *string
-	GetPodmanContainerName(ctx context.Context) *string
-	GetNetNsPath(ctx context.Context) *string
+func GetNetNsInfo(ctx context.Context, nlIf ContainerizableResource) (*pkgnetns.NetNsInfo, error) {
+	dockerName := nlIf.GetDockerContainerName(ctx)
+	if dockerName != nil && *dockerName != "" {
+		cli, err := pkgutils.DockerCliFromCtx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+		}
+		pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *dockerName)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get container ns pid: %w", err)
+		}
+		return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
+	}
+
+	podmanContainerName := nlIf.GetPodmanContainerName(ctx)
+	if podmanContainerName != nil && *podmanContainerName != "" {
+		// todo: implement podman support
+		panic("not implemented")
+	}
+
+	netnsPath := nlIf.GetNetNsPath(ctx)
+	if netnsPath != nil && *netnsPath != "" {
+		return &pkgnetns.NetNsInfo{NetNsPath: netnsPath}, nil
+	}
+
+	return nil, nil
 }
 
-func GetNetNsInfo(ctx context.Context, nlIf ContainerizableResource) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+func GetInterfaceFromContainer(ctx context.Context, netnsInfo *pkgnetns.NetNsInfo, linkType string) (map[string]pkgreconcile.ResourceCanceller, error) {
+	type result struct {
+		ifaces map[string]pkgreconcile.ResourceCanceller
+	}
+
+	res := new(result)
+	res.ifaces = make(map[string]pkgreconcile.ResourceCanceller, 0)
+
+	err := pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+		links, err := handle.LinkList()
+		if err != nil {
+			return fmt.Errorf("failed to list links: %w", err)
+		}
+
+		for _, link := range links {
+			if strings.HasPrefix(link.Attrs().Name, "eth") {
+				continue
+			}
+
+			if strings.HasPrefix(link.Attrs().Name, "lo") {
+				continue
+			}
+
+			if link.Type() == linkType {
+				res.ifaces[link.Attrs().Name] = &StubInterfaceCanceller{NetnsInfo: netnsInfo, InterfaceName: link.Attrs().Name, Type: link.Type()}
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get interface from container: %w", err)
+	}
+
+	return res.ifaces, nil
 }

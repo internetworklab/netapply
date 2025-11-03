@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
 
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
-	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	"github.com/vishvananda/netlink"
 )
 
@@ -154,44 +151,6 @@ func (dpChangeSet *ResourceListChangeSet) Apply(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func GetInterfaceFromContainer(ctx context.Context, netnsInfo *pkgnetns.NetNsInfo, linkType string) (map[string]ResourceCanceller, error) {
-	type result struct {
-		ifaces map[string]ResourceCanceller
-	}
-
-	res := new(result)
-	res.ifaces = make(map[string]ResourceCanceller, 0)
-
-	err := pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
-		links, err := handle.LinkList()
-		if err != nil {
-			return fmt.Errorf("failed to list links: %w", err)
-		}
-
-		for _, link := range links {
-			if strings.HasPrefix(link.Attrs().Name, "eth") {
-				continue
-			}
-
-			if strings.HasPrefix(link.Attrs().Name, "lo") {
-				continue
-			}
-
-			if link.Type() == linkType {
-				res.ifaces[link.Attrs().Name] = &pkginterfacestub.StubInterfaceCanceller{NetnsInfo: netnsInfo, InterfaceName: link.Attrs().Name, Type: link.Type()}
-			}
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return nil, fmt.Errorf("failed to get interface from container: %w", err)
-	}
-
-	return res.ifaces, nil
 }
 
 // func (dpChangeSet *ResourceListChangeSet) Log() {

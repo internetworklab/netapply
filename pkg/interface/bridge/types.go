@@ -9,12 +9,14 @@ import (
 type BridgeConfig struct {
 	Name            string                             `yaml:"name" json:"name"`
 	SlaveInterfaces []string                           `yaml:"slave_interfaces,omitempty" json:"slave_interfaces,omitempty"`
-	ContainerName   *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses       []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 	VRF             *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
 
 	// Soft deletion support
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
+
+	// Optional fields for containerized resources
+	ContainerInfo *pkginterfacecommon.ContainerInfo `yaml:"container,omitempty" json:"container,omitempty"`
 }
 
 type BridgeInterfaceChangeSet struct {
@@ -29,8 +31,8 @@ type BridgeInterfaceChangeSet struct {
 }
 
 type BridgeConfigurationList struct {
-	Containers []string       `yaml:"containers" json:"containers"`
-	Bridges    []BridgeConfig `yaml:"bridges" json:"bridges"`
+	Containers []pkginterfacecommon.ContainerInfo `yaml:"containers" json:"containers"`
+	Bridges    []BridgeConfig                     `yaml:"bridges" json:"bridges"`
 }
 
 type BridgingConnectionConfig struct {

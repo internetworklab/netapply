@@ -6,18 +6,20 @@ import (
 )
 
 type VRFConfig struct {
-	Name          string                             `yaml:"name" json:"name"`
-	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	TableId       uint32                             `yaml:"table_id" json:"table_id"`
-	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	Name      string                             `yaml:"name" json:"name"`
+	TableId   uint32                             `yaml:"table_id" json:"table_id"`
+	Addresses []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 
 	// Soft deletion support
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
+
+	// Optional fields for containerized resources
+	ContainerInfo *pkginterfacecommon.ContainerInfo `yaml:"container,omitempty" json:"container,omitempty"`
 }
 
 type VRFConfigurationList struct {
-	Containers []string    `yaml:"containers" json:"containers"`
-	VRFs       []VRFConfig `yaml:"vrfs" json:"vrfs"`
+	Containers []pkginterfacecommon.ContainerInfo `yaml:"containers" json:"containers"`
+	VRFs       []VRFConfig                        `yaml:"vrfs" json:"vrfs"`
 }
 
 const VRFNameEmpty = ""

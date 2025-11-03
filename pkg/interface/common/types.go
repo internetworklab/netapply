@@ -12,3 +12,9 @@ type AddrsChangeSet struct {
 	AddressesToAdd    []*netlink.Addr
 	AddressesToRemove []*netlink.Addr
 }
+
+type ContainerInfo struct {
+	Docker    *string `yaml:"docker,omitempty" json:"docker,omitempty" bson:"docker,omitempty"`
+	Podman    *string `yaml:"podman,omitempty" json:"podman,omitempty" bson:"podman,omitempty"`
+	NetnsPath *string `yaml:"netns_path,omitempty" json:"netns_path,omitempty" bson:"netns_path,omitempty"`
+}

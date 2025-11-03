@@ -78,15 +78,15 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) HasUpdates() bool {
 
 func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 	changeSet := new(BridgeInterfaceChangeSet)
-	changeSet.ContainerName = bridgeConfig.ContainerName
-	changeSet.InterfaceName = bridgeConfig.Name
-	changeSet.InterfaceToEnslave = make(map[string]interface{})
-	changeSet.InterfaceToUnslave = make(map[string]interface{})
 
 	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
 	}
+	changeSet.NetnsInfo = netnsInfo
+	changeSet.InterfaceName = bridgeConfig.Name
+	changeSet.InterfaceToEnslave = make(map[string]interface{})
+	changeSet.InterfaceToUnslave = make(map[string]interface{})
 
 	// Since here we use 'WithNsHandleSafe' instead of 'WithNsHandle',
 	// the result might be incorrect if the container is not yet running
@@ -135,10 +135,6 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 	})
 
 	return changeSet, err
-}
-
-func (bridgeConfig *BridgeConfig) GetContainerName() *string {
-	return bridgeConfig.ContainerName
 }
 
 func (bridgeConfig *BridgeConfig) GetInterfaceName() string {
@@ -338,16 +334,23 @@ func (bridgeConfig *BridgeConfig) IsSoftDeleted() bool {
 }
 
 func (bridgeConfig *BridgeConfig) GetDockerContainerName(ctx context.Context) *string {
-	return bridgeConfig.ContainerName
+	if bridgeConfig.ContainerInfo != nil {
+		return bridgeConfig.ContainerInfo.Docker
+	}
+	return nil
 }
 
 func (bridgeConfig *BridgeConfig) GetPodmanContainerName(ctx context.Context) *string {
-	// todo
+	if bridgeConfig.ContainerInfo != nil {
+		return bridgeConfig.ContainerInfo.Podman
+	}
 	return nil
 }
 
 func (bridgeConfig *BridgeConfig) GetNetNsPath(ctx context.Context) *string {
-	// todo
+	if bridgeConfig.ContainerInfo != nil {
+		return bridgeConfig.ContainerInfo.NetnsPath
+	}
 	return nil
 }
 

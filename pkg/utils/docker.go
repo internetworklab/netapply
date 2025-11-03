@@ -3,8 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"log"
-	"strconv"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/filters"
@@ -21,7 +19,7 @@ const (
 )
 
 // If no container is found, return (nil, nil), by default, it expects exact match
-func FindContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
+func findContainer(ctx context.Context, cli *client.Client, containerName string) (*container.Summary, error) {
 	filters := filters.NewArgs()
 	filters.Add("name", "^"+containerName+"$")
 
@@ -40,74 +38,8 @@ func FindContainer(ctx context.Context, cli *client.Client, containerName string
 	return &containers[0], nil
 }
 
-func StopAndRemoveContainer(ctx context.Context, containerName string) error {
-	cli, err := DockerCliFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get docker client from context: %w", err)
-	}
-
-	cont, err := FindContainer(ctx, cli, containerName)
-	if err != nil {
-		return fmt.Errorf("failed to find container: %w", err)
-	}
-
-	if cont == nil {
-		log.Printf("Container %s is already removed, nothing to do", containerName)
-		return nil
-	}
-
-	log.Printf("Stop and removing container %s, container id: %s, state: %s", containerName, cont.ID, cont.State)
-	switch cont.State {
-	case container.StateRunning, container.StateRestarting:
-		log.Printf("Container %s is running, shutting it down...", containerName)
-		if err := cli.ContainerStop(ctx, containerName, container.StopOptions{}); err != nil {
-			return fmt.Errorf("failed to stop container: %w", err)
-		}
-
-		log.Printf("Waiting for container %s to stop...", containerName)
-		respCh, errCh := cli.ContainerWait(ctx, containerName, container.WaitConditionNotRunning)
-		var err error
-		select {
-		case <-respCh:
-		case err = <-errCh:
-		}
-
-		if err != nil {
-			return fmt.Errorf("failed to wait for container to stop: %w", err)
-		}
-
-		log.Printf("Container %s stopped", containerName)
-	}
-
-	log.Printf("Removing container %s", containerName)
-	err = cli.ContainerRemove(ctx, containerName, container.RemoveOptions{Force: true})
-	if err != nil {
-		return fmt.Errorf("failed to remove container: %w", err)
-	}
-
-	cont, err = FindContainer(ctx, cli, containerName)
-	if err != nil {
-		return fmt.Errorf("failed to find container: %w", err)
-	}
-	if cont != nil {
-		log.Printf("Waiting for container %s to be removed...", containerName)
-		respCh, errCh := cli.ContainerWait(ctx, containerName, container.WaitConditionRemoved)
-		select {
-		case <-respCh:
-		case err = <-errCh:
-		}
-		if err != nil {
-			return fmt.Errorf("failed to wait for container to be removed: %w", err)
-		}
-	}
-
-	log.Printf("Container %s is removed", containerName)
-
-	return nil
-}
-
 func GetNetNSHandle(ctx context.Context, cli *client.Client, containerName string) (netns.NsHandle, error) {
-	container, err := FindContainer(ctx, cli, containerName)
+	container, err := findContainer(ctx, cli, containerName)
 	if err != nil {
 		return -1, fmt.Errorf("failed to find container: %w", err)
 	}
@@ -120,7 +52,7 @@ func GetNetNSHandle(ctx context.Context, cli *client.Client, containerName strin
 }
 
 func GetContainerNSPid(ctx context.Context, cli *client.Client, containerName string) (*int, error) {
-	container, err := FindContainer(ctx, cli, containerName)
+	container, err := findContainer(ctx, cli, containerName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find container: %w", err)
 	}
@@ -137,22 +69,18 @@ func GetContainerNSPid(ctx context.Context, cli *client.Client, containerName st
 	return &resp.State.Pid, nil
 }
 
-func GetContainerKey(netnsInfo *pkgnetns.NetNsInfo) ContainerKey {
-	if netnsInfo == nil {
-		return ContainerKeyHost
-	}
-
-	if netnsInfo.Pid == 0 {
-		return ContainerKeyHost
-	}
-
-	return ContainerKey(strconv.Itoa(netnsInfo.Pid))
-}
-
 func GetContainerDisplayName(netnsInfo *pkgnetns.NetNsInfo) string {
 	if netnsInfo == nil {
 		return "host"
 	}
 
-	return fmt.Sprintf("pid %d", netnsInfo.Pid)
+	if netnsInfo.Pid != nil {
+		return fmt.Sprintf("pid %d", *netnsInfo.Pid)
+	}
+
+	if netnsInfo.NetNsPath != nil {
+		return fmt.Sprintf("path %s", *netnsInfo.NetNsPath)
+	}
+
+	return "unknown"
 }
