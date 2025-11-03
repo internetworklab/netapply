@@ -346,3 +346,7 @@ func (vethCfgsList *VethPairConfigurationList) DetectChanges(ctx context.Context
 func (vethPairSpec *VethPairConfig) IsSoftDeleted() bool {
 	return vethPairSpec.Deleted
 }
+
+func (vethPairSpec *VethPairConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
+	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, vethPairSpec)
+}

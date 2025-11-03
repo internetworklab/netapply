@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	"github.com/vishvananda/netlink"
 )
 
@@ -13,8 +13,8 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) GetInterfaceName() string 
 	return stubInterfaceCanceller.InterfaceName
 }
 
-func (stubInterfaceCanceller *StubInterfaceCanceller) GetContainerName() *string {
-	return stubInterfaceCanceller.ContainerName
+func (stubInterfaceCanceller *StubInterfaceCanceller) GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	return stubInterfaceCanceller.NetnsInfo, nil
 }
 
 func (stubInterfaceCanceller *StubInterfaceCanceller) GetType() string {
@@ -31,7 +31,7 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) Cancel(ctx context.Context
 		return nil
 	}
 
-	return pkgdocker.WithNsHandle(ctx, stubInterfaceCanceller.ContainerName, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandle(ctx, stubInterfaceCanceller.NetnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(stubInterfaceCanceller.InterfaceName)
 		if err == nil && link != nil {
 			// in case that the interface might be already deleted, we don't need to delete it again
@@ -50,8 +50,12 @@ func CheckExist(ctx context.Context, nlIf StubNetlinkInterface) (bool, error) {
 		Exist bool
 	}
 	res := new(result)
+	netnsInfo, err := nlIf.GetNetnsInfo(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get netns info: %w", err)
+	}
 
-	err := pkgdocker.WithNsHandleSafe(ctx, nlIf.GetContainerName(), func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(nlIf.GetInterfaceName())
 		if err != nil {
 			if _, ok := err.(netlink.LinkNotFoundError); ok {

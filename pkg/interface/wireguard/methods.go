@@ -849,3 +849,7 @@ func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context,
 func (wgConfig *WireGuardConfig) IsSoftDeleted() bool {
 	return wgConfig.Deleted
 }
+
+func (wgConfig *WireGuardConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
+	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, wgConfig)
+}

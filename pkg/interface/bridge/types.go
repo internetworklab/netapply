@@ -2,6 +2,7 @@ package bridge
 
 import (
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	"github.com/vishvananda/netlink"
 )
 
@@ -17,6 +18,7 @@ type BridgeConfig struct {
 }
 
 type BridgeInterfaceChangeSet struct {
+	NetnsInfo          *pkgnetns.NetNsInfo
 	InterfaceToEnslave map[string]interface{}
 	InterfaceToUnslave map[string]interface{}
 	ContainerName      *string

@@ -2,13 +2,15 @@ package reconcile
 
 import (
 	"context"
+
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 )
 
 type InterfaceChangeSet interface {
 	Apply(ctx context.Context) error
 	HasUpdates() bool
 	GetInterfaceName() string
-	GetContainerName() *string
+	GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 	GetType() string
 }
 
@@ -23,9 +25,6 @@ type ResourceProvisioner interface {
 	// Get the interface name (or resource name) for indexing and logging purposes.
 	GetInterfaceName() string
 
-	// Get the container name for indexing and logging purposes.
-	GetContainerName() *string
-
 	// Check if the interface is actually exist in the system,
 	// If it's not exist, should return (false, nil), error is non-nil only when there is error (and resource-doesnt exist is not considered as an error)
 	CheckExist(ctx context.Context) (bool, error)
@@ -35,15 +34,13 @@ type ResourceProvisioner interface {
 
 	// Check if the resource has been marked as soft-deleted, mainly called by the upper layer's GetProvisioners function.
 	IsSoftDeleted() bool
+
+	// when in host netns, return nil as *NetNsInfo
+	GetPrimaryNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }
 
 type ResourceProvisionersList interface {
 	GetType() string
-
-	// GetProvisioners function shall respect soft-deletion of the resources, if any.
-	GetProvisioners() []ResourceProvisioner
-	IndexCurrentResources(ctx context.Context) (map[string]map[string]ResourceCanceller, error)
-	CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]ResourceProvisioner, resource ResourceCanceller) (bool, error)
 
 	// If delete is true, meaning that should ignore those presented in actual state but not in the spec,
 	// its just like the `--delete` flag of the `rsync` command.
@@ -53,27 +50,13 @@ type ResourceProvisionersList interface {
 type ResourceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string
-	GetContainerName() *string
 	GetType() string
+	GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }
 
 type ResourceListChangeSet struct {
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be added
-	AddedResources map[string][]ResourceProvisioner
-
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be updated
+	// key is the identifier of the netns (e.g., pid)
+	AddedResources   map[string][]ResourceProvisioner
 	UpdatedResources map[string][]InterfaceChangeSet
-
-	// key is the container name, for default netns, the key will be '-', value is the list of interfaces to be removed
 	RemovedResources map[string][]ResourceCanceller
-}
-
-// netns -> iface name -> iface canceller
-type CurrentIfaceIndex = map[string]map[string]ResourceCanceller
-
-type SpecIfaceIndex = map[string]map[string]ResourceProvisioner
-
-type StubNetlinkInterfaceList interface {
-	GetType() string
-	GetContainers() []string
 }

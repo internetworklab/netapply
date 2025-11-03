@@ -206,3 +206,7 @@ func (dummyCfgsList *DummyConfigurationList) DetectChanges(ctx context.Context, 
 func (dummyConfig *DummyConfig) IsSoftDeleted() bool {
 	return dummyConfig.Deleted
 }
+
+func (dummyConfig *DummyConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
+	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, dummyConfig)
+}

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -486,4 +487,8 @@ func (r *RouteConfigurationList) DetectChanges(ctx context.Context, delete bool)
 
 func (r *RouteConfig) IsSoftDeleted() bool {
 	return r.Deleted
+}
+
+func (r *RouteConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, r)
 }

@@ -250,3 +250,7 @@ func (vrfList *VRFConfigurationList) DetectChanges(ctx context.Context, delete b
 func (vrfConfig *VRFConfig) IsSoftDeleted() bool {
 	return vrfConfig.Deleted
 }
+
+func (vrfConfig *VRFConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
+	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, vrfConfig)
+}

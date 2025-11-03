@@ -4,10 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -20,8 +19,16 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetChangedItems() map[string]bo
 	return changedItems
 }
 
+func (bridgeChangeSet *BridgeInterfaceChangeSet) GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	return bridgeChangeSet.NetnsInfo, nil
+}
+
 func (bridgeChangeSet *BridgeInterfaceChangeSet) Apply(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, bridgeChangeSet.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := bridgeChangeSet.GetNetnsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -75,10 +82,15 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 	changeSet.InterfaceToEnslave = make(map[string]interface{})
 	changeSet.InterfaceToUnslave = make(map[string]interface{})
 
+	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
 	// Since here we use 'WithNsHandleSafe' instead of 'WithNsHandle',
 	// the result might be incorrect if the container is not yet running
 	// during the detection process.
-	err := pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -154,7 +166,12 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 	actuallyAdded := make(map[string]interface{})
 	actuallyRemoved := make(map[string]interface{})
 
-	err := pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -202,7 +219,12 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 }
 
 func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link := &netlink.Bridge{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: bridgeConfig.Name,
@@ -261,29 +283,13 @@ func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkgreconcile.
 	return provisioners
 }
 
-func (bridgeCfgsList *BridgeConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if bridgeCfgsList == nil {
-		return nil, nil
-	}
-	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, bridgeCfgsList)
-}
-
-func (bridgeCfgsList *BridgeConfigurationList) GetContainers() []string {
-	if bridgeCfgsList == nil {
-		return nil
-	}
-	return bridgeCfgsList.Containers
-}
-
-func (bridgeCfgsList *BridgeConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if bridgeCfgsList == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
-}
-
 func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, bridgeConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			if _, ok := err.(netlink.LinkNotFoundError); !ok {
@@ -314,7 +320,8 @@ func (bridgeConfig *BridgeConfig) GetType() string {
 }
 
 func (bridgeConfig *BridgeConfig) CheckExist(ctx context.Context) (bool, error) {
-	return pkginterfacestub.CheckExist(ctx, bridgeConfig)
+	// todo
+	return false, nil
 }
 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
@@ -322,9 +329,15 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
 }
 
 func (bridgeCfgsList *BridgeConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, bridgeCfgsList, delete)
+	// todo
+	return nil, nil
 }
 
 func (bridgeConfig *BridgeConfig) IsSoftDeleted() bool {
 	return bridgeConfig.Deleted
+}
+
+func (bridgeConfig *BridgeConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }

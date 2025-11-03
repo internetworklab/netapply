@@ -1,13 +1,19 @@
 package stub
 
+import (
+	"context"
+
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
+)
+
 type StubInterfaceCanceller struct {
-	ContainerName *string
+	NetnsInfo     *pkgnetns.NetNsInfo
 	InterfaceName string
-	Type string
+	Type          string
 }
 
 type StubNetlinkInterface interface {
 	GetType() string
-	GetContainerName() *string
+	GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 	GetInterfaceName() string
 }

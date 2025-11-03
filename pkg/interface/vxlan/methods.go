@@ -216,3 +216,7 @@ func (vxlanCfgsList *VXLANConfigurationList) DetectChanges(ctx context.Context, 
 func (vxlanConfig *VXLANConfig) IsSoftDeleted() bool {
 	return vxlanConfig.Deleted
 }
+
+func (vxlanConfig *VXLANConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
+	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, vxlanConfig)
+}
