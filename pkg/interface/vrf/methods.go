@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 )
@@ -93,7 +93,12 @@ func (vrfConfig *VRFConfig) CheckExist(ctx context.Context) (bool, error) {
 }
 
 func (vrfConfig *VRFConfig) Create(ctx context.Context) error {
-	return pkgdocker.WithNsHandle(ctx, vrfConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := vrfConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link := &netlink.Vrf{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: vrfConfig.Name,
@@ -135,12 +140,18 @@ func (vrfChangeSet *VRFChangeSet) GetInterfaceName() string {
 	return vrfChangeSet.InterfaceName
 }
 
-func (vrfChangeSet *VRFChangeSet) GetContainerName() *string {
-	return vrfChangeSet.ContainerName
+func (vrfChangeSet *VRFChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }
 
 func (vrfChangeSet *VRFChangeSet) Apply(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, vrfChangeSet.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := vrfChangeSet.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vrfChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get vrf link: %w", err)
@@ -169,10 +180,14 @@ func (vrfChangeSet *VRFChangeSet) Apply(ctx context.Context) error {
 
 func (vrfConfig *VRFConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 	changeSet := new(VRFChangeSet)
-	changeSet.ContainerName = vrfConfig.ContainerName
 	changeSet.InterfaceName = vrfConfig.Name
 
-	err := pkgdocker.WithNsHandleSafe(ctx, vrfConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := vrfConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		vrfLink, err := handle.LinkByName(vrfConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get vrf link: %w", err)
@@ -214,13 +229,6 @@ func (vrfList *VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourcePr
 	return provisioners
 }
 
-func (vrfList *VRFConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if vrfList == nil {
-		return nil, nil
-	}
-	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vrfList)
-}
-
 func (vrfList *VRFConfigurationList) GetContainers() []string {
 	if vrfList == nil {
 		return nil
@@ -236,21 +244,16 @@ func (vrfChangeSet *VRFChangeSet) GetType() string {
 	return new(netlink.Vrf).Type()
 }
 
-func (vrfList *VRFConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if vrfList == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
-}
-
 func (vrfList *VRFConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, vrfList, delete)
+	// todo
+	return nil, nil
 }
 
 func (vrfConfig *VRFConfig) IsSoftDeleted() bool {
 	return vrfConfig.Deleted
 }
 
-func (vrfConfig *VRFConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
-	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, vrfConfig)
+func (vrfConfig *VRFConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }

@@ -10,7 +10,7 @@ type InterfaceChangeSet interface {
 	Apply(ctx context.Context) error
 	HasUpdates() bool
 	GetInterfaceName() string
-	GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
+	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 	GetType() string
 }
 
@@ -36,7 +36,7 @@ type ResourceProvisioner interface {
 	IsSoftDeleted() bool
 
 	// when in host netns, return nil as *NetNsInfo
-	GetPrimaryNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
+	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }
 
 type ResourceProvisionersList interface {
@@ -51,7 +51,7 @@ type ResourceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string
 	GetType() string
-	GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
+	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }
 
 type ResourceListChangeSet struct {

@@ -4,18 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
-	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
-
-func (vethPair *VethPairChangeSet) GetContainerName() *string {
-	return vethPair.Local.ContainerName
-}
 
 func (vethPair *VethPairChangeSet) GetInterfaceName() string {
 	return vethPair.Local.InterfaceName
@@ -43,12 +38,22 @@ func (vethPeer *VethPairPeerChangeSet) HasUpdates() bool {
 	return vethPeer != nil && (len(vethPeer.AddressesToAdd) > 0 || len(vethPeer.AddressesToDel) > 0 || vethPeer.MTUToSet != nil || vethPeer.VRFToSet != nil)
 }
 
+func (vethPeer *VethPairPeerChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
+}
+
 func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
 	if vethPeer == nil {
 		return nil
 	}
 
-	return pkgdocker.WithNsHandleSafe(ctx, vethPeer.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := vethPeer.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vethPeer.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get veth link: %w", err)
@@ -120,6 +125,11 @@ func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec 
 	return changeSet, nil
 }
 
+func (vChangeSet *VethPairChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
+}
+
 func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 	if vethPairConfig.Stub {
 		// stub interface never actually reconciles
@@ -128,8 +138,18 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 
 	changeSet := new(VethPairChangeSet)
 
+	primaryNetnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	secondaryNetnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get secondary netns info: %w", err)
+	}
+
 	// Detecting local changeset
-	err := pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandleSafe(ctx, primaryNetnsInfo, func(handle *netlink.Handle) error {
 		localChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.ContainerName, vethPairConfig.Name, vethPairConfig, handle)
 		if err != nil {
 			return fmt.Errorf("failed to detect local changeset: %w", err)
@@ -142,7 +162,7 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 	}
 
 	// Detecting peer changeset
-	err = pkgdocker.WithNsHandleSafe(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandleSafe(ctx, secondaryNetnsInfo, func(handle *netlink.Handle) error {
 		peerChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.Peer.ContainerName, vethPairConfig.Peer.Name, vethPairConfig.Peer, handle)
 		if err != nil {
 			return fmt.Errorf("failed to detect peer changeset: %w", err)
@@ -154,7 +174,7 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 		return nil, fmt.Errorf("failed to detect changeset: %w", err)
 	}
 
-	return changeSet, err
+	return changeSet, nil
 }
 
 func (vethPairConfig *VethPairConfig) GetContainerName() *string {
@@ -171,12 +191,7 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 		return nil
 	}
 
-	return pkgdocker.WithNsHandleSafe(ctx, nil, func(handle *netlink.Handle) error {
-		cli, err := pkgutils.DockerCliFromCtx(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get docker cli from context: %w", err)
-		}
-
+	return pkgnetns.WithNsHandleSafe(ctx, nil, func(handle *netlink.Handle) error {
 		if vethPairConfig.Peer == nil {
 			return fmt.Errorf("peer is not set")
 		}
@@ -189,31 +204,37 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 		}
 
 		if vethPairConfig.ContainerName != nil {
-			pidPtr, err := pkgdocker.GetContainerNSPid(ctx, cli, *vethPairConfig.ContainerName)
+			netnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to get container ns pid: %w", err)
+				return fmt.Errorf("failed to get netns info: %w", err)
 			}
-			if pidPtr != nil {
-				link.Namespace = netlink.NsPid(*pidPtr)
-			}
+			link.Namespace = netlink.NsPid(netnsInfo.Pid)
 		}
 
 		if vethPairConfig.Peer.ContainerName != nil {
-			pidPtr, err := pkgdocker.GetContainerNSPid(ctx, cli, *vethPairConfig.Peer.ContainerName)
+			netnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
 			if err != nil {
-				return fmt.Errorf("failed to get container ns pid: %w", err)
+				return fmt.Errorf("failed to get netns info: %w", err)
 			}
-			if pidPtr != nil {
-				link.PeerNamespace = netlink.NsPid(*pidPtr)
-			}
+			link.PeerNamespace = netlink.NsPid(netnsInfo.Pid)
 		}
 
-		err = handle.LinkAdd(link)
+		err := handle.LinkAdd(link)
 		if err != nil {
 			return fmt.Errorf("failed to add veth link: %w", err)
 		}
 
-		err = pkgdocker.WithNsHandle(ctx, vethPairConfig.ContainerName, func(handle *netlink.Handle) error {
+		primaryNetnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get primary netns info: %w", err)
+		}
+
+		secondaryNetnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get secondary netns info: %w", err)
+		}
+
+		err = pkgnetns.WithNsHandleSafe(ctx, primaryNetnsInfo, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(vethPairConfig.Name)
 			if err != nil {
 				return fmt.Errorf("failed to get veth link: %w", err)
@@ -247,7 +268,7 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to set veth link up (lhs): %w", err)
 		}
 
-		err = pkgdocker.WithNsHandle(ctx, vethPairConfig.Peer.ContainerName, func(handle *netlink.Handle) error {
+		err = pkgnetns.WithNsHandleSafe(ctx, secondaryNetnsInfo, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(vethPairConfig.Peer.Name)
 			if err != nil {
 				return fmt.Errorf("failed to get veth link: %w", err)
@@ -306,27 +327,6 @@ func (vethCfgsList *VethPairConfigurationList) GetProvisioners() []pkgreconcile.
 	return provisioners
 }
 
-func (vethCfgsList *VethPairConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if vethCfgsList == nil {
-		return nil, nil
-	}
-	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vethCfgsList)
-}
-
-func (vethCfgsList *VethPairConfigurationList) GetContainers() []string {
-	if vethCfgsList == nil {
-		return nil
-	}
-	return vethCfgsList.Containers
-}
-
-func (vethCfgsList *VethPairConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if vethCfgsList == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
-}
-
 func (vethPairSpec *VethPairConfig) GetType() string {
 	return new(netlink.Veth).Type()
 }
@@ -340,13 +340,14 @@ func (vethPairChangeSet *VethPairChangeSet) GetType() string {
 }
 
 func (vethCfgsList *VethPairConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, vethCfgsList, delete)
+	return nil, nil
 }
 
 func (vethPairSpec *VethPairConfig) IsSoftDeleted() bool {
 	return vethPairSpec.Deleted
 }
 
-func (vethPairSpec *VethPairConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
-	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, vethPairSpec)
+func (vethPairSpec *VethPairConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }

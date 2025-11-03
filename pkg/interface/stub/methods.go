@@ -13,7 +13,7 @@ func (stubInterfaceCanceller *StubInterfaceCanceller) GetInterfaceName() string 
 	return stubInterfaceCanceller.InterfaceName
 }
 
-func (stubInterfaceCanceller *StubInterfaceCanceller) GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+func (stubInterfaceCanceller *StubInterfaceCanceller) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
 	return stubInterfaceCanceller.NetnsInfo, nil
 }
 
@@ -50,7 +50,7 @@ func CheckExist(ctx context.Context, nlIf StubNetlinkInterface) (bool, error) {
 		Exist bool
 	}
 	res := new(result)
-	netnsInfo, err := nlIf.GetNetnsInfo(ctx)
+	netnsInfo, err := nlIf.GetNetNsInfo(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get netns info: %w", err)
 	}

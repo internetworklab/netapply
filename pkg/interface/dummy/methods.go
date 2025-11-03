@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 )
@@ -33,7 +33,12 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) Apply(ctx context.Contex
 		return nil
 	}
 
-	return pkgdocker.WithNsHandle(ctx, dummyInterfaceChangeSet.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := dummyInterfaceChangeSet.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(dummyInterfaceChangeSet.InterfaceName)
 		if err == nil && link != nil {
 
@@ -58,6 +63,16 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) Apply(ctx context.Contex
 		}
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to apply dummy interface change set: %w", err)
+	}
+
+	return nil
+}
+
+func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }
 
 func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
@@ -70,7 +85,12 @@ func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile
 		changeSet.AddressesToAdd = append(changeSet.AddressesToAdd, nlAddr)
 	}
 
-	pkgdocker.WithNsHandle(ctx, dummyConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := dummyConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(dummyConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get dummy link: %w", err)
@@ -95,6 +115,10 @@ func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile
 		return nil
 	})
 
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changes for dummy config: %w", err)
+	}
+
 	changeSet.ContainerName = dummyConfig.ContainerName
 	changeSet.InterfaceName = dummyConfig.Name
 
@@ -110,7 +134,12 @@ func (dummyConfig *DummyConfig) GetInterfaceName() string {
 }
 
 func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
-	return pkgdocker.WithNsHandle(ctx, dummyConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := dummyConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link := &netlink.Dummy{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: dummyConfig.Name,
@@ -146,6 +175,11 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to create dummy link: %w", err)
+	}
+
+	return nil
 }
 
 func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
@@ -162,29 +196,13 @@ func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkgreconcile.Re
 	return provisioners
 }
 
-func (dummyCfgsList *DummyConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if dummyCfgsList == nil {
-		return nil, nil
-	}
-	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, dummyCfgsList)
-}
-
-func (dummyCfgsList *DummyConfigurationList) GetContainers() []string {
-	if dummyCfgsList == nil {
-		return nil
-	}
-	return dummyCfgsList.Containers
-}
-
 func (dummyCfgsList *DummyConfigurationList) GetType() string {
 	return new(netlink.Dummy).Type()
 }
 
-func (dummyCfgsList *DummyConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if dummyCfgsList == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
+func (dummyConfig *DummyConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }
 
 func (dummyConfig *DummyConfig) GetType() string {
@@ -200,13 +218,10 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetType() string {
 }
 
 func (dummyCfgsList *DummyConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, dummyCfgsList, delete)
+	// todo
+	return nil, nil
 }
 
 func (dummyConfig *DummyConfig) IsSoftDeleted() bool {
 	return dummyConfig.Deleted
-}
-
-func (dummyConfig *DummyConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
-	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, dummyConfig)
 }

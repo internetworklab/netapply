@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
@@ -88,22 +88,30 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
 	return false
 }
 
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
+}
+
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Context) error {
 	if wgInterfaceChangeSet == nil {
 		return nil
 	}
 
-	containerName := wgInterfaceChangeSet.ContainerName
+	netnsInfo, err := wgInterfaceChangeSet.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
 
 	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersToRemove != nil || wgInterfaceChangeSet.PeersToAdd != nil {
-		err := pkgdocker.WithNetnsWGCli(ctx, containerName, func(wgCtrl *wgctrl.Client) error {
+		err := pkgnetns.WithNetnsWGCli(ctx, netnsInfo, func(wgCtrl *wgctrl.Client) error {
 			currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.InterfaceName)
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard device: %w", err)
 			}
 
 			if currentConfig == nil {
-				return fmt.Errorf("failed to get wireguard device: %s in %s", wgInterfaceChangeSet.InterfaceName, pkgdocker.GetContainerDisplayName(wgInterfaceChangeSet.ContainerName))
+				return fmt.Errorf("failed to get wireguard device: %s in %s", wgInterfaceChangeSet.InterfaceName, pkgutils.GetContainerDisplayName(netnsInfo))
 			}
 
 			if wgInterfaceChangeSet.PrivateKeyToSet != nil {
@@ -153,7 +161,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		}
 	}
 
-	err := pkgdocker.WithNsHandle(ctx, containerName, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard link: %w", err)
@@ -295,14 +303,19 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		specPeerConfigs = append(specPeerConfigs, *peercfg)
 	}
 
-	err = pkgdocker.WithNetnsWGCli(ctx, wgConf.ContainerName, func(wgCtrl *wgctrl.Client) error {
+	netnsInfo, err := wgConf.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNetnsWGCli(ctx, netnsInfo, func(wgCtrl *wgctrl.Client) error {
 		currentConfig, err := wgCtrl.Device(wgConf.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard device: %w", err)
 		}
 
 		if currentConfig == nil {
-			return fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, pkgdocker.GetContainerDisplayName(wgConf.ContainerName))
+			return fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, pkgutils.GetContainerDisplayName(netnsInfo))
 		}
 
 		currPeers := make([]*wgtypes.Peer, 0)
@@ -333,7 +346,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		return nil, fmt.Errorf("failed to detect changes for wireguard config: %w", err)
 	}
 
-	err = pkgdocker.WithNsHandle(ctx, wgConf.ContainerName, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(wgConf.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard link: %w", err)
@@ -484,7 +497,7 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 	}
 
-	return pkgdocker.WithNsHandle(ctx, nil, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandle(ctx, nil, func(handle *netlink.Handle) error {
 		wgLink := &netlink.Wireguard{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: wgConf.Name,
@@ -525,7 +538,7 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 				return fmt.Errorf("failed to get docker cli from context: %w", err)
 			}
 
-			pidPtr, err := pkgdocker.GetContainerNSPid(ctx, cli, *wgConf.ContainerName)
+			pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *wgConf.ContainerName)
 			if err != nil {
 				return fmt.Errorf("failed to get container ns pid: %w", err)
 			}
@@ -536,7 +549,12 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 			}
 		}
 
-		return pkgdocker.WithNsHandle(ctx, wgConf.ContainerName, func(handle *netlink.Handle) error {
+		netnsInfo, err := wgConf.GetNetNsInfo(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to get netns info: %w", err)
+		}
+
+		return pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(wgConf.Name)
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard link: %w", err)
@@ -562,44 +580,8 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 	})
 }
 
-// Scan containers specified for any reconciliation clues.
-func (wgCfgsList *WireGuardConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
-	if wgCfgsList == nil {
-		return nil
-	}
-	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, wgCfg := range wgCfgsList.WireGuardConfigs {
-		if wgCfg.IsSoftDeleted() {
-			continue
-		}
-		provisioners = append(provisioners, &wgCfg)
-	}
-	return provisioners
-}
-
-func (wgCfgsList *WireGuardConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if wgCfgsList == nil {
-		return nil, nil
-	}
-	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, wgCfgsList)
-}
-
-func (wgCfgsList *WireGuardConfigurationList) GetContainers() []string {
-	if wgCfgsList == nil {
-		return nil
-	}
-	return wgCfgsList.Containers
-}
-
 func (wgCfgsList *WireGuardConfigurationList) GetType() string {
 	return new(netlink.Wireguard).Type()
-}
-
-func (wgCfgsList *WireGuardConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if wgCfgsList == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetType() string {
@@ -843,13 +825,14 @@ func (adapter *ExtendedINIWireGuardConfigAdapter) ToWireGuardConfig(raw []byte) 
 }
 
 func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, wgCfgsList, delete)
+	// todo
+	return nil, nil
 }
 
 func (wgConfig *WireGuardConfig) IsSoftDeleted() bool {
 	return wgConfig.Deleted
 }
 
-func (wgConfig *WireGuardConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
-	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, wgConfig)
+func (wgConfig *WireGuardConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	return nil, nil
 }

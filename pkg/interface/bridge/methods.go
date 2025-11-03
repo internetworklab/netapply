@@ -19,12 +19,12 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetChangedItems() map[string]bo
 	return changedItems
 }
 
-func (bridgeChangeSet *BridgeInterfaceChangeSet) GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+func (bridgeChangeSet *BridgeInterfaceChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
 	return bridgeChangeSet.NetnsInfo, nil
 }
 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) Apply(ctx context.Context) error {
-	netnsInfo, err := bridgeChangeSet.GetNetnsInfo(ctx)
+	netnsInfo, err := bridgeChangeSet.GetNetNsInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get netns info: %w", err)
 	}
@@ -82,7 +82,7 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 	changeSet.InterfaceToEnslave = make(map[string]interface{})
 	changeSet.InterfaceToUnslave = make(map[string]interface{})
 
-	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
 	}
@@ -166,7 +166,7 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 	actuallyAdded := make(map[string]interface{})
 	actuallyRemoved := make(map[string]interface{})
 
-	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to get primary netns info: %w", err)
 	}
@@ -219,7 +219,7 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 }
 
 func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
-	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get primary netns info: %w", err)
 	}
@@ -284,7 +284,7 @@ func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkgreconcile.
 }
 
 func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {
-	netnsInfo, err := bridgeConfig.GetPrimaryNetNsInfo(ctx)
+	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get primary netns info: %w", err)
 	}
@@ -337,7 +337,7 @@ func (bridgeConfig *BridgeConfig) IsSoftDeleted() bool {
 	return bridgeConfig.Deleted
 }
 
-func (bridgeConfig *BridgeConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+func (bridgeConfig *BridgeConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
 	// todo
 	return nil, nil
 }

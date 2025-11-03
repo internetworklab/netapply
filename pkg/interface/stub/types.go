@@ -14,6 +14,6 @@ type StubInterfaceCanceller struct {
 
 type StubNetlinkInterface interface {
 	GetType() string
-	GetNetnsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 	GetInterfaceName() string
+	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }

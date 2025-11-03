@@ -10,7 +10,6 @@ import (
 
 	"strings"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -81,7 +80,7 @@ func (r *RouteConfig) GetTableId(ctx context.Context) uint32 {
 
 func retrieveRouteObject(
 	ctx context.Context,
-	container *string,
+	netnsInfo *pkgnetns.NetNsInfo,
 	tableId uint32,
 	destIPNet net.IPNet,
 	proto netlink.RouteProtocol,
@@ -91,7 +90,7 @@ func retrieveRouteObject(
 	}
 	res := new(result)
 
-	err := pkgdocker.WithNsHandleSafe(ctx, container, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 
 		routes, err := handle.RouteGet(destIPNet.IP)
 		if err != nil {
@@ -134,7 +133,12 @@ func (r *RouteConfig) RetrieveRouteObject(ctx context.Context) (*netlink.Route, 
 		protoExpected = r.Protocol.ToInt()
 	}
 
-	return retrieveRouteObject(ctx, r.ContainerName, tableId, *destIPNet, protoExpected)
+	netnsInfo, err := r.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	return retrieveRouteObject(ctx, netnsInfo, tableId, *destIPNet, protoExpected)
 }
 
 func (r *RouteConfig) CheckExist(ctx context.Context) (bool, error) {
@@ -191,7 +195,12 @@ func (r *RouteConfig) GetType() string {
 }
 
 func (r *RouteConfig) Create(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, r.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := r.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get primary netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		rtObj := new(netlink.Route)
 
 		rtObj.Table = int(r.GetTableId(ctx))
@@ -262,6 +271,11 @@ func (r *RouteConfig) Create(ctx context.Context) error {
 		}
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to create route: %w", err)
+	}
+
+	return nil
 }
 
 func (r *RouteObjectChangeSet) GetContainerName() *string {
@@ -290,7 +304,12 @@ func (r *RouteObjectChangeSet) Apply(ctx context.Context) error {
 		return nil
 	}
 
-	return pkgdocker.WithNsHandleSafe(ctx, r.GetContainerName(), func(handle *netlink.Handle) error {
+	netnsInfo, err := r.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 
 		rtObj, err := r.Spec.RetrieveRouteObject(ctx)
 		if err != nil {
@@ -327,12 +346,27 @@ func (r *RouteObjectChangeSet) Apply(ctx context.Context) error {
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to apply route object change set: %w", err)
+	}
+
+	return nil
+}
+
+func (r *RouteObjectChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }
 
 func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 	changeSet := new(RouteObjectChangeSet)
 	changeSet.Spec = r
-	err := pkgdocker.WithNsHandleSafe(ctx, r.GetContainerName(), func(handle *netlink.Handle) error {
+	netnsInfo, err := r.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		rtObj, err := r.RetrieveRouteObject(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to retrieve route object: %w", err)
@@ -384,17 +418,20 @@ func (r *RouteConfig) DetectChanges(ctx context.Context) (pkgreconcile.Interface
 	return changeSet, nil
 }
 
-func (r *RouteConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if r == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
+func (r *RouteResourceCanceller) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }
 
 func (r *RouteResourceCanceller) Cancel(ctx context.Context) error {
-	return pkgdocker.WithNsHandleSafe(ctx, r.ResourceContainer, func(handle *netlink.Handle) error {
+	netnsInfo, err := r.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
 
-		routeObj, err := retrieveRouteObject(ctx, r.ResourceContainer, r.TableId, r.Destination, RouteProtocolStatic.ToInt())
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+
+		routeObj, err := retrieveRouteObject(ctx, netnsInfo, r.TableId, r.Destination, RouteProtocolStatic.ToInt())
 		if err != nil {
 			// Can't retrieve the route object, presumably it's already deleted
 			return nil
@@ -408,54 +445,19 @@ func (r *RouteResourceCanceller) Cancel(ctx context.Context) error {
 
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("failed to cancel route: %w", err)
+	}
+
+	return nil
 }
 
 func (r *RouteResourceCanceller) GetInterfaceName() string {
 	return getResourceKey(&r.TableId, r.Destination)
 }
 
-func (r *RouteResourceCanceller) GetContainerName() *string {
-	return r.ResourceContainer
-}
-
 func (r *RouteResourceCanceller) GetType() string {
 	return ResourceTypeRoute
-}
-
-func (r *RouteConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if r == nil {
-		return nil, nil
-	}
-	currentResourcesMap := make(map[string]map[string]pkgreconcile.ResourceCanceller)
-	for _, container := range r.Containers {
-		err := pkgdocker.WithNsHandleSafe(ctx, &container, func(handle *netlink.Handle) error {
-			routes, err := handle.RouteList(nil, netlink.FAMILY_ALL)
-			if err != nil {
-				return fmt.Errorf("failed to list routes: %w", err)
-			}
-			for _, route := range routes {
-				if route.Dst == nil {
-					// since we rely on Dst to calculate the resource key, if Dst is nil, we simply skip it (because it's non-comparable)
-					continue
-				}
-				tb := uint32(route.Table)
-				routeKey := getResourceKey(&tb, *route.Dst)
-				if _, ok := currentResourcesMap[container]; !ok {
-					currentResourcesMap[container] = make(map[string]pkgreconcile.ResourceCanceller)
-				}
-				containerKey := string(pkgdocker.GetContainerKey(&container))
-				currentResourcesMap[containerKey][routeKey] = &RouteResourceCanceller{ResourceName: routeKey, ResourceContainer: &containerKey}
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return nil, fmt.Errorf("failed to get current route resources: %w", err)
-		}
-	}
-
-	return currentResourcesMap, nil
 }
 
 func (r *RouteConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
@@ -481,14 +483,15 @@ func (r *RouteConfigurationList) GetType() string {
 }
 
 func (r *RouteConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	// todo: implement the DetectChanges receiver of RouteConfigurationList separately
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, r, delete)
+	// todo
+	return nil, nil
 }
 
 func (r *RouteConfig) IsSoftDeleted() bool {
 	return r.Deleted
 }
 
-func (r *RouteConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, r)
+func (r *RouteConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }

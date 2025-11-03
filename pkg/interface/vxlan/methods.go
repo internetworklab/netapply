@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net"
 
-	pkgdocker "github.com/internetworklab/netapply/pkg/docker"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	"github.com/vishvananda/netlink"
 )
@@ -31,7 +31,12 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) Apply(ctx context.Contex
 		return nil
 	}
 
-	return pkgdocker.WithNsHandle(ctx, vxlanInterfaceChangeSet.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := vxlanInterfaceChangeSet.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vxlanInterfaceChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get vxlan link: %w", err)
@@ -59,6 +64,11 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) Apply(ctx context.Contex
 	})
 }
 
+func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
+}
+
 func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetChangedItems() map[string]bool {
 	changedItems := make(map[string]bool)
 	changedItems["Addresses"] = len(vxlanInterfaceChangeSet.AddressesToAdd)+len(vxlanInterfaceChangeSet.AddressedToRemove) > 0
@@ -71,7 +81,12 @@ func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (pkgreconcile
 	changeSet.ContainerName = vxlanConfig.ContainerName
 	changeSet.InterfaceName = vxlanConfig.Name
 
-	err := pkgdocker.WithNsHandle(ctx, vxlanConfig.ContainerName, func(handle *netlink.Handle) error {
+	netnsInfo, err := vxlanConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vxlanConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get vxlan link: %w", err)
@@ -93,7 +108,7 @@ func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (pkgreconcile
 		return nil
 	})
 
-	return changeSet, err
+	return changeSet, nil
 }
 
 func (vxlanConfig *VXLANConfig) GetContainerName() *string {
@@ -105,8 +120,12 @@ func (vxlanConfig *VXLANConfig) GetInterfaceName() string {
 }
 
 func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
-	return pkgdocker.WithNsHandle(ctx, vxlanConfig.ContainerName, func(handle *netlink.Handle) error {
-		var err error
+	netnsInfo, err := vxlanConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
+	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
 
 		link := &netlink.Vxlan{
 			LinkAttrs: netlink.LinkAttrs{
@@ -172,29 +191,8 @@ func (vxlanCfgsList *VXLANConfigurationList) GetProvisioners() []pkgreconcile.Re
 	return provisioners
 }
 
-func (vxlanCfgsList *VXLANConfigurationList) IndexCurrentResources(ctx context.Context) (map[string]map[string]pkgreconcile.ResourceCanceller, error) {
-	if vxlanCfgsList == nil {
-		return nil, nil
-	}
-	return pkgreconcile.IndexStubNetlinkInterfaceList(ctx, vxlanCfgsList)
-}
-
-func (vxlanCfgsList *VXLANConfigurationList) GetContainers() []string {
-	if vxlanCfgsList == nil {
-		return nil
-	}
-	return vxlanCfgsList.Containers
-}
-
 func (vxlanCfgsList *VXLANConfigurationList) GetType() string {
 	return new(netlink.Vxlan).Type()
-}
-
-func (vxlanCfgsList *VXLANConfigurationList) CheckResourceExistInSpec(ctx context.Context, specsMap map[string]map[string]pkgreconcile.ResourceProvisioner, resource pkgreconcile.ResourceCanceller) (bool, error) {
-	if vxlanCfgsList == nil {
-		return false, nil
-	}
-	return pkgreconcile.CheckResourceExistInSpec(ctx, specsMap, resource)
 }
 
 func (vxlanConfig *VXLANConfig) GetType() string {
@@ -210,13 +208,14 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetType() string {
 }
 
 func (vxlanCfgsList *VXLANConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return pkgreconcile.DetectChangesForProvisionersList(ctx, vxlanCfgsList, delete)
+	return nil, nil
 }
 
 func (vxlanConfig *VXLANConfig) IsSoftDeleted() bool {
 	return vxlanConfig.Deleted
 }
 
-func (vxlanConfig *VXLANConfig) GetPrimaryNetNsInfo(ctx context.Context) (*pkgreconcile.NetNsInfo, error) {
-	return pkgreconcile.GetPrimaryNetNsInfoForCommonResource(ctx, vxlanConfig)
+func (vxlanConfig *VXLANConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	// todo
+	return nil, nil
 }
