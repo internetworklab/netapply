@@ -38,7 +38,7 @@ type ResourceProvisionersList interface {
 
 	// If delete is true, meaning that should ignore those presented in actual state but not in the spec,
 	// its just like the `--delete` flag of the `rsync` command.
-	DetectChanges(ctx context.Context, delete bool) (*ResourceListChangeSet, error)
+	DetectChanges(ctx context.Context, delete bool) (ResourceListChangeSet, error)
 }
 
 type ResourceCanceller interface {
@@ -47,8 +47,9 @@ type ResourceCanceller interface {
 	GetType() string
 }
 
-type ResourceListChangeSet struct {
-	AddedResources   map[string]ResourceProvisioner
-	UpdatedResources map[string]InterfaceChangeSet
-	RemovedResources map[string]ResourceCanceller
+type ResourceListChangeSet interface {
+	GetAddedResources() map[string]ResourceProvisioner
+	GetUpdatedResources() map[string]InterfaceChangeSet
+	GetRemovedResources() map[string]ResourceCanceller
+	HasUpdates() bool
 }

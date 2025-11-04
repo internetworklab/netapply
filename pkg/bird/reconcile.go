@@ -13,7 +13,33 @@ import (
 
 const ResourceTypeBirdEBGPEBGP = "bird-ebgp"
 
-func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+type BirdEBGPRessourceListChangeSet struct {
+	addedResources   map[string]pkgreconcile.ResourceProvisioner
+	removedResources map[string]pkgreconcile.ResourceCanceller
+	updatedResources map[string]pkgreconcile.InterfaceChangeSet
+}
+
+func (changeSet *BirdEBGPRessourceListChangeSet) GetAddedResources() map[string]pkgreconcile.ResourceProvisioner {
+	return changeSet.addedResources
+}
+
+func (changeSet *BirdEBGPRessourceListChangeSet) GetRemovedResources() map[string]pkgreconcile.ResourceCanceller {
+	return changeSet.removedResources
+}
+
+func (changeSet *BirdEBGPRessourceListChangeSet) GetUpdatedResources() map[string]pkgreconcile.InterfaceChangeSet {
+	return changeSet.updatedResources
+}
+
+func (changeSet *BirdEBGPRessourceListChangeSet) HasUpdates() bool {
+	if changeSet == nil {
+		return false
+	}
+
+	return len(changeSet.addedResources) > 0 || len(changeSet.removedResources) > 0 || len(changeSet.updatedResources) > 0
+}
+
+func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
 	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
@@ -45,7 +71,7 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 		specResources[proto.Name] = proto
 	}
 
-	changeSet := new(pkgreconcile.ResourceListChangeSet)
+	changeSet := new(BirdEBGPRessourceListChangeSet)
 	addedResources := make(map[string]pkgreconcile.ResourceProvisioner)
 	removedResources := make(map[string]pkgreconcile.ResourceCanceller)
 	updatedResources := make(map[string]pkgreconcile.InterfaceChangeSet)
@@ -76,9 +102,9 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 		}
 	}
 
-	changeSet.AddedResources = addedResources
-	changeSet.RemovedResources = removedResources
-	changeSet.UpdatedResources = updatedResources
+	changeSet.addedResources = addedResources
+	changeSet.removedResources = removedResources
+	changeSet.updatedResources = updatedResources
 
 	return changeSet, nil
 }
@@ -247,7 +273,7 @@ func (proto *BGPProtocol) CheckExist(ctx context.Context) (bool, error) {
 	}
 
 	baseName := fmt.Sprintf("%s.conf", proto.Name)
-	os.Stat(filepath.Join(directory, baseName))
+	_, err = os.Stat(filepath.Join(directory, baseName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -271,7 +297,7 @@ func (proto *BGPProtocol) Cancel(ctx context.Context) error {
 		return fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
 	}
 
-	os.Remove(filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)))
+	err = os.Remove(filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)))
 	if err != nil {
 		return fmt.Errorf("failed to remove config file %s: %w", filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)), err)
 	}

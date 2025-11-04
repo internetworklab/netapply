@@ -1,6 +1,7 @@
 package models
 
 import (
+	pkgbird "github.com/internetworklab/netapply/pkg/bird"
 	pkginterfacebridge "github.com/internetworklab/netapply/pkg/interface/bridge"
 	pkginterfacedummy "github.com/internetworklab/netapply/pkg/interface/dummy"
 	pkginterfaceroute "github.com/internetworklab/netapply/pkg/interface/route"
@@ -55,4 +56,5 @@ type ResourcesConfig struct {
 	VethPair  *pkginterfaceveth.VethPairConfigurationList       `yaml:"veth,omitempty" json:"veth,omitempty"`
 	Bridge    *pkginterfacebridge.BridgeConfigurationList       `yaml:"bridge,omitempty" json:"bridge,omitempty"`
 	Dummy     *pkginterfacedummy.DummyConfigurationList         `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+	BirdBGP   *pkgbird.BirdBGPConfigurationList                 `yaml:"bird_bgp,omitempty" json:"bird_bgp,omitempty"`
 }
