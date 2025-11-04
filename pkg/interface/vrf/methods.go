@@ -76,10 +76,6 @@ func CheckVRFDiff(handle *netlink.Handle, link netlink.Link, vrfName *string) (*
 	return nil, nil
 }
 
-func (vrfConfig *VRFConfig) GetContainerName() *string {
-	return vrfConfig.ContainerName
-}
-
 func (vrfConfig *VRFConfig) GetInterfaceName() string {
 	return vrfConfig.Name
 }
@@ -227,13 +223,6 @@ func (vrfList *VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourcePr
 		provisioners = append(provisioners, &vrfCfg)
 	}
 	return provisioners
-}
-
-func (vrfList *VRFConfigurationList) GetContainers() []string {
-	if vrfList == nil {
-		return nil
-	}
-	return vrfList.Containers
 }
 
 func (vrfList *VRFConfigurationList) GetType() string {
