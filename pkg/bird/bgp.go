@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 type BGPProtocol struct {
@@ -257,4 +259,29 @@ func (protoList BGPProtoList) ToConfigs(dir string) error {
 		}
 	}
 	return nil
+}
+
+func (proto *BGPProtocol) SetNodeAndResourceID(nodeName string) error {
+	if nodeName == "" {
+		return fmt.Errorf("node name is required")
+	}
+	if proto.Node == nil || *proto.Node == "" {
+		proto.Node = pkgutils.StringPtr(nodeName)
+	}
+
+	if proto.ResourceID == nil || *proto.ResourceID == "" {
+		if proto.Name == "" {
+			return fmt.Errorf("protocol name is required")
+		}
+		proto.ResourceID = pkgutils.StringPtr(fmt.Sprintf("%s-%s", nodeName, proto.Name))
+	}
+
+	return nil
+}
+
+func (proto *BGPProtocol) GetResourceID() (string, error) {
+	if proto.ResourceID == nil || *proto.ResourceID == "" {
+		return "", fmt.Errorf("resource id is not set")
+	}
+	return *proto.ResourceID, nil
 }

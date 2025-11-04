@@ -8,11 +8,10 @@ import (
 
 	"strings"
 
-	uuid "github.com/google/uuid"
-	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 
+	pkgbird "github.com/internetworklab/netapply/pkg/bird"
 	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
 )
 
@@ -51,73 +50,88 @@ func extractCollectionNameFromRequest(r *http.Request) string {
 	return ""
 }
 
-func generateResourceId(nodeName string, ifname string) string {
-	if nodeName != "" {
-		return fmt.Sprintf("%s-%s", nodeName, ifname)
-	}
-	return uuid.New().String()
+type NodeIdentifiable interface {
+	SetNodeAndResourceID(nodeName string) error
+	GetResourceID() (string, error)
 }
 
-func prepareDocuments(r *http.Request) ([]pkginterfacewireguard.WireGuardConfig, error) {
-	var wgConfigs []pkginterfacewireguard.WireGuardConfig
-	if err := json.NewDecoder(r.Body).Decode(&wgConfigs); err != nil {
-		return nil, err
+func prepareDocuments(nodeName string, identifiables []NodeIdentifiable) error {
+	for i := range identifiables {
+		if err := identifiables[i].SetNodeAndResourceID(nodeName); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func IdentifiablesFromWgConfigs(wgConfigs []pkginterfacewireguard.WireGuardConfig) []NodeIdentifiable {
+	identifiables := make([]NodeIdentifiable, 0)
+	for i := range wgConfigs {
+		identifiables = append(identifiables, &wgConfigs[i])
+	}
+	return identifiables
+}
+
+func IdentifiablesFromBGPConfigs(bgpConfigs []pkgbird.BGPProtocol) []NodeIdentifiable {
+	identifiables := make([]NodeIdentifiable, 0)
+	for i := range bgpConfigs {
+		identifiables = append(identifiables, &bgpConfigs[i])
+	}
+	return identifiables
+}
+
+func (ch *CollectionHandler) handleWriteIdentifiables(ctx context.Context, w http.ResponseWriter, r *http.Request, identifiables []NodeIdentifiable) {
+	collectionName := extractCollectionNameFromRequest(r)
+	if collectionName == "" {
+		RespondWithError(w, fmt.Errorf("collection name is must not be empty"), http.StatusBadRequest)
+		return
 	}
 
 	nodeName := extractNodeNameFromRequest(r)
-	if nodeName != "" {
-		for i := range wgConfigs {
-			wgConfigs[i].Node = pkgutils.StringPtr(nodeName)
-
-		}
-
+	if nodeName == "" {
+		RespondWithError(w, fmt.Errorf("node name is must not be empty"), http.StatusBadRequest)
+		return
 	}
 
-	for i := range wgConfigs {
-		nodeName := wgConfigs[i].Node
-		if nodeName == nil || *nodeName == "" {
-			return nil, fmt.Errorf("node name is required")
-		}
-
-		ifName := wgConfigs[i].Name
-		if ifName == "" {
-			return nil, fmt.Errorf("interface name is required")
-		}
-
-		if wgConfigs[i].ResourceId == nil || *(wgConfigs[i].ResourceId) == "" {
-			wgConfigs[i].ResourceId = pkgutils.StringPtr(generateResourceId(*nodeName, ifName))
-		}
-	}
-
-	return wgConfigs, nil
-}
-
-func (ch *CollectionHandler) handleWriteWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	wgConfigs, err := prepareDocuments(r)
+	err := prepareDocuments(nodeName, identifiables)
 	if err != nil {
 		RespondWithError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	writeMdls := make([]mongo.WriteModel, 0)
-	for i := range wgConfigs {
+	for i := range identifiables {
+
+		resourceID, err := identifiables[i].GetResourceID()
+		if err != nil {
+			RespondWithError(w, fmt.Errorf("failed to get resource id: %w", err), http.StatusBadRequest)
+			return
+		}
+
 		replaceMdl := mongo.NewReplaceOneModel()
 		replaceMdl.SetUpsert(true)
-		replaceMdl.SetFilter(bson.D{bson.E{Key: "resource_id", Value: *wgConfigs[i].ResourceId}})
-		replaceMdl.SetReplacement(wgConfigs[i])
+		replaceMdl.SetFilter(bson.D{bson.E{Key: "resource_id", Value: resourceID}})
+		replaceMdl.SetReplacement(identifiables[i])
 		writeMdls = append(writeMdls, replaceMdl)
 	}
 
-	collectionName := extractCollectionNameFromRequest(r)
 	coll := ch.client.Database(dbName).Collection(collectionName)
-
 	_, err = coll.BulkWrite(ctx, writeMdls)
 	if err != nil {
 		RespondWithError(w, err, http.StatusInternalServerError)
 		return
 	}
-
 	w.WriteHeader(http.StatusOK)
+}
+
+func (ch *CollectionHandler) handleWriteWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	var wgConfigs []pkginterfacewireguard.WireGuardConfig
+	if err := json.NewDecoder(r.Body).Decode(&wgConfigs); err != nil {
+		RespondWithError(w, fmt.Errorf("failed to decode request body: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	ch.handleWriteIdentifiables(ctx, w, r, IdentifiablesFromWgConfigs(wgConfigs))
 }
 
 const queryParamIncludeDeleted = "includedeleted"
@@ -147,7 +161,7 @@ func applySoftDeletionFilter(filter bson.D, r *http.Request) bson.D {
 	return filter
 }
 
-func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+func (ch *CollectionHandler) handleReadCollection(ctx context.Context, w http.ResponseWriter, r *http.Request, decoder func(cursor *mongo.Cursor, v interface{}) (interface{}, error)) {
 	collectionName := extractCollectionNameFromRequest(r)
 	coll := ch.client.Database(dbName).Collection(collectionName)
 
@@ -163,27 +177,67 @@ func (ch *CollectionHandler) handleReadWgCollection(ctx context.Context, w http.
 	}
 	defer cursor.Close(context.TODO())
 
-	result := make([]pkginterfacewireguard.WireGuardConfig, 0)
-
+	result := make([]interface{}, 0)
 	for cursor.Next(context.TODO()) {
-		var wg pkginterfacewireguard.WireGuardConfig
-		err := cursor.Decode(&wg)
+		elem, err := decoder(cursor, result)
 		if err != nil {
-			RespondWithError(w, err, http.StatusBadRequest)
+			RespondWithError(w, fmt.Errorf("failed to decode element: %w", err), http.StatusBadRequest)
 			return
 		}
-		result = append(result, wg)
+		result = append(result, elem)
 	}
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(result)
 }
 
+func (ch *CollectionHandler) handleReadWireGuardCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	ch.handleReadCollection(ctx, w, r, func(cursor *mongo.Cursor, v interface{}) (interface{}, error) {
+		var wg pkginterfacewireguard.WireGuardConfig
+		err := cursor.Decode(&wg)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode wireguard config: %w", err)
+		}
+		return wg, nil
+	})
+}
+
 func (ch *CollectionHandler) handleWgCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost {
 		ch.handleWriteWgCollection(ctx, w, r)
 	} else if r.Method == http.MethodGet {
-		ch.handleReadWgCollection(ctx, w, r)
+		ch.handleReadWireGuardCollection(ctx, w, r)
+	} else {
+		RespondWithError(w, fmt.Errorf("invalid method: %s", r.Method), http.StatusMethodNotAllowed)
+	}
+}
+
+func (ch *CollectionHandler) handleWriteBGPCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	var birdBGPConfigs []pkgbird.BGPProtocol
+	if err := json.NewDecoder(r.Body).Decode(&birdBGPConfigs); err != nil {
+		RespondWithError(w, fmt.Errorf("failed to decode request body: %w", err), http.StatusBadRequest)
+		return
+	}
+
+	ch.handleWriteIdentifiables(ctx, w, r, IdentifiablesFromBGPConfigs(birdBGPConfigs))
+}
+
+func (ch *CollectionHandler) handleReadBGPCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	ch.handleReadCollection(ctx, w, r, func(cursor *mongo.Cursor, v interface{}) (interface{}, error) {
+		var bird pkgbird.BGPProtocol
+		err := cursor.Decode(&bird)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode bird bgp config: %w", err)
+		}
+		return bird, nil
+	})
+}
+
+func (ch *CollectionHandler) handleBirdBGPCollection(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		ch.handleWriteBGPCollection(ctx, w, r)
+	} else if r.Method == http.MethodGet {
+		ch.handleReadBGPCollection(ctx, w, r)
 	} else {
 		RespondWithError(w, fmt.Errorf("invalid method: %s", r.Method), http.StatusMethodNotAllowed)
 	}
@@ -196,6 +250,9 @@ func NewCollectionHandler(mongoClient *mongo.Client) *CollectionHandler {
 
 	muxer.HandleFunc("/collections/wg/", func(w http.ResponseWriter, r *http.Request) {
 		ch.handleWgCollection(context.Background(), w, r)
+	})
+	muxer.HandleFunc("/collections/bgp/", func(w http.ResponseWriter, r *http.Request) {
+		ch.handleBirdBGPCollection(context.Background(), w, r)
 	})
 
 	ch.muxer = muxer

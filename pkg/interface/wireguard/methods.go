@@ -836,3 +836,28 @@ func (wgConfig *WireGuardConfig) IsSoftDeleted() bool {
 func (wgConfig *WireGuardConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
 	return nil, nil
 }
+
+func (wgConfig *WireGuardConfig) SetNodeAndResourceID(nodeName string) error {
+	if nodeName == "" {
+		return fmt.Errorf("node name is required")
+	}
+	if wgConfig.Node == nil || *wgConfig.Node == "" {
+		wgConfig.Node = pkgutils.StringPtr(nodeName)
+	}
+
+	if wgConfig.ResourceId == nil || *wgConfig.ResourceId == "" {
+		if wgConfig.Name == "" {
+			return fmt.Errorf("interface name is required")
+		}
+		wgConfig.ResourceId = pkgutils.StringPtr(fmt.Sprintf("%s-%s", nodeName, wgConfig.Name))
+	}
+
+	return nil
+}
+
+func (wgConfig *WireGuardConfig) GetResourceID() (string, error) {
+	if wgConfig.ResourceId == nil || *wgConfig.ResourceId == "" {
+		return "", fmt.Errorf("resource id is not set")
+	}
+	return *wgConfig.ResourceId, nil
+}
