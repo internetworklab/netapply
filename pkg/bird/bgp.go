@@ -1,6 +1,7 @@
 package bird
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,30 +12,6 @@ import (
 
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
-
-type BGPProtocol struct {
-	Name         string  `yaml:"name" json:"name" bson:"name"`
-	Template     *string `yaml:"template,omitempty" json:"template,omitempty" bson:"template,omitempty"`
-	Interface    *string `yaml:"interface,omitempty" json:"interface,omitempty" bson:"interface,omitempty"`
-	LocalAddress *string `yaml:"local_address,omitempty" json:"local_address,omitempty" bson:"local_address,omitempty"`
-	PeerAddress  *string `yaml:"peer_address,omitempty" json:"peer_address,omitempty" bson:"peer_address,omitempty"`
-	LocalASN     *string `yaml:"local_asn,omitempty" json:"local_asn,omitempty" bson:"local_asn,omitempty"`
-	PeerASN      *string `yaml:"peer_asn,omitempty" json:"peer_asn,omitempty" bson:"peer_asn,omitempty"`
-	PeerExternal *bool   `yaml:"peer_external,omitempty" json:"peer_external,omitempty" bson:"peer_external,omitempty"`
-	PeerInternal *bool   `yaml:"peer_internal,omitempty" json:"peer_internal,omitempty" bson:"peer_internal,omitempty"`
-
-	// For storing in database, distinguish which node the resource belongs to.
-	Node *string `yaml:"node,omitempty" json:"node,omitempty" bson:"node,omitempty"`
-
-	// For storing in database, the unique ID to distinguish the resource in the global scope.
-	ResourceID *string `yaml:"resource_id,omitempty" json:"resource_id,omitempty" bson:"resource_id,omitempty"`
-
-	// To support soft-deletion.
-	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
-}
-
-const patternWildCard = "*"
-const patternAnySequence = "**"
 
 func testLinePattern(line []string, pattern []string) bool {
 	n := len(pattern)
@@ -284,4 +261,16 @@ func (proto *BGPProtocol) GetResourceID() (string, error) {
 		return "", fmt.Errorf("resource id is not set")
 	}
 	return *proto.ResourceID, nil
+}
+
+func (proto *BGPProtocol) ToBaseName() string {
+	return fmt.Sprintf("%s.conf", proto.Name)
+}
+
+func (proto *BGPProtocol) ToFilePath(ctx context.Context) string {
+	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(directory, proto.ToBaseName())
 }

@@ -2,15 +2,12 @@ package reconcile
 
 import (
 	"context"
-
-	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 )
 
 type InterfaceChangeSet interface {
 	Apply(ctx context.Context) error
 	HasUpdates() bool
 	GetInterfaceName() string
-	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 	GetType() string
 }
 
@@ -34,9 +31,6 @@ type ResourceProvisioner interface {
 
 	// Check if the resource has been marked as soft-deleted, mainly called by the upper layer's GetProvisioners function.
 	IsSoftDeleted() bool
-
-	// when in host netns, return nil as *NetNsInfo
-	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }
 
 type ResourceProvisionersList interface {
@@ -51,12 +45,10 @@ type ResourceCanceller interface {
 	Cancel(ctx context.Context) error
 	GetInterfaceName() string
 	GetType() string
-	GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error)
 }
 
 type ResourceListChangeSet struct {
-	// key is the identifier of the netns (e.g., pid)
-	AddedResources   map[string][]ResourceProvisioner
-	UpdatedResources map[string][]InterfaceChangeSet
-	RemovedResources map[string][]ResourceCanceller
+	AddedResources   map[string]ResourceProvisioner
+	UpdatedResources map[string]InterfaceChangeSet
+	RemovedResources map[string]ResourceCanceller
 }
