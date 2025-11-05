@@ -38,6 +38,8 @@ type ResourceProvisionersList interface {
 
 	// If delete is true, meaning that should ignore those presented in actual state but not in the spec,
 	// its just like the `--delete` flag of the `rsync` command.
+	//
+	// Also, All implementations of ResourceProvisionersList should respect the IsSoftDeleted() result of provisioner.
 	DetectChanges(ctx context.Context, delete bool) (ResourceListChangeSet, error)
 }
 

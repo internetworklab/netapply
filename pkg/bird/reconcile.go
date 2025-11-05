@@ -74,6 +74,10 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 
 	specResources := make(map[string]BGPProtocol)
 	for _, proto := range bgpConfigList.EBGPProtocols {
+		if proto.IsSoftDeleted() {
+			continue
+		}
+
 		proto.Reloader = reloaderShellCommand
 		proto.ConfigDirectory = directory
 		specResources[proto.Name] = proto

@@ -10,11 +10,6 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
-type NetNsInfo struct {
-	Pid       *int
-	NetNsPath *string
-}
-
 func toNsHandle(netnsInfo *NetNsInfo) (*vnetns.NsHandle, error) {
 	if netnsInfo != nil {
 		if netnsInfo.Pid != nil {
