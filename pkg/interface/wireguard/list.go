@@ -118,13 +118,17 @@ func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context,
 		superfluous := make([]*WireGuardInterfaceCanceller, 0)
 
 		links, err := h.LinkList()
+		if err != nil {
+			return fmt.Errorf("failed to list links: %w", err)
+		}
+
 		for _, lk := range links {
 			if lk.Type() != ty {
 				continue
 			}
 
 			if m, ok := specIndex[netnsKey]; ok {
-				if x, ok := m[lk.Attrs().Name]; !ok {
+				if x, ok := m[lk.Attrs().Name]; ok {
 					closureWrapperPtr.commonSet[netnsKey][lk.Attrs().Name] = &x
 					continue
 				}

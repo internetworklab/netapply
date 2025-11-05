@@ -29,14 +29,7 @@ func TrySetVRF(handle *netlink.Handle, link netlink.Link, vrfName *string) error
 
 	vrfLink, err := handle.LinkByName(*vrfName)
 	if err != nil {
-		if _, ok := err.(netlink.LinkNotFoundError); !ok {
-			return fmt.Errorf("failed to get vrf link: %w", err)
-		}
-
-		// There is no guarantee that the reconciliation will converged at once,
-		// it is the responsibility of the caller to check whether it's converged or not.
-		// Hence, if the specified VRF is not found, simply skip, because that VRF might be created later.
-		return nil
+		return fmt.Errorf("failed to get vrf link: %w", err)
 	}
 
 	if err := handle.LinkSetMaster(link, vrfLink); err != nil {
