@@ -130,6 +130,7 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context, delete bool)
 
 	reconcileTargets := make([]pkgreconcile.ResourceProvisionersList, 0)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.BirdBGP)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.WireGuard)
 
 	mergedChangeSet := new(WrappedResourceListChangeSet)
 

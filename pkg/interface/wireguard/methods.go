@@ -12,8 +12,6 @@ import (
 	"time"
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
-	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -162,7 +160,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		}
 
 		if wgInterfaceChangeSet.VRFToSet != nil {
-			if err := pkginterfacevrf.TrySetVRF(handle, link, wgInterfaceChangeSet.VRFToSet); err != nil {
+			if err := pkgutils.TrySetVRF(handle, link, wgInterfaceChangeSet.VRFToSet); err != nil {
 				return fmt.Errorf("failed to set vrf for wireguard link: %w", err)
 			}
 		}
@@ -208,7 +206,21 @@ func (wgConf *WireGuardConfig) GetType() string {
 }
 
 func (wgConf *WireGuardConfig) CheckExist(ctx context.Context) (bool, error) {
-	return pkginterfacestub.CheckExist(ctx, wgConf)
+	var exist *bool = new(bool)
+	*exist = false
+	err := pkgnetns.WithNsHandleSafe(ctx, wgConf, func(handle *netlink.Handle) error {
+		lk, err := handle.LinkByName(wgConf.Name)
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); ok {
+				return nil
+			}
+			return fmt.Errorf("failed to get wireguard link: %w", err)
+		}
+
+		*exist = lk != nil
+		return nil
+	})
+	return *exist, err
 }
 
 // returns: (added, removed)
@@ -348,7 +360,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		}
 
 		if wgConf.VRF != nil {
-			vrfDiff, err := pkginterfacevrf.CheckVRFDiff(handle, link, wgConf.VRF)
+			vrfDiff, err := pkgutils.CheckVRFDiff(handle, link, wgConf.VRF)
 			if err != nil {
 				return fmt.Errorf("failed to check vrf diff: %w", err)
 			}
