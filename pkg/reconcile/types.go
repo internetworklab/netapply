@@ -50,8 +50,8 @@ type ResourceCanceller interface {
 }
 
 type ResourceListChangeSet interface {
-	GetAddedResources() map[string]ResourceProvisioner
-	GetUpdatedResources() map[string]InterfaceChangeSet
-	GetRemovedResources() map[string]ResourceCanceller
+	GetAddedResources() []ResourceProvisioner
+	GetUpdatedResources() []InterfaceChangeSet
+	GetRemovedResources() []ResourceCanceller
 	HasUpdates() bool
 }

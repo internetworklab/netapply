@@ -29,11 +29,9 @@ func appendNoNil(targets []pkgreconcile.ResourceProvisionersList, target pkgreco
 	return append(targets, target)
 }
 
-func reOrderAddedInterfaces(provisioners map[string]pkgreconcile.ResourceProvisioner) []pkgreconcile.ResourceProvisioner {
+func reOrderAddedInterfaces(provisioners []pkgreconcile.ResourceProvisioner) []pkgreconcile.ResourceProvisioner {
 	results := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, provisioner := range provisioners {
-		results = append(results, provisioner)
-	}
+	results = append(results, provisioners...)
 
 	sort.Slice(results, func(i, j int) bool {
 		return getOrderByType(results[i].GetType()) < getOrderByType(results[j].GetType())
@@ -70,20 +68,20 @@ func getOrderByType(ty string) int16 {
 }
 
 type WrappedResourceListChangeSet struct {
-	addedResources   map[string]pkgreconcile.ResourceProvisioner
-	removedResources map[string]pkgreconcile.ResourceCanceller
-	updatedResources map[string]pkgreconcile.InterfaceChangeSet
+	addedResources   []pkgreconcile.ResourceProvisioner
+	removedResources []pkgreconcile.ResourceCanceller
+	updatedResources []pkgreconcile.InterfaceChangeSet
 }
 
-func (wrapped *WrappedResourceListChangeSet) GetAddedResources() map[string]pkgreconcile.ResourceProvisioner {
+func (wrapped *WrappedResourceListChangeSet) GetAddedResources() []pkgreconcile.ResourceProvisioner {
 	return wrapped.addedResources
 }
 
-func (wrapped *WrappedResourceListChangeSet) GetUpdatedResources() map[string]pkgreconcile.InterfaceChangeSet {
+func (wrapped *WrappedResourceListChangeSet) GetUpdatedResources() []pkgreconcile.InterfaceChangeSet {
 	return wrapped.updatedResources
 }
 
-func (wrapped *WrappedResourceListChangeSet) GetRemovedResources() map[string]pkgreconcile.ResourceCanceller {
+func (wrapped *WrappedResourceListChangeSet) GetRemovedResources() []pkgreconcile.ResourceCanceller {
 	return wrapped.removedResources
 }
 
@@ -92,60 +90,24 @@ func (changeset *WrappedResourceListChangeSet) Merge(other pkgreconcile.Resource
 		panic("wrappedresourcelistchangeset must be initialized before use")
 	}
 
-	mergedAddedSet := make(map[string]pkgreconcile.ResourceProvisioner)
-	mergedRemovedSet := make(map[string]pkgreconcile.ResourceCanceller)
-	mergedUpdatedSet := make(map[string]pkgreconcile.InterfaceChangeSet)
-	for k, v := range changeset.addedResources {
-		mergedAddedSet[k] = v
-	}
-	for k, v := range changeset.removedResources {
-		mergedRemovedSet[k] = v
-	}
-	for k, v := range changeset.updatedResources {
-		mergedUpdatedSet[k] = v
+	mergedAddedSet := make([]pkgreconcile.ResourceProvisioner, 0)
+	mergedRemovedSet := make([]pkgreconcile.ResourceCanceller, 0)
+	mergedUpdatedSet := make([]pkgreconcile.InterfaceChangeSet, 0)
+
+	mergedAddedSet = append(mergedAddedSet, changeset.addedResources...)
+	mergedRemovedSet = append(mergedRemovedSet, changeset.removedResources...)
+	mergedUpdatedSet = append(mergedUpdatedSet, changeset.updatedResources...)
+
+	for _, v := range other.GetAddedResources() {
+		mergedAddedSet = append(mergedAddedSet, v)
 	}
 
-	for k, v := range other.GetAddedResources() {
-		if curr, ok := mergedAddedSet[k]; ok {
-			if curr.GetType() == v.GetType() {
-				return nil, fmt.Errorf("duplicate added resource in changeset: %s", k)
-			}
-
-			lhs := mergedAddedSet[k]
-			delete(mergedAddedSet, k)
-			mergedAddedSet[lhs.GetType()+":"+k] = lhs
-			mergedAddedSet[v.GetType()+":"+k] = v
-		} else {
-			mergedAddedSet[k] = v
-		}
+	for _, v := range other.GetRemovedResources() {
+		mergedRemovedSet = append(mergedRemovedSet, v)
 	}
 
-	for k, v := range other.GetRemovedResources() {
-		if curr, ok := mergedRemovedSet[k]; ok {
-			if curr.GetType() == v.GetType() {
-				return nil, fmt.Errorf("duplicate removed resource in changeset: %s", k)
-			}
-			lhs := mergedRemovedSet[k]
-			delete(mergedRemovedSet, k)
-			mergedRemovedSet[lhs.GetType()+":"+k] = lhs
-			mergedRemovedSet[v.GetType()+":"+k] = v
-		} else {
-			mergedRemovedSet[k] = v
-		}
-	}
-
-	for k, v := range other.GetUpdatedResources() {
-		if curr, ok := mergedUpdatedSet[k]; ok {
-			if curr.GetType() == v.GetType() {
-				return nil, fmt.Errorf("duplicate updated resource in changeset: %s", k)
-			}
-			lhs := mergedUpdatedSet[k]
-			delete(mergedUpdatedSet, k)
-			mergedUpdatedSet[lhs.GetType()+":"+k] = lhs
-			mergedUpdatedSet[v.GetType()+":"+k] = v
-		} else {
-			mergedUpdatedSet[k] = v
-		}
+	for _, v := range other.GetUpdatedResources() {
+		mergedUpdatedSet = append(mergedUpdatedSet, v)
 	}
 
 	mergedChangeSet := new(WrappedResourceListChangeSet)

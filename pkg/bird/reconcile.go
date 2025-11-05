@@ -14,20 +14,20 @@ import (
 const ResourceTypeBirdEBGPEBGP = "bird-ebgp"
 
 type BirdEBGPRessourceListChangeSet struct {
-	addedResources   map[string]pkgreconcile.ResourceProvisioner
-	removedResources map[string]pkgreconcile.ResourceCanceller
-	updatedResources map[string]pkgreconcile.InterfaceChangeSet
+	addedResources   []pkgreconcile.ResourceProvisioner
+	removedResources []pkgreconcile.ResourceCanceller
+	updatedResources []pkgreconcile.InterfaceChangeSet
 }
 
-func (changeSet *BirdEBGPRessourceListChangeSet) GetAddedResources() map[string]pkgreconcile.ResourceProvisioner {
+func (changeSet *BirdEBGPRessourceListChangeSet) GetAddedResources() []pkgreconcile.ResourceProvisioner {
 	return changeSet.addedResources
 }
 
-func (changeSet *BirdEBGPRessourceListChangeSet) GetRemovedResources() map[string]pkgreconcile.ResourceCanceller {
+func (changeSet *BirdEBGPRessourceListChangeSet) GetRemovedResources() []pkgreconcile.ResourceCanceller {
 	return changeSet.removedResources
 }
 
-func (changeSet *BirdEBGPRessourceListChangeSet) GetUpdatedResources() map[string]pkgreconcile.InterfaceChangeSet {
+func (changeSet *BirdEBGPRessourceListChangeSet) GetUpdatedResources() []pkgreconcile.InterfaceChangeSet {
 	return changeSet.updatedResources
 }
 
@@ -84,15 +84,15 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 	}
 
 	changeSet := new(BirdEBGPRessourceListChangeSet)
-	changeSet.addedResources = make(map[string]pkgreconcile.ResourceProvisioner)
-	changeSet.removedResources = make(map[string]pkgreconcile.ResourceCanceller)
-	changeSet.updatedResources = make(map[string]pkgreconcile.InterfaceChangeSet)
+	changeSet.addedResources = make([]pkgreconcile.ResourceProvisioner, 0)
+	changeSet.removedResources = make([]pkgreconcile.ResourceCanceller, 0)
+	changeSet.updatedResources = make([]pkgreconcile.InterfaceChangeSet, 0)
 
 	commonResources := make(map[string]*BGPProtocol)
 
 	for name, res := range currResources {
 		if _, ok := specResources[name]; !ok && delete {
-			changeSet.removedResources[name] = &res
+			changeSet.removedResources = append(changeSet.removedResources, &res)
 		} else {
 			commonResources[name] = &res
 		}
@@ -100,7 +100,7 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 
 	for name, res := range specResources {
 		if _, ok := currResources[name]; !ok {
-			changeSet.addedResources[name] = &res
+			changeSet.addedResources = append(changeSet.addedResources, &res)
 		}
 	}
 
@@ -110,7 +110,7 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 			return nil, fmt.Errorf("failed to detect changes for protocol %s: %w", name, err)
 		}
 		if changes != nil && changes.HasUpdates() {
-			changeSet.updatedResources[name] = changes
+			changeSet.updatedResources = append(changeSet.updatedResources, changes)
 		}
 	}
 
