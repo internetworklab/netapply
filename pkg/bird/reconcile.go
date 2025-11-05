@@ -91,7 +91,7 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 	commonResources := make(map[string]*BGPProtocol)
 
 	for name, res := range currResources {
-		if _, ok := specResources[name]; !ok {
+		if _, ok := specResources[name]; !ok && delete {
 			changeSet.removedResources[name] = &res
 		} else {
 			commonResources[name] = &res

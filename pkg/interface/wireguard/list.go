@@ -16,8 +16,13 @@ func (wgCfgsList *WireGuardConfigurationList) GetType() string {
 }
 
 func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
+	err := pkgnetns.WithMultiNetnsHandle(ctx, wgCfgsList, func(h *netlink.Handle, netnsInfo *pkgnetns.NetNsInfo) error {
+		// todo
+		return nil
+	})
+
 	// todo
-	return nil, nil
+	return nil, err
 }
 
 // An WireGuardConfigurationList is also an implementation of MultiNetnsResource interface.

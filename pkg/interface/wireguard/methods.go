@@ -98,20 +98,15 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		return nil
 	}
 
-	netnsInfo, err := wgInterfaceChangeSet.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
 	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersToRemove != nil || wgInterfaceChangeSet.PeersToAdd != nil {
-		err := pkgnetns.WithNetnsWGCli(ctx, netnsInfo, func(wgCtrl *wgctrl.Client) error {
+		err := pkgnetns.WithNetnsWGCli(ctx, wgInterfaceChangeSet, func(wgCtrl *wgctrl.Client) error {
 			currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.InterfaceName)
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard device: %w", err)
 			}
 
 			if currentConfig == nil {
-				return fmt.Errorf("failed to get wireguard device: %s in %s", wgInterfaceChangeSet.InterfaceName, pkgutils.GetContainerDisplayName(netnsInfo))
+				return fmt.Errorf("failed to get wireguard device: %s", wgInterfaceChangeSet.InterfaceName)
 			}
 
 			if wgInterfaceChangeSet.PrivateKeyToSet != nil {
@@ -161,7 +156,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		}
 	}
 
-	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandle(ctx, wgInterfaceChangeSet, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard link: %w", err)
@@ -308,7 +303,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		return nil, fmt.Errorf("failed to get netns info: %w", err)
 	}
 
-	err = pkgnetns.WithNetnsWGCli(ctx, netnsInfo, func(wgCtrl *wgctrl.Client) error {
+	err = pkgnetns.WithNetnsWGCli(ctx, wgConf, func(wgCtrl *wgctrl.Client) error {
 		currentConfig, err := wgCtrl.Device(wgConf.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard device: %w", err)
@@ -346,7 +341,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		return nil, fmt.Errorf("failed to detect changes for wireguard config: %w", err)
 	}
 
-	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandle(ctx, wgConf, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(wgConf.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard link: %w", err)
@@ -549,12 +544,7 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 			}
 		}
 
-		netnsInfo, err := wgConf.GetNetNsInfo(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get netns info: %w", err)
-		}
-
-		return pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
+		return pkgnetns.WithNsHandle(ctx, wgConf, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(wgConf.Name)
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard link: %w", err)

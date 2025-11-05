@@ -29,25 +29,71 @@ func toNsHandle(netnsInfo *NetNsInfo) (*vnetns.NsHandle, error) {
 	return nil, nil
 }
 
-func WithNsHandle(ctx context.Context, netnsInfo *NetNsInfo, f func(h *netlink.Handle) error) error {
+func withHostNetnsHandle(f func(h *netlink.Handle) error) error {
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return fmt.Errorf("failed to create netlink handle: %w", err)
+	}
+	defer handle.Close()
+	return f(handle)
+}
+
+func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h *netlink.Handle, netnsInfo *NetNsInfo) error) error {
+	netnsInfos, err := res.GetNetNsInfos(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns infos: %w", err)
+	}
+
+	if len(netnsInfos) == 0 {
+		return withHostNetnsHandle(func(h *netlink.Handle) error {
+			return f(h, nil)
+		})
+	}
+
+	for _, netnsInfo := range netnsInfos {
+		nsHandle, err := toNsHandle(&netnsInfo)
+		if err != nil {
+			return fmt.Errorf("failed to get netns handle: %w", err)
+		}
+		err = func(nshandle *vnetns.NsHandle) error {
+			defer nshandle.Close()
+
+			handle, err := netlink.NewHandleAt(*nshandle)
+			if err != nil {
+				return fmt.Errorf("failed to create netlink handle: %w", err)
+			}
+			defer handle.Close()
+
+			return f(handle, &netnsInfo)
+		}(nsHandle)
+		if err != nil {
+			return fmt.Errorf("failed to run function: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func WithNsHandle(ctx context.Context, res NetNsAwareResource, f func(h *netlink.Handle) error) error {
+	netnsInfo, err := res.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
 	var nsHandle *vnetns.NsHandle = nil
 
-	nsHandle, err := toNsHandle(netnsInfo)
+	nsHandle, err = toNsHandle(netnsInfo)
 	if err != nil {
 		return fmt.Errorf("failed to get netns handle: %w", err)
 	}
+	defer nsHandle.Close()
 
 	if nsHandle != nil {
 		defer nsHandle.Close()
 	}
 
 	if nsHandle == nil {
-		handle, err := netlink.NewHandle()
-		if err != nil {
-			return fmt.Errorf("failed to create netlink handle: %w", err)
-		}
-		defer handle.Close()
-		return f(handle)
+		return withHostNetnsHandle(f)
 	}
 
 	handle, err := netlink.NewHandleAt(*nsHandle)
@@ -59,11 +105,16 @@ func WithNsHandle(ctx context.Context, netnsInfo *NetNsInfo, f func(h *netlink.H
 	return f(handle)
 }
 
-func WithNsHandleSafe(ctx context.Context, netnsInfo *NetNsInfo, f func(h *netlink.Handle) error) error {
-	return WithNsHandle(ctx, netnsInfo, f)
+func WithNsHandleSafe(ctx context.Context, res NetNsAwareResource, f func(h *netlink.Handle) error) error {
+	return WithNsHandle(ctx, res, f)
 }
 
-func WithNetnsWGCli(ctx context.Context, netnsInfo *NetNsInfo, hook func(wgCtrlCli *wgctrl.Client) error) error {
+func WithNetnsWGCli(ctx context.Context, res NetNsAwareResource, hook func(wgCtrlCli *wgctrl.Client) error) error {
+	netnsInfo, err := res.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+
 	var wgCtrlCli *wgctrl.Client
 
 	nsHandle, err := toNsHandle(netnsInfo)
