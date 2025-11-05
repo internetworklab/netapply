@@ -34,6 +34,7 @@ type WireGuardConfig struct {
 }
 
 type WireGuardInterfaceChangeSet struct {
+	origin        *WireGuardConfig
 	ContainerName *string
 	InterfaceName string
 

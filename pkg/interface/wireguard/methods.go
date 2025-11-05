@@ -89,8 +89,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	return wgInterfaceChangeSet.origin.GetNetNsInfo(ctx)
 }
 
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Context) error {
@@ -274,6 +273,7 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 
 	changeSet := new(WireGuardInterfaceChangeSet)
+	changeSet.origin = wgConf
 	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
 
