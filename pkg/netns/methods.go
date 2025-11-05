@@ -81,6 +81,50 @@ func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h 
 	return nil
 }
 
+func MoveLinkToNetns(ctx context.Context, res NetNsAwareResource, link netlink.Link) error {
+	var err error
+	var netnsInfo *NetNsInfo
+
+	netnsInfo, err = res.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info: %w", err)
+	}
+	nsHandle, err := netnsInfo.ToNsHandle()
+	if err != nil {
+		return fmt.Errorf("failed to get netns handle: %w", err)
+	}
+	defer nsHandle.Close()
+
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return fmt.Errorf("failed to create netlink handle: %w", err)
+	}
+
+	currentNsHandle, err := vnetns.Get()
+	if err != nil {
+		return fmt.Errorf("failed to get current netns handle: %w", err)
+	}
+
+	if !currentNsHandle.Equal(nsHandle) {
+		if err := handle.LinkSetNsFd(link, int(nsHandle)); err != nil {
+			return fmt.Errorf("failed to move link to netns: %w", err)
+		}
+		name := link.Attrs().Name
+		err = WithNsHandle(ctx, res, func(h *netlink.Handle) error {
+			l, _ := h.LinkByName(name)
+			if l == nil {
+				return fmt.Errorf("failed to get link by name: %w", err)
+			}
+			if err := h.LinkSetUp(l); err != nil {
+				return fmt.Errorf("failed to set link up: %w", err)
+			}
+			return nil
+		})
+
+	}
+	return err
+}
+
 func WithNsHandle(ctx context.Context, res NetNsAwareResource, f func(h *netlink.Handle) error) error {
 	netnsInfo, err := res.GetNetNsInfo(ctx)
 	if err != nil {

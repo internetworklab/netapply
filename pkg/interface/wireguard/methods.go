@@ -504,81 +504,73 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 	}
 
-	return pkgnetns.WithNsHandle(ctx, nil, func(handle *netlink.Handle) error {
-		wgLink := &netlink.Wireguard{
-			LinkAttrs: netlink.LinkAttrs{
-				Name: wgConf.Name,
-			},
-		}
+	wgLink := &netlink.Wireguard{
+		LinkAttrs: netlink.LinkAttrs{
+			Name: wgConf.Name,
+		},
+	}
 
-		if wgConf.MTU != nil {
-			wgLink.MTU = *wgConf.MTU
-		}
+	if wgConf.MTU != nil {
+		wgLink.MTU = *wgConf.MTU
+	}
 
-		var link netlink.Link = wgLink
-		err := handle.LinkAdd(link)
+	handle, err := netlink.NewHandle()
+	if err != nil {
+		return fmt.Errorf("failed to create netlink handle: %w", err)
+	}
+	defer handle.Close()
+
+	var link netlink.Link = wgLink
+	err = handle.LinkAdd(link)
+	if err != nil {
+		log.Printf("failed to add wireguard link %s: %v", wgConf.Name, err)
+		link, err = handle.LinkByName(wgConf.Name)
 		if err != nil {
-			log.Printf("failed to add wireguard link %s: %v", wgConf.Name, err)
-			link, err = handle.LinkByName(wgConf.Name)
-			if err != nil {
-				return fmt.Errorf("failed to get wireguard link %s: %w", wgConf.Name, err)
-			}
+			return fmt.Errorf("failed to get wireguard link %s: %w", wgConf.Name, err)
 		}
+	}
 
-		wgCtrl, err := wgctrl.New()
+	wgCtrl, err := wgctrl.New()
+	if err != nil {
+		return fmt.Errorf("failed to new a wireguard controller: %w", err)
+	}
+	defer wgCtrl.Close()
+
+	if err := wgCtrl.ConfigureDevice(wgConf.Name, *wgtypesConf); err != nil {
+		return fmt.Errorf("failed to configure wireguard device: %w", err)
+	}
+
+	if err := handle.LinkSetUp(link); err != nil {
+		return fmt.Errorf("failed to set wireguard link up: %w", err)
+	}
+
+	err = pkgnetns.MoveLinkToNetns(ctx, wgConf, link)
+	if err != nil {
+		return fmt.Errorf("failed to move wireguard link to netns: %w", err)
+	}
+
+	return pkgnetns.WithNsHandle(ctx, wgConf, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(wgConf.Name)
 		if err != nil {
-			return fmt.Errorf("failed to create wireguard controller: %w", err)
-		}
-		defer wgCtrl.Close()
-
-		if err := wgCtrl.ConfigureDevice(wgConf.Name, *wgtypesConf); err != nil {
-			return fmt.Errorf("failed to configure wireguard device: %w", err)
+			return fmt.Errorf("failed to get wireguard link: %w", err)
 		}
 
 		if err := handle.LinkSetUp(link); err != nil {
 			return fmt.Errorf("failed to set wireguard link up: %w", err)
 		}
 
-		if wgConf.ContainerName != nil {
-			cli, err := pkgutils.DockerCliFromCtx(ctx)
+		for _, peer := range wgConf.Addresses {
+			nlAddr, err := peer.ToNetlinkAddr()
 			if err != nil {
-				return fmt.Errorf("failed to get docker cli from context: %w", err)
+				return fmt.Errorf("failed to convert address to netlink addr: %w", err)
 			}
-
-			pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *wgConf.ContainerName)
+			err = handle.AddrAdd(link, nlAddr)
 			if err != nil {
-				return fmt.Errorf("failed to get container ns pid: %w", err)
-			}
-			if pidPtr != nil {
-				if err := netlink.LinkSetNsPid(link, int(*pidPtr)); err != nil {
-					return fmt.Errorf("failed to set wireguard link %s to ns pid %d: %w", wgConf.Name, *pidPtr, err)
-				}
+				return fmt.Errorf("failed to add address to wireguard link: %w", err)
 			}
 		}
 
-		return pkgnetns.WithNsHandle(ctx, wgConf, func(handle *netlink.Handle) error {
-			link, err := handle.LinkByName(wgConf.Name)
-			if err != nil {
-				return fmt.Errorf("failed to get wireguard link: %w", err)
-			}
-
-			if err := handle.LinkSetUp(link); err != nil {
-				return fmt.Errorf("failed to set wireguard link up: %w", err)
-			}
-
-			for _, peer := range wgConf.Addresses {
-				nlAddr, err := peer.ToNetlinkAddr()
-				if err != nil {
-					return fmt.Errorf("failed to convert address to netlink addr: %w", err)
-				}
-				err = handle.AddrAdd(link, nlAddr)
-				if err != nil {
-					return fmt.Errorf("failed to add address to wireguard link: %w", err)
-				}
-			}
-
-			return nil
-		})
+		return nil
 	})
 }
 
