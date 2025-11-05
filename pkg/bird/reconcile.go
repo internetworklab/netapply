@@ -40,9 +40,13 @@ func (changeSet *BirdEBGPRessourceListChangeSet) HasUpdates() bool {
 }
 
 func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
-	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
+	directory := bgpConfigList.TargetConfigDirectory
+	if directory == "" {
+		return nil, fmt.Errorf("bird bgp config directory is not set")
+	}
+	reloaderShellCommand := bgpConfigList.ReloaderShellCommand
+	if reloaderShellCommand == "" {
+		return nil, fmt.Errorf("bird bgp reloader shell command is not set")
 	}
 
 	files, err := os.ReadDir(directory)
@@ -62,12 +66,16 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse config file %s: %w", filepath.Join(directory, file.Name()), err)
 		}
+		cfg.Reloader = reloaderShellCommand
+		cfg.ConfigDirectory = directory
 
 		currResources[cfg.Name] = *cfg
 	}
 
 	specResources := make(map[string]BGPProtocol)
 	for _, proto := range bgpConfigList.EBGPProtocols {
+		proto.Reloader = reloaderShellCommand
+		proto.ConfigDirectory = directory
 		specResources[proto.Name] = proto
 	}
 
@@ -136,9 +144,9 @@ func (changeSet *BirdEBGPChangeSet) Apply(ctx context.Context) error {
 		return fmt.Errorf("failed to generate config for protocol %s: %w", changeSet.resource.Name, err)
 	}
 
-	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
+	directory := changeSet.resource.ConfigDirectory
+	if directory == "" {
+		return fmt.Errorf("bird bgp config directory is not set")
 	}
 
 	err = os.WriteFile(filepath.Join(directory, fmt.Sprintf("%s.conf", changeSet.resource.Name)), []byte(config), 0644)
@@ -179,15 +187,18 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to generate config for protocol %s: %w", proto.Name, err)
 	}
 
-	fullpath := proto.ToFilePath(ctx)
+	fullpath, err := proto.ToFilePath()
+	if err != nil {
+		return fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
+	}
 	err = os.WriteFile(fullpath, []byte(config), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write config to file %s: %w", fullpath, err)
 	}
 
-	reloaderShellCommand, err := BirdBGPReloaderShellCommandFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get bird bgp reloader shell command from context: %w", err)
+	reloaderShellCommand := proto.Reloader
+	if reloaderShellCommand == "" {
+		return fmt.Errorf("bird bgp reloader shell command is not set")
 	}
 
 	command := exec.Command(reloaderShellCommand)
@@ -198,9 +209,9 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 }
 
 func (proto *BGPProtocol) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
-	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
+	directory := proto.ConfigDirectory
+	if directory == "" {
+		return nil, fmt.Errorf("bird bgp config directory is not set")
 	}
 
 	config, err := FromFile(filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)))
@@ -267,13 +278,13 @@ func (proto *BGPProtocol) GetInterfaceName() string {
 }
 
 func (proto *BGPProtocol) CheckExist(ctx context.Context) (bool, error) {
-	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
+	directory := proto.ConfigDirectory
+	if directory == "" {
+		return false, fmt.Errorf("bird bgp config directory is not set")
 	}
 
 	baseName := fmt.Sprintf("%s.conf", proto.Name)
-	_, err = os.Stat(filepath.Join(directory, baseName))
+	_, err := os.Stat(filepath.Join(directory, baseName))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -292,19 +303,19 @@ func (proto *BGPProtocol) IsSoftDeleted() bool {
 }
 
 func (proto *BGPProtocol) Cancel(ctx context.Context) error {
-	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
+	fullpath, err := proto.ToFilePath()
 	if err != nil {
-		return fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
+		return fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
 
-	err = os.Remove(filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)))
+	err = os.Remove(fullpath)
 	if err != nil {
-		return fmt.Errorf("failed to remove config file %s: %w", filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)), err)
+		return fmt.Errorf("failed to remove config file %s: %w", fullpath, err)
 	}
 
-	reloaderShellCommand, err := BirdBGPReloaderShellCommandFromCtx(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get bird bgp reloader shell command from context: %w", err)
+	reloaderShellCommand := proto.Reloader
+	if reloaderShellCommand == "" {
+		return fmt.Errorf("bird bgp reloader shell command is not set")
 	}
 
 	command := exec.Command(reloaderShellCommand)

@@ -25,14 +25,12 @@ type BGPProtocol struct {
 
 	// To support soft-deletion.
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
+
+	Reloader        string `yaml:"-" json:"-" bson:"-"`
+	ConfigDirectory string `yaml:"-" json:"-" bson:"-"`
 }
 
 const patternWildCard = "*"
 const patternAnySequence = "**"
-
-type ContextKey string
-
-const CtxKeyBirdBGPConfigDirectory = ContextKey("bird_bgp_config_directory")
-const CtxKeyBirdBGPReloaderShellCommand = ContextKey("bird_bgp_reloader_shell_command")
 
 const ConfigExtension = ".conf"

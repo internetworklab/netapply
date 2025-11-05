@@ -1,7 +1,6 @@
 package bird
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -267,10 +266,11 @@ func (proto *BGPProtocol) ToBaseName() string {
 	return fmt.Sprintf("%s.conf", proto.Name)
 }
 
-func (proto *BGPProtocol) ToFilePath(ctx context.Context) string {
-	directory, err := BirdBGPConfigDirectoryFromCtx(ctx)
-	if err != nil {
-		return ""
+func (proto *BGPProtocol) ToFilePath() (string, error) {
+	directory := proto.ConfigDirectory
+	if directory == "" {
+		return "", fmt.Errorf("bird bgp config directory is not set")
 	}
-	return filepath.Join(directory, proto.ToBaseName())
+	baseName := proto.ToBaseName()
+	return filepath.Join(directory, baseName), nil
 }
