@@ -70,22 +70,21 @@ func getOrderByType(ty string) int16 {
 }
 
 type WrappedResourceListChangeSet struct {
-	original         pkgreconcile.ResourceListChangeSet
 	addedResources   map[string]pkgreconcile.ResourceProvisioner
 	removedResources map[string]pkgreconcile.ResourceCanceller
 	updatedResources map[string]pkgreconcile.InterfaceChangeSet
 }
 
 func (wrapped *WrappedResourceListChangeSet) GetAddedResources() map[string]pkgreconcile.ResourceProvisioner {
-	return wrapped.original.GetAddedResources()
+	return wrapped.addedResources
 }
 
 func (wrapped *WrappedResourceListChangeSet) GetUpdatedResources() map[string]pkgreconcile.InterfaceChangeSet {
-	return wrapped.original.GetUpdatedResources()
+	return wrapped.updatedResources
 }
 
 func (wrapped *WrappedResourceListChangeSet) GetRemovedResources() map[string]pkgreconcile.ResourceCanceller {
-	return wrapped.original.GetRemovedResources()
+	return wrapped.removedResources
 }
 
 func (changeset *WrappedResourceListChangeSet) Merge(other pkgreconcile.ResourceListChangeSet) (*WrappedResourceListChangeSet, error) {

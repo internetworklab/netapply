@@ -45,7 +45,7 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 		return nil, fmt.Errorf("bird bgp config directory is not set")
 	}
 	reloaderShellCommand := bgpConfigList.ReloaderShellCommand
-	if reloaderShellCommand == "" {
+	if reloaderShellCommand == nil {
 		return nil, fmt.Errorf("bird bgp reloader shell command is not set")
 	}
 
@@ -193,11 +193,11 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 	}
 
 	reloaderShellCommand := proto.Reloader
-	if reloaderShellCommand == "" {
+	if reloaderShellCommand == nil {
 		return fmt.Errorf("bird bgp reloader shell command is not set")
 	}
 
-	command := exec.Command(reloaderShellCommand)
+	command := exec.Command(reloaderShellCommand[0], reloaderShellCommand[1:]...)
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("failed to run reloader shell command: %w", err)
 	}
@@ -308,11 +308,11 @@ func (proto *BGPProtocol) Cancel(ctx context.Context) error {
 	}
 
 	reloaderShellCommand := proto.Reloader
-	if reloaderShellCommand == "" {
+	if reloaderShellCommand == nil {
 		return fmt.Errorf("bird bgp reloader shell command is not set")
 	}
 
-	command := exec.Command(reloaderShellCommand)
+	command := exec.Command(reloaderShellCommand[0], reloaderShellCommand[1:]...)
 	if err := command.Run(); err != nil {
 		return fmt.Errorf("failed to run reloader shell command: %w", err)
 	}

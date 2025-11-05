@@ -1,7 +1,7 @@
 package bird
 
 type BirdBGPConfigurationList struct {
-	ReloaderShellCommand  string        `yaml:"reloader_shell_command" json:"reloader_shell_command" bson:"reloader_shell_command"`
+	ReloaderShellCommand  []string      `yaml:"reloader_shell_command" json:"reloader_shell_command" bson:"reloader_shell_command"`
 	TargetConfigDirectory string        `yaml:"target_config_directory" json:"target_config_directory" bson:"target_config_directory"`
 	EBGPProtocols         []BGPProtocol `yaml:"ebgp_protocols" json:"ebgp_protocols" bson:"ebgp_protocols"`
 }
@@ -26,8 +26,8 @@ type BGPProtocol struct {
 	// To support soft-deletion.
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
 
-	Reloader        string `yaml:"-" json:"-" bson:"-"`
-	ConfigDirectory string `yaml:"-" json:"-" bson:"-"`
+	Reloader        []string `yaml:"-" json:"-" bson:"-"`
+	ConfigDirectory string   `yaml:"-" json:"-" bson:"-"`
 }
 
 const patternWildCard = "*"
