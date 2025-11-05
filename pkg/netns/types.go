@@ -4,6 +4,10 @@ import (
 	"context"
 )
 
+// A NetNsInfo is different from a NsHandle object in vishvananda/netns package, the later is a handle that
+// usually points to a opened file descriptor (hence the name 'handle'), whilst the former is simply a struct
+// that describes something.
+// To say, a NsHandle is more or less a file descriptor that points to a opened file handle of some process.
 type NetNsInfo struct {
 	Pid       *int
 	NetNsPath *string

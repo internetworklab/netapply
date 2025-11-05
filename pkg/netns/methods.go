@@ -3,30 +3,37 @@ package netns
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/vishvananda/netlink"
 	vnetns "github.com/vishvananda/netns"
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
-func toNsHandle(netnsInfo *NetNsInfo) (*vnetns.NsHandle, error) {
-	if netnsInfo != nil {
-		if netnsInfo.Pid != nil {
-			pidHandle, err := vnetns.GetFromPid(*netnsInfo.Pid)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get netns from pid: %w", err)
-			}
-			return &pidHandle, nil
-		} else if netnsInfo.NetNsPath != nil {
-			pathNsHandle, err := vnetns.GetFromPath(*netnsInfo.NetNsPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to get netns from path: %w", err)
-			}
-			return &pathNsHandle, nil
-		}
+func (netnsInfo *NetNsInfo) ToNsHandle() (vnetns.NsHandle, error) {
+	if netnsInfo == nil {
+		return vnetns.Get()
 	}
-	return nil, nil
+
+	if netnsInfo.Pid != nil {
+		return vnetns.GetFromPid(*netnsInfo.Pid)
+	}
+
+	if netnsInfo.NetNsPath != nil {
+		return vnetns.GetFromPath(*netnsInfo.NetNsPath)
+	}
+
+	return -1, fmt.Errorf("invalid netns info, no idea know how to obtain a netns handle from it")
+}
+
+// returns a string which uniquely identifies the namespace associated with the network handle.
+// when working with multi-netns reconciliation, one needs such a key to uniquely identify the namespace where the resource is associated with.
+func (netnsInfo *NetNsInfo) ToNetnsKey() (string, error) {
+	nsHandle, err := netnsInfo.ToNsHandle()
+	if err != nil {
+		return "", fmt.Errorf("failed to get netns unique key: %w", err)
+	}
+
+	return nsHandle.UniqueId(), nil
 }
 
 func withHostNetnsHandle(f func(h *netlink.Handle) error) error {
@@ -51,14 +58,14 @@ func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h 
 	}
 
 	for _, netnsInfo := range netnsInfos {
-		nsHandle, err := toNsHandle(&netnsInfo)
+		nsHandle, err := netnsInfo.ToNsHandle()
 		if err != nil {
 			return fmt.Errorf("failed to get netns handle: %w", err)
 		}
-		err = func(nshandle *vnetns.NsHandle) error {
+		err = func(nshandle vnetns.NsHandle) error {
 			defer nshandle.Close()
 
-			handle, err := netlink.NewHandleAt(*nshandle)
+			handle, err := netlink.NewHandleAt(nshandle)
 			if err != nil {
 				return fmt.Errorf("failed to create netlink handle: %w", err)
 			}
@@ -80,23 +87,13 @@ func WithNsHandle(ctx context.Context, res NetNsAwareResource, f func(h *netlink
 		return fmt.Errorf("failed to get netns info: %w", err)
 	}
 
-	var nsHandle *vnetns.NsHandle = nil
-
-	nsHandle, err = toNsHandle(netnsInfo)
+	nsHandle, err := netnsInfo.ToNsHandle()
 	if err != nil {
 		return fmt.Errorf("failed to get netns handle: %w", err)
 	}
 	defer nsHandle.Close()
 
-	if nsHandle != nil {
-		defer nsHandle.Close()
-	}
-
-	if nsHandle == nil {
-		return withHostNetnsHandle(f)
-	}
-
-	handle, err := netlink.NewHandleAt(*nsHandle)
+	handle, err := netlink.NewHandleAt(nsHandle)
 	if err != nil {
 		return fmt.Errorf("failed to create netlink handle: %w", err)
 	}
@@ -117,30 +114,19 @@ func WithNetnsWGCli(ctx context.Context, res NetNsAwareResource, hook func(wgCtr
 
 	var wgCtrlCli *wgctrl.Client
 
-	nsHandle, err := toNsHandle(netnsInfo)
+	nsHandle, err := netnsInfo.ToNsHandle()
 	if err != nil {
 		return fmt.Errorf("failed to get netns handle: %w", err)
 	}
-
-	if nsHandle == nil {
-		wgCtrlCli, err = wgctrl.New()
-		if err != nil {
-			return fmt.Errorf("failed to get wgctrl client: %s", err.Error())
-		}
-		defer wgCtrlCli.Close()
-		return hook(wgCtrlCli)
-	}
-
 	defer nsHandle.Close()
 
-	hostPid := os.Getpid()
-	hostNsHandle, err := vnetns.GetFromPid(hostPid)
+	hostNsHandle, err := vnetns.Get()
 	if err != nil {
-		return fmt.Errorf("failed to get host netns: %s", err.Error())
+		return fmt.Errorf("failed to get host netns handle: %w", err)
 	}
 	defer hostNsHandle.Close()
 
-	vnetns.Set(*nsHandle)
+	vnetns.Set(nsHandle)
 	defer vnetns.Set(hostNsHandle)
 
 	wgCtrlCli, err = wgctrl.New()
