@@ -80,15 +80,15 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 	}
 
 	changeSet := new(BirdEBGPRessourceListChangeSet)
-	addedResources := make(map[string]pkgreconcile.ResourceProvisioner)
-	removedResources := make(map[string]pkgreconcile.ResourceCanceller)
-	updatedResources := make(map[string]pkgreconcile.InterfaceChangeSet)
+	changeSet.addedResources = make(map[string]pkgreconcile.ResourceProvisioner)
+	changeSet.removedResources = make(map[string]pkgreconcile.ResourceCanceller)
+	changeSet.updatedResources = make(map[string]pkgreconcile.InterfaceChangeSet)
 
 	commonResources := make(map[string]*BGPProtocol)
 
 	for name, res := range currResources {
 		if _, ok := specResources[name]; !ok {
-			removedResources[name] = &res
+			changeSet.removedResources[name] = &res
 		} else {
 			commonResources[name] = &res
 		}
@@ -96,23 +96,19 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 
 	for name, res := range specResources {
 		if _, ok := currResources[name]; !ok {
-			addedResources[name] = &res
+			changeSet.addedResources[name] = &res
 		}
 	}
 
 	for name, res := range commonResources {
-		changeSet, err := res.DetectChanges(ctx)
+		changes, err := res.DetectChanges(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to detect changes for protocol %s: %w", name, err)
 		}
-		if changeSet != nil && changeSet.HasUpdates() {
-			updatedResources[name] = changeSet
+		if changes != nil && changes.HasUpdates() {
+			changeSet.updatedResources[name] = changes
 		}
 	}
-
-	changeSet.addedResources = addedResources
-	changeSet.removedResources = removedResources
-	changeSet.updatedResources = updatedResources
 
 	return changeSet, nil
 }
@@ -144,14 +140,14 @@ func (changeSet *BirdEBGPChangeSet) Apply(ctx context.Context) error {
 		return fmt.Errorf("failed to generate config for protocol %s: %w", changeSet.resource.Name, err)
 	}
 
-	directory := changeSet.resource.ConfigDirectory
-	if directory == "" {
-		return fmt.Errorf("bird bgp config directory is not set")
+	fullpath, err := changeSet.resource.ToFilePath()
+	if err != nil {
+		return fmt.Errorf("failed to get file path for protocol %s: %w", changeSet.resource.Name, err)
 	}
 
-	err = os.WriteFile(filepath.Join(directory, fmt.Sprintf("%s.conf", changeSet.resource.Name)), []byte(config), 0644)
+	err = os.WriteFile(fullpath, []byte(config), 0644)
 	if err != nil {
-		return fmt.Errorf("failed to write config to file %s: %w", filepath.Join(directory, fmt.Sprintf("%s.conf", changeSet.resource.Name)), err)
+		return fmt.Errorf("failed to write config to file %s: %w", fullpath, err)
 	}
 
 	return nil
@@ -209,14 +205,14 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 }
 
 func (proto *BGPProtocol) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
-	directory := proto.ConfigDirectory
-	if directory == "" {
-		return nil, fmt.Errorf("bird bgp config directory is not set")
+	fullpath, err := proto.ToFilePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
 
-	config, err := FromFile(filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)))
+	config, err := FromFile(fullpath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse config file %s: %w", filepath.Join(directory, fmt.Sprintf("%s.conf", proto.Name)), err)
+		return nil, fmt.Errorf("failed to parse config file %s: %w", fullpath, err)
 	}
 
 	changeSet := new(BirdEBGPChangeSet)
@@ -278,18 +274,16 @@ func (proto *BGPProtocol) GetInterfaceName() string {
 }
 
 func (proto *BGPProtocol) CheckExist(ctx context.Context) (bool, error) {
-	directory := proto.ConfigDirectory
-	if directory == "" {
-		return false, fmt.Errorf("bird bgp config directory is not set")
+	fullpath, err := proto.ToFilePath()
+	if err != nil {
+		return false, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
-
-	baseName := fmt.Sprintf("%s.conf", proto.Name)
-	_, err := os.Stat(filepath.Join(directory, baseName))
+	_, err = os.Stat(fullpath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
-		return false, fmt.Errorf("failed to stat file %s: %w", baseName, err)
+		return false, fmt.Errorf("failed to stat file %s: %w", fullpath, err)
 	}
 	return true, nil
 }
