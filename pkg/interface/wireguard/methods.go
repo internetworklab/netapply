@@ -846,16 +846,16 @@ func (wgConfig *WireGuardConfig) GetResourceID() (string, error) {
 // A WireGuardConfig is also an implementation of NetNsAwareResource interface
 func (wgConfig *WireGuardConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
 	if wgConfig.ContainerName == nil || *wgConfig.ContainerName == "" {
-		cli, err := pkgutils.DockerCliFromCtx(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
-		}
-		pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *wgConfig.ContainerName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get container ns pid: %w", err)
-		}
-		return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
+		return nil, nil
 	}
 
-	return nil, nil
+	cli, err := pkgutils.DockerCliFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+	}
+	pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *wgConfig.ContainerName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container ns pid: %w", err)
+	}
+	return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
 }
