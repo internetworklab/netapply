@@ -4,7 +4,7 @@ WORKDIR /app/netapply
 
 COPY . .
 
-RUN go build -o bin/netapply ./main.go
+RUN go build -o bin/netapply ./cmd/netapply
 
 ENTRYPOINT ["/app/netapply/bin/netapply"]
 

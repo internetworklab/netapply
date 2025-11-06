@@ -1,0 +1,21 @@
+networks:
+  mongo:
+    external: true
+volumes:
+  shared-socks:
+    external: true
+services:
+  netapply-collection:
+    container_name: netapply-collection
+    hostname: netapply-collection-vie1
+    image: netapply:latest
+    pull_policy: never
+    networks:
+      - mongo
+    restart: unless-stopped
+    volumes:
+      - shared-socks:/shared-socks
+    command:
+      - serve-collection
+      - "--bind-unix-socket=/shared-socks/netapply-collections.sock"
+      - "--mongo-dburi=mongodb://mongo:27017"
