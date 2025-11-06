@@ -1,4 +1,17 @@
+FROM golang:1.23.5-bookworm AS builder-basis
+
+WORKDIR /app/netapply
+
+COPY go.mod go.mod
+COPY go.sum go.sum
+
+RUN go mod download -x
+
+
 FROM golang:1.23.5-bookworm AS builder
+
+
+COPY --from=builder-basis /go/pkg /go/pkg
 
 WORKDIR /app/netapply
 

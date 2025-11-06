@@ -1,0 +1,21 @@
+volumes:
+  shared-socks:
+    external: true
+services:
+  netapply-local:
+    container_name: netapply-local
+    hostname: netapply-local-vie1
+    image: netapply:latest
+    pull_policy: never
+    ipc: host
+    pid: host
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - shared-socks:/shared-socks
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    privileged: true
+    command:
+      - serve-local
+      - "--node=vie1"
+      - "--bind-unix-socket=/shared-socks/netapply-local.sock"
