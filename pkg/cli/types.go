@@ -1,8 +1,6 @@
 package cli
 
-// CLI structure for Kong
 type CLI struct {
-	Up              UpCmd              `cmd:"" help:"Apply the specified configuration"`
 	ServeCollection ServeCollectionCmd `cmd:"" help:"Serving as a collection manager"`
 	ServeLocal      ServeLocalCmd      `cmd:"" help:"Serving as a local configurator (node agent)"`
 	Version         VersionCmd         `cmd:"" help:"Show the version of the program"`
@@ -14,12 +12,6 @@ type CLI struct {
 	HTTPBasicAuthUsername string `help:"Username for HTTP basic authentication"`
 	HTTPBasicAuthPassword string `help:"Password for HTTP basic authentication"`
 	VersionMetadata       map[string]string
-}
-
-type UpCmd struct {
-	Delete           bool   `help:"To delete the resources not presented in the configuration"`
-	Config           string `required:"" help:"Path to the configuration file"`
-	OutputChangeLogs string `help:"Outputs what's just been updated to a file, in YAML format" type:"path"`
 }
 
 type ServeLocalCmd struct {
