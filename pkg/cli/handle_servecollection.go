@@ -13,9 +13,12 @@ import (
 
 	pkghandler "github.com/internetworklab/netapply/pkg/handler"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
+func (cmd *ServeCollectionCmd) Run(globalCLIConfig *CLI) error {
 	ctx, err := initCtx(context.Background(), globalCLIConfig)
 	if err != nil {
 		return fmt.Errorf("failed to initialize context: %w", err)
@@ -42,8 +45,24 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 		}
 	}()
 
+	uri := cmd.MongoDBURI
+	envMongoDBURI := os.Getenv("MONGODB_URI")
+	if envMongoDBURI != "" {
+		uri = envMongoDBURI
+	}
+	if uri == "" {
+		return fmt.Errorf("mongodb uri is not set")
+	}
+
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	if err != nil {
+		return fmt.Errorf("failed to connect to mongodb: %w", err)
+	}
+
+	defer client.Disconnect(context.TODO())
+
 	muxer := http.NewServeMux()
-	muxer.Handle("/resources/", pkghandler.NewResourceHandler(ctx))
+	muxer.Handle("/collections/", pkghandler.NewCollectionHandler(client))
 	muxer.Handle("/basicinfo/", pkghandler.NewBasicInfoHandler(ctx))
 
 	server := &http.Server{
@@ -52,7 +71,7 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 
 	serverErrCh := make(chan error)
 	go func() {
-		log.Printf("Serving as a local configurator (node agent) on %s\n", cmd.BindUnixSocket)
+		log.Printf("Serving as a collection manager on %s\n", cmd.BindUnixSocket)
 		serverErrCh <- server.Serve(listener)
 	}()
 

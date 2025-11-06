@@ -2,9 +2,10 @@ package cli
 
 // CLI structure for Kong
 type CLI struct {
-	Up         UpCmd         `cmd:"" help:"Apply the specified configuration"`
-	ServeLocal ServeLocalCmd `cmd:"" help:"Serving as a long-running local configurator process"`
-	Version    VersionCmd    `cmd:"" help:"Show the version of the program"`
+	Up              UpCmd              `cmd:"" help:"Apply the specified configuration"`
+	ServeCollection ServeCollectionCmd `cmd:"" help:"Serving as a collection manager"`
+	ServeLocal      ServeLocalCmd      `cmd:"" help:"Serving as a local configurator (node agent)"`
+	Version         VersionCmd         `cmd:"" help:"Show the version of the program"`
 
 	Node                  string `help:"Name of the node to start" short:"n"`
 	TLSTrustedCACert      string `help:"Path to trusted CA certificate file for TLS" type:"path"`
@@ -23,5 +24,9 @@ type UpCmd struct {
 
 type ServeLocalCmd struct {
 	BindUnixSocket string `help:"Path to the unix socket to bind" type:"path"`
-	ServiceName    string `required:"" help:"Name of the service" short:"s"`
+}
+
+type ServeCollectionCmd struct {
+	MongoDBURI     string `help:"URI of the MongoDB to connect to" short:"m"`
+	BindUnixSocket string `help:"Path to the unix socket to bind" type:"path"`
 }
