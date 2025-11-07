@@ -30,10 +30,6 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetChangedItems() map[s
 	return changedItems
 }
 
-func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetContainerName() *string {
-	return wgInterfaceChangeSet.ContainerName
-}
-
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetInterfaceName() string {
 	return wgInterfaceChangeSet.InterfaceName
 }
@@ -197,10 +193,6 @@ func (wgConf *WireGuardConfig) GetInterfaceName() string {
 	return wgConf.Name
 }
 
-func (wgConf *WireGuardConfig) GetContainerName() *string {
-	return wgConf.ContainerName
-}
-
 func (wgConf *WireGuardConfig) GetType() string {
 	return new(netlink.Wireguard).Type()
 }
@@ -286,7 +278,6 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 
 	changeSet := new(WireGuardInterfaceChangeSet)
 	changeSet.origin = wgConf
-	changeSet.ContainerName = wgConf.ContainerName
 	changeSet.InterfaceName = wgConf.Name
 
 	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
@@ -845,17 +836,5 @@ func (wgConfig *WireGuardConfig) GetResourceID() (string, error) {
 
 // A WireGuardConfig is also an implementation of NetNsAwareResource interface
 func (wgConfig *WireGuardConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	if wgConfig.ContainerName == nil || *wgConfig.ContainerName == "" {
-		return nil, nil
-	}
-
-	cli, err := pkgutils.DockerCliFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
-	}
-	pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *wgConfig.ContainerName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get container ns pid: %w", err)
-	}
-	return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
+	return wgConfig.ContainerInfo.GetNetNsInfo(ctx)
 }
