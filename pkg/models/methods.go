@@ -98,16 +98,16 @@ func (changeset *WrappedResourceListChangeSet) Merge(other pkgreconcile.Resource
 	mergedRemovedSet = append(mergedRemovedSet, changeset.removedResources...)
 	mergedUpdatedSet = append(mergedUpdatedSet, changeset.updatedResources...)
 
-	for _, v := range other.GetAddedResources() {
-		mergedAddedSet = append(mergedAddedSet, v)
+	if resources := other.GetAddedResources(); resources != nil {
+		mergedAddedSet = append(mergedAddedSet, resources...)
 	}
 
-	for _, v := range other.GetRemovedResources() {
-		mergedRemovedSet = append(mergedRemovedSet, v)
+	if resources := other.GetRemovedResources(); resources != nil {
+		mergedRemovedSet = append(mergedRemovedSet, resources...)
 	}
 
-	for _, v := range other.GetUpdatedResources() {
-		mergedUpdatedSet = append(mergedUpdatedSet, v)
+	if resources := other.GetUpdatedResources(); resources != nil {
+		mergedUpdatedSet = append(mergedUpdatedSet, resources...)
 	}
 
 	mergedChangeSet := new(WrappedResourceListChangeSet)
@@ -129,8 +129,9 @@ func (changeset *WrappedResourceListChangeSet) HasUpdates() bool {
 func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
 
 	reconcileTargets := make([]pkgreconcile.ResourceProvisionersList, 0)
-	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.BirdBGP)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VRF)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.WireGuard)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.BirdBGP)
 
 	mergedChangeSet := new(WrappedResourceListChangeSet)
 

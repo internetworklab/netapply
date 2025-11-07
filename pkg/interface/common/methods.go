@@ -1,8 +1,12 @@
 package common
 
 import (
+	"context"
 	"fmt"
 	"net"
+
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 
 	"github.com/vishvananda/netlink"
 )
@@ -137,4 +141,34 @@ func CompareSpecAddrsAgainstActualAddrs(specAddrConfigs []AddressConfig, link ne
 		AddressesToAdd:    added,
 		AddressesToRemove: removed,
 	}, nil
+}
+
+func (containerInfo *ContainerInfo) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	if containerInfo == nil {
+		return nil, fmt.Errorf("container info is nil")
+	}
+
+	if containerInfo.Docker != nil {
+		cli, err := pkgutils.DockerCliFromCtx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+		}
+
+		pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *containerInfo.Docker)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get container ns pid: %w", err)
+		}
+
+		return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
+	}
+
+	if containerInfo.Podman != nil {
+		return nil, fmt.Errorf("podman is not supported yet")
+	}
+
+	if containerInfo.NetnsPath != nil {
+		return &pkgnetns.NetNsInfo{NetNsPath: containerInfo.NetnsPath}, nil
+	}
+
+	return nil, fmt.Errorf("no container info found")
 }

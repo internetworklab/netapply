@@ -150,31 +150,8 @@ func (vrfConfig *VRFConfig) DetectChanges(ctx context.Context) (pkgreconcile.Int
 	return changeSet, nil
 }
 
-func (vrfList *VRFConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
-	if vrfList == nil {
-		return nil
-	}
-	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
-	for _, vrfCfg := range vrfList.VRFs {
-		if vrfCfg.IsSoftDeleted() {
-			continue
-		}
-		provisioners = append(provisioners, &vrfCfg)
-	}
-	return provisioners
-}
-
-func (vrfList *VRFConfigurationList) GetType() string {
-	return new(netlink.Vrf).Type()
-}
-
 func (vrfChangeSet *VRFChangeSet) GetType() string {
 	return new(netlink.Vrf).Type()
-}
-
-func (vrfList *VRFConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	// todo
-	return nil, nil
 }
 
 func (vrfConfig *VRFConfig) IsSoftDeleted() bool {
