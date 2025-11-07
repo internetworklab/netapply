@@ -23,6 +23,7 @@ type VRFConfigurationList struct {
 }
 
 type VRFChangeSet struct {
+	origin            *VRFConfig
 	ContainerName     *string
 	InterfaceName     string
 	AddressesToAdd    []*netlink.Addr

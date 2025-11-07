@@ -6,9 +6,9 @@ import (
 	"net"
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 
@@ -21,16 +21,27 @@ func (vrfConfig *VRFConfig) GetType() string {
 }
 
 func (vrfConfig *VRFConfig) CheckExist(ctx context.Context) (bool, error) {
-	return pkginterfacestub.CheckExist(ctx, vrfConfig)
+	exist := new(bool)
+	*exist = false
+	err := pkgnetns.WithNsHandleSafe(ctx, vrfConfig, func(handle *netlink.Handle) error {
+		_, err := handle.LinkByName(vrfConfig.Name)
+		if err != nil {
+			if _, ok := err.(netlink.LinkNotFoundError); ok {
+				return nil
+			}
+			return fmt.Errorf("failed to get vrf link: %w", err)
+		}
+		*exist = true
+		return nil
+	})
+	if err != nil {
+		return false, fmt.Errorf("failed to check exist: %w", err)
+	}
+	return *exist, nil
 }
 
 func (vrfConfig *VRFConfig) Create(ctx context.Context) error {
-	netnsInfo, err := vrfConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, vrfConfig, func(handle *netlink.Handle) error {
 		link := &netlink.Vrf{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: vrfConfig.Name,
@@ -73,17 +84,14 @@ func (vrfChangeSet *VRFChangeSet) GetInterfaceName() string {
 }
 
 func (vrfChangeSet *VRFChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	if vrfChangeSet == nil {
+		return nil, fmt.Errorf("vrf change set is nil")
+	}
+	return vrfChangeSet.origin.GetNetNsInfo(ctx)
 }
 
 func (vrfChangeSet *VRFChangeSet) Apply(ctx context.Context) error {
-	netnsInfo, err := vrfChangeSet.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, vrfChangeSet, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vrfChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get vrf link: %w", err)
@@ -114,12 +122,7 @@ func (vrfConfig *VRFConfig) DetectChanges(ctx context.Context) (pkgreconcile.Int
 	changeSet := new(VRFChangeSet)
 	changeSet.InterfaceName = vrfConfig.Name
 
-	netnsInfo, err := vrfConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandleSafe(ctx, vrfConfig, func(handle *netlink.Handle) error {
 		vrfLink, err := handle.LinkByName(vrfConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get vrf link: %w", err)
@@ -179,6 +182,33 @@ func (vrfConfig *VRFConfig) IsSoftDeleted() bool {
 }
 
 func (vrfConfig *VRFConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	if vrfConfig == nil {
+		return nil, fmt.Errorf("vrf config is nil")
+	}
+
+	if vrfConfig.ContainerInfo == nil {
+		return nil, nil
+	}
+
+	if vrfConfig.ContainerInfo.Docker != nil {
+		cli, err := pkgutils.DockerCliFromCtx(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
+		}
+		pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *vrfConfig.ContainerInfo.Docker)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get container ns pid: %w", err)
+		}
+		return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
+	}
+
+	if vrfConfig.ContainerInfo.Podman != nil {
+		return nil, fmt.Errorf("podman is not supported yet")
+	}
+
+	if vrfConfig.ContainerInfo.NetnsPath != nil {
+		return &pkgnetns.NetNsInfo{NetNsPath: vrfConfig.ContainerInfo.NetnsPath}, nil
+	}
+
+	return nil, fmt.Errorf("no container info found")
 }
