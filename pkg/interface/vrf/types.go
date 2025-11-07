@@ -14,7 +14,7 @@ type VRFConfig struct {
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
 
 	// Optional fields for containerized resources
-	ContainerInfo *pkginterfacecommon.ContainerInfo `yaml:"container,omitempty" json:"container,omitempty"`
+	Container *pkginterfacecommon.ContainerInfo `yaml:"container,omitempty" json:"container,omitempty"`
 }
 
 type VRFConfigurationList struct {
@@ -24,7 +24,6 @@ type VRFConfigurationList struct {
 
 type VRFChangeSet struct {
 	origin            *VRFConfig
-	ContainerName     *string
 	InterfaceName     string
 	AddressesToAdd    []*netlink.Addr
 	AddressesToRemove []*netlink.Addr

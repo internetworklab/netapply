@@ -163,28 +163,28 @@ func (vrfConfig *VRFConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsIn
 		return nil, fmt.Errorf("vrf config is nil")
 	}
 
-	if vrfConfig.ContainerInfo == nil {
+	if vrfConfig.Container == nil {
 		return nil, nil
 	}
 
-	if vrfConfig.ContainerInfo.Docker != nil {
+	if vrfConfig.Container.Docker != nil {
 		cli, err := pkgutils.DockerCliFromCtx(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get docker cli from context: %w", err)
 		}
-		pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *vrfConfig.ContainerInfo.Docker)
+		pidPtr, err := pkgutils.GetContainerNSPid(ctx, cli, *vrfConfig.Container.Docker)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get container ns pid: %w", err)
 		}
 		return &pkgnetns.NetNsInfo{Pid: pidPtr}, nil
 	}
 
-	if vrfConfig.ContainerInfo.Podman != nil {
+	if vrfConfig.Container.Podman != nil {
 		return nil, fmt.Errorf("podman is not supported yet")
 	}
 
-	if vrfConfig.ContainerInfo.NetnsPath != nil {
-		return &pkgnetns.NetNsInfo{NetNsPath: vrfConfig.ContainerInfo.NetnsPath}, nil
+	if vrfConfig.Container.NetnsPath != nil {
+		return &pkgnetns.NetNsInfo{NetNsPath: vrfConfig.Container.NetnsPath}, nil
 	}
 
 	return nil, fmt.Errorf("no container info found")

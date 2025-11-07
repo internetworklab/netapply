@@ -836,5 +836,5 @@ func (wgConfig *WireGuardConfig) GetResourceID() (string, error) {
 
 // A WireGuardConfig is also an implementation of NetNsAwareResource interface
 func (wgConfig *WireGuardConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	return wgConfig.ContainerInfo.GetNetNsInfo(ctx)
+	return wgConfig.Container.GetNetNsInfo(ctx)
 }

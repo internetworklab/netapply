@@ -15,7 +15,7 @@ type WireGuardConfig struct {
 	PrivateKeyFrom *string                            `yaml:"privatekey_from,omitempty" json:"privatekey_from,omitempty" bson:"privatekey_from,omitempty"`
 	Peers          []WireGuardPeerConfig              `yaml:"peers,omitempty" json:"peers,omitempty" bson:"peers,omitempty"`
 	Addresses      []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty" bson:"addresses,omitempty"`
-	ContainerInfo  *pkginterfacecommon.ContainerInfo  `yaml:"container,omitempty" json:"container,omitempty" bson:"container,omitempty"`
+	Container      *pkginterfacecommon.ContainerInfo  `yaml:"container,omitempty" json:"container,omitempty" bson:"container,omitempty"`
 
 	ListenPort *int `yaml:"listen_port,omitempty" json:"listen_port,omitempty" bson:"listen_port,omitempty"`
 	MTU        *int `yaml:"mtu,omitempty" json:"mtu,omitempty" bson:"mtu,omitempty"`
