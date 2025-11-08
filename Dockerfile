@@ -1,15 +1,19 @@
-FROM golang:1.23.5-bookworm AS builder-basis
+FROM --platform=$BUILDPLATFORM golang:1.23.5-bookworm AS builder-basis
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /app/netapply
 
 COPY go.mod go.mod
 COPY go.sum go.sum
 
-RUN go mod download -x
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go mod download
 
 
-FROM golang:1.23.5-bookworm AS builder
-
+FROM --platform=$BUILDPLATFORM golang:1.23.5-bookworm AS builder
+ARG TARGETOS
+ARG TARGETARCH
 
 COPY --from=builder-basis /go/pkg /go/pkg
 
@@ -17,7 +21,7 @@ WORKDIR /app/netapply
 
 COPY . .
 
-RUN go build -o bin/netapply ./cmd/netapply
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o bin/netapply ./cmd/netapply
 
 ENTRYPOINT ["/app/netapply/bin/netapply"]
 
