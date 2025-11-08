@@ -40,6 +40,10 @@ func (changeSet *BirdEBGPRessourceListChangeSet) HasUpdates() bool {
 }
 
 func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
+	if bgpConfigList == nil {
+		return nil, nil
+	}
+
 	directory := bgpConfigList.TargetConfigDirectory
 	if directory == "" {
 		return nil, fmt.Errorf("bird bgp config directory is not set")

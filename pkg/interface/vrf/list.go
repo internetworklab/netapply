@@ -34,6 +34,10 @@ func (vrfList *VRFConfigurationList) GetProvisioners() []pkginterfacestub.NetnsI
 }
 
 func (vrfList *VRFConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	if vrfList == nil {
+		return nil, nil
+	}
+
 	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
 	for _, container := range vrfList.Containers {
 		netnsInfo, err := container.GetNetNsInfo(ctx)
