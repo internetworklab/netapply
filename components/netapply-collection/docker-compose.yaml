@@ -7,7 +7,7 @@ volumes:
 services:
   netapply-collection:
     container_name: netapply-collection
-    hostname: netapply-collection-vie1
+    hostname: netapply-collection-${NODE_NAME}
     image: ghcr.io/hsiaofongw/netapply:latest
     networks:
       - mongo
@@ -16,5 +16,6 @@ services:
       - shared-socks:/shared-socks
     command:
       - serve-collection
+      - "--node=${NODE_NAME}"
       - "--bind-unix-socket=/shared-socks/netapply-collections.sock"
       - "--mongo-dburi=mongodb://mongo:27017"

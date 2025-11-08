@@ -10,7 +10,6 @@ import (
 type BasicInfo struct {
 	NodeName       string
 	Hostname       string
-	ServiceName    string
 	StartedAt      uint64
 	Uptime         uint64
 	UnixSocketPath string
@@ -44,12 +43,6 @@ func CollectBasicInfo(ctx context.Context) (*BasicInfo, error) {
 		return nil, fmt.Errorf("failed to get node name from context: %w", err)
 	}
 	basicInfo.NodeName = nodeName
-
-	serviceName, err := ServiceNameFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get service name from context: %w", err)
-	}
-	basicInfo.ServiceName = serviceName
 
 	return basicInfo, nil
 }

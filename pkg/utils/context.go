@@ -91,14 +91,6 @@ func DockerCliFromCtx(ctx context.Context) (*client.Client, error) {
 	return cli, nil
 }
 
-func ServiceNameFromCtx(ctx context.Context) (string, error) {
-	serviceName, ok := ctx.Value(ctxKeyServiceName).(string)
-	if !ok {
-		return "", fmt.Errorf("service name is not set in context")
-	}
-	return serviceName, nil
-}
-
 func SetDockerCliInCtx(ctx context.Context, cli *client.Client) context.Context {
 	return context.WithValue(ctx, ctxKeyDockerCli, cli)
 }
