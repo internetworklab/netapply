@@ -21,6 +21,7 @@ WORKDIR /app/netapply
 
 COPY . .
 
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go generate ./cmd/netapply/main.go
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o bin/netapply ./cmd/netapply
 
 ENTRYPOINT ["/app/netapply/bin/netapply"]

@@ -4,9 +4,8 @@ volumes:
 services:
   netapply-local:
     container_name: netapply-local
-    hostname: netapply-local-vie1
-    image: netapply:latest
-    pull_policy: never
+    hostname: netapply-local-${NODE_NAME}
+    image: ghcr.io/hsiaofongw/netapply:latest
     ipc: host
     pid: host
     network_mode: host
@@ -17,5 +16,5 @@ services:
     privileged: true
     command:
       - serve-local
-      - "--node=vie1"
+      - "--node=${NODE_NAME}"
       - "--bind-unix-socket=/shared-socks/netapply-local.sock"
