@@ -9,6 +9,7 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl"
 )
 
+// It is the caller's responsibility to close the returned netns handle.
 func (netnsInfo *NetNsInfo) ToNsHandle() (vnetns.NsHandle, error) {
 	if netnsInfo == nil {
 		return vnetns.Get()
@@ -32,8 +33,10 @@ func (netnsInfo *NetNsInfo) ToNetnsKey() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get netns unique key: %w", err)
 	}
+	defer nsHandle.Close()
+	nsId := nsHandle.UniqueId()
 
-	return nsHandle.UniqueId(), nil
+	return nsId, nil
 }
 
 func withHostNetnsHandle(f func(h *netlink.Handle) error) error {
@@ -58,11 +61,11 @@ func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h 
 	}
 
 	for _, netnsInfo := range netnsInfos {
-		nsHandle, err := netnsInfo.ToNsHandle()
-		if err != nil {
-			return fmt.Errorf("failed to get netns handle: %w", err)
-		}
-		err = func(nshandle vnetns.NsHandle) error {
+		err = func() error {
+			nshandle, err := netnsInfo.ToNsHandle()
+			if err != nil {
+				return fmt.Errorf("failed to get netns handle: %w", err)
+			}
 			defer nshandle.Close()
 
 			handle, err := netlink.NewHandleAt(nshandle)
@@ -72,7 +75,7 @@ func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h 
 			defer handle.Close()
 
 			return f(handle, &netnsInfo)
-		}(nsHandle)
+		}()
 		if err != nil {
 			return fmt.Errorf("failed to run function: %w", err)
 		}
