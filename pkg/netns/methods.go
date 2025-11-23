@@ -49,6 +49,7 @@ func withHostNetnsHandle(f func(h *netlink.Handle) error) error {
 }
 
 func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h *netlink.Handle, netnsInfo *NetNsInfo) error) error {
+
 	netnsInfos, err := res.GetNetNsInfos(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get netns infos: %w", err)

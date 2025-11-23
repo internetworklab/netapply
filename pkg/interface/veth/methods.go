@@ -325,6 +325,9 @@ func (vethPairChangeSet *VethPairChangeSet) GetType() string {
 }
 
 func (vethCfgsList *VethPairConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	if vethCfgsList == nil {
+		return nil, nil
+	}
 	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
 	for _, container := range vethCfgsList.Containers {
 		netnsInfo, err := container.GetNetNsInfo(ctx)

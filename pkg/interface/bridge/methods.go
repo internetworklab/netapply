@@ -266,6 +266,9 @@ func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkginterfaces
 }
 
 func (bridgeCfgsList *BridgeConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	if bridgeCfgsList == nil {
+		return nil, nil
+	}
 	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
 	for _, container := range bridgeCfgsList.Containers {
 		netnsInfo, err := container.GetNetNsInfo(ctx)

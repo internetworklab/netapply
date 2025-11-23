@@ -32,6 +32,10 @@ func (wgCfgsList *WireGuardConfigurationList) DetectChanges(ctx context.Context,
 
 // An WireGuardConfigurationList is also an implementation of MultiNetnsResource interface.
 func (wgCfgsList *WireGuardConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	if wgCfgsList == nil {
+		return nil, nil
+	}
+
 	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
 
 	for _, container := range wgCfgsList.Containers {

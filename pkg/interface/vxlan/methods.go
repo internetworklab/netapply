@@ -189,6 +189,9 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetType() string {
 }
 
 func (vxlanCfgsList *VXLANConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	if vxlanCfgsList == nil {
+		return nil, nil
+	}
 	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
 	for _, container := range vxlanCfgsList.Containers {
 		netnsInfo, err := container.GetNetNsInfo(ctx)

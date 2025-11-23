@@ -170,6 +170,9 @@ func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkginterfacestu
 }
 
 func (dummyCfgsList *DummyConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	if dummyCfgsList == nil {
+		return nil, nil
+	}
 	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
 	for _, container := range dummyCfgsList.Containers {
 		netnsInfo, err := container.GetNetNsInfo(ctx)
