@@ -206,9 +206,14 @@ func (proto *BGPProtocol) ToConfig() (string, error) {
 		peerAddrLine := []string{"neighbor", *proto.PeerAddress}
 		if proto.PeerASN != nil {
 			peerAddrLine = append(peerAddrLine, "as", *proto.PeerASN)
-		} else if proto.PeerExternal != nil {
+			if proto.PeerExternal != nil && *proto.PeerExternal {
+				peerAddrLine = append(peerAddrLine, "external")
+			} else if proto.PeerInternal != nil && *proto.PeerInternal {
+				peerAddrLine = append(peerAddrLine, "internal")
+			}
+		} else if proto.PeerExternal != nil && *proto.PeerExternal {
 			peerAddrLine = append(peerAddrLine, "external")
-		} else if proto.PeerInternal != nil {
+		} else if proto.PeerInternal != nil && *proto.PeerInternal {
 			peerAddrLine = append(peerAddrLine, "internal")
 		}
 		lines = append(lines, "    "+appendSemiColon(strings.Join(peerAddrLine, " ")))

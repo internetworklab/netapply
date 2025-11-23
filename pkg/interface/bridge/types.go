@@ -16,7 +16,7 @@ type BridgeConfig struct {
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty"`
 
 	// Optional fields for containerized resources
-	ContainerInfo *pkginterfacecommon.ContainerInfo `yaml:"container,omitempty" json:"container,omitempty"`
+	Container      *pkginterfacecommon.ContainerInfo  `yaml:"container,omitempty" json:"container,omitempty" bson:"container,omitempty"`
 }
 
 type BridgeInterfaceChangeSet struct {

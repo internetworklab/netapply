@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
@@ -21,23 +22,7 @@ func (vrfConfig *VRFConfig) GetType() string {
 }
 
 func (vrfConfig *VRFConfig) CheckExist(ctx context.Context) (bool, error) {
-	exist := new(bool)
-	*exist = false
-	err := pkgnetns.WithNsHandleSafe(ctx, vrfConfig, func(handle *netlink.Handle) error {
-		_, err := handle.LinkByName(vrfConfig.Name)
-		if err != nil {
-			if _, ok := err.(netlink.LinkNotFoundError); ok {
-				return nil
-			}
-			return fmt.Errorf("failed to get vrf link: %w", err)
-		}
-		*exist = true
-		return nil
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to check exist: %w", err)
-	}
-	return *exist, nil
+	return pkginterfacestub.CheckExist(ctx, vrfConfig)
 }
 
 func (vrfConfig *VRFConfig) Create(ctx context.Context) error {

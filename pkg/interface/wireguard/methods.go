@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
@@ -198,21 +199,7 @@ func (wgConf *WireGuardConfig) GetType() string {
 }
 
 func (wgConf *WireGuardConfig) CheckExist(ctx context.Context) (bool, error) {
-	var exist *bool = new(bool)
-	*exist = false
-	err := pkgnetns.WithNsHandleSafe(ctx, wgConf, func(handle *netlink.Handle) error {
-		lk, err := handle.LinkByName(wgConf.Name)
-		if err != nil {
-			if _, ok := err.(netlink.LinkNotFoundError); ok {
-				return nil
-			}
-			return fmt.Errorf("failed to get wireguard link: %w", err)
-		}
-
-		*exist = lk != nil
-		return nil
-	})
-	return *exist, err
+	return pkginterfacestub.CheckExist(ctx, wgConf)
 }
 
 // returns: (added, removed)

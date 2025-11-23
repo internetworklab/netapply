@@ -6,7 +6,6 @@ import (
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
-	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -25,18 +24,14 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetNetNsInfo(ctx context.Contex
 }
 
 func (bridgeChangeSet *BridgeInterfaceChangeSet) Apply(ctx context.Context) error {
-	netnsInfo, err := bridgeChangeSet.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, bridgeChangeSet, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
 		}
 
 		if bridgeChangeSet.VRFToSet != nil {
-			if err := pkginterfacevrf.TrySetVRF(handle, link, bridgeChangeSet.VRFToSet); err != nil {
+			if err := pkgutils.TrySetVRF(handle, link, bridgeChangeSet.VRFToSet); err != nil {
 				return fmt.Errorf("failed to set vrf for bridge link: %w", err)
 			}
 		}
@@ -91,14 +86,14 @@ func (bridgeConfig *BridgeConfig) DetectChanges(ctx context.Context) (pkgreconci
 	// Since here we use 'WithNsHandleSafe' instead of 'WithNsHandle',
 	// the result might be incorrect if the container is not yet running
 	// during the detection process.
-	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err = pkgnetns.WithNsHandleSafe(ctx, bridgeConfig, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
 		}
 
 		if bridgeConfig.VRF != nil {
-			diff, err := pkginterfacevrf.CheckVRFDiff(handle, link, bridgeConfig.VRF)
+			diff, err := pkgutils.CheckVRFDiff(handle, link, bridgeConfig.VRF)
 			if err != nil {
 				return fmt.Errorf("failed to check vrf diff: %w", err)
 			}
@@ -163,12 +158,7 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 	actuallyAdded := make(map[string]interface{})
 	actuallyRemoved := make(map[string]interface{})
 
-	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get primary netns info: %w", err)
-	}
-
-	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandleSafe(ctx, bridgeConfig, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get bridge link: %w", err)
@@ -216,12 +206,7 @@ func (bridgeConfig *BridgeConfig) ReconcileEnclaves(ctx context.Context) (map[st
 }
 
 func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
-	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get primary netns info: %w", err)
-	}
-
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, bridgeConfig, func(handle *netlink.Handle) error {
 		link := &netlink.Bridge{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: bridgeConfig.Name,
@@ -233,8 +218,8 @@ func (bridgeConfig *BridgeConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to add bridge link: %w", err)
 		}
 
-		if bridgeConfig.VRF != nil && *bridgeConfig.VRF != pkginterfacevrf.VRFNameDefault && *bridgeConfig.VRF != pkginterfacevrf.VRFNameEmpty {
-			if err := pkginterfacevrf.TrySetVRF(handle, link, bridgeConfig.VRF); err != nil {
+		if bridgeConfig.VRF != nil && *bridgeConfig.VRF != pkgutils.VRFNameDefault && *bridgeConfig.VRF != pkgutils.VRFNameEmpty {
+			if err := pkgutils.TrySetVRF(handle, link, bridgeConfig.VRF); err != nil {
 				return fmt.Errorf("failed to set vrf for bridge link: %w", err)
 			}
 		}
@@ -264,12 +249,12 @@ func (bridgeCfgsList *BridgeConfigurationList) GetType() string {
 	return new(netlink.Bridge).Type()
 }
 
-func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkginterfacestub.NetnsIdentifiableProvisioner {
 	if bridgeCfgsList == nil {
 		return nil
 	}
 
-	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	provisioners := make([]pkginterfacestub.NetnsIdentifiableProvisioner, 0)
 	for _, bridgeCfg := range bridgeCfgsList.Bridges {
 		if bridgeCfg.IsSoftDeleted() {
 			continue
@@ -280,13 +265,20 @@ func (bridgeCfgsList *BridgeConfigurationList) GetProvisioners() []pkgreconcile.
 	return provisioners
 }
 
-func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {
-	netnsInfo, err := bridgeConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get primary netns info: %w", err)
+func (bridgeCfgsList *BridgeConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
+	for _, container := range bridgeCfgsList.Containers {
+		netnsInfo, err := container.GetNetNsInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get netns info: %w", err)
+		}
+		netnsInfos = append(netnsInfos, *netnsInfo)
 	}
+	return netnsInfos, nil
+}
 
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+func (bridgeConfig *BridgeConfig) TrySetup(ctx context.Context) error {
+	return pkgnetns.WithNsHandleSafe(ctx, bridgeConfig, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(bridgeConfig.Name)
 		if err != nil {
 			if _, ok := err.(netlink.LinkNotFoundError); !ok {
@@ -324,36 +316,14 @@ func (bridgeChangeSet *BridgeInterfaceChangeSet) GetType() string {
 	return new(netlink.Bridge).Type()
 }
 
-func (bridgeCfgsList *BridgeConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	// todo
-	return nil, nil
+func (bridgeCfgsList *BridgeConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
+	return pkginterfacestub.DetectChanges(ctx, bridgeCfgsList, delete)
 }
 
 func (bridgeConfig *BridgeConfig) IsSoftDeleted() bool {
 	return bridgeConfig.Deleted
 }
 
-func (bridgeConfig *BridgeConfig) GetDockerContainerName(ctx context.Context) *string {
-	if bridgeConfig.ContainerInfo != nil {
-		return bridgeConfig.ContainerInfo.Docker
-	}
-	return nil
-}
-
-func (bridgeConfig *BridgeConfig) GetPodmanContainerName(ctx context.Context) *string {
-	if bridgeConfig.ContainerInfo != nil {
-		return bridgeConfig.ContainerInfo.Podman
-	}
-	return nil
-}
-
-func (bridgeConfig *BridgeConfig) GetNetNsPath(ctx context.Context) *string {
-	if bridgeConfig.ContainerInfo != nil {
-		return bridgeConfig.ContainerInfo.NetnsPath
-	}
-	return nil
-}
-
 func (bridgeConfig *BridgeConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	return pkginterfacestub.GetNetNsInfo(ctx, bridgeConfig)
+	return bridgeConfig.Container.GetNetNsInfo(ctx)
 }
