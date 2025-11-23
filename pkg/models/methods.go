@@ -160,19 +160,19 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context, delete bool)
 func ApplyChanges(ctx context.Context, changeset pkgreconcile.ResourceListChangeSet) error {
 	for _, canceller := range changeset.GetRemovedResources() {
 		if err := canceller.Cancel(ctx); err != nil {
-			return fmt.Errorf("failed to cancel resource: %w", err)
+			log.Println("Failed to cancel resource:", canceller.GetType(), err)
 		}
 	}
 
 	for _, changeSet := range changeset.GetUpdatedResources() {
 		if err := changeSet.Apply(ctx); err != nil {
-			return fmt.Errorf("failed to apply changes: %w", err)
+			log.Println("Failed to apply changes:", changeSet.GetType(), err)
 		}
 	}
 
 	for _, provisioner := range reOrderAddedInterfaces(changeset.GetAddedResources()) {
 		if err := provisioner.Create(ctx); err != nil {
-			return fmt.Errorf("failed to create resource: %w", err)
+			log.Println("Failed to create resource:", provisioner.GetType(), err)
 		}
 	}
 
