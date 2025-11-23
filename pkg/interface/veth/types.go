@@ -6,12 +6,12 @@ import (
 )
 
 type VethPairConfig struct {
-	Name          string                             `yaml:"name" json:"name"`
-	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
-	Peer          *VethPairConfig                    `yaml:"peer,omitempty" json:"peer,omitempty"`
-	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
-	MTU           *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
-	VRF           *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
+	Name      string                             `yaml:"name" json:"name"`
+	Container *pkginterfacecommon.ContainerInfo  `yaml:"container,omitempty" json:"container,omitempty" bson:"container,omitempty"`
+	Peer      *VethPairConfig                    `yaml:"peer,omitempty" json:"peer,omitempty"`
+	Addresses []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
+	MTU       *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
+	VRF       *string                            `yaml:"vrf,omitempty" json:"vrf,omitempty"`
 
 	// A stub veth simply represents the another end of a veth pair, it's not actually created or actually reconciled.
 	Stub bool `yaml:"stub,omitempty" json:"stub,omitempty"`

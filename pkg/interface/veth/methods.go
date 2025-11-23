@@ -6,9 +6,9 @@ import (
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
-	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 )
@@ -49,19 +49,14 @@ func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
 		return nil
 	}
 
-	netnsInfo, err := vethPeer.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, vethPeer, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vethPeer.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get veth link: %w", err)
 		}
 
 		if vethPeer.VRFToSet != nil {
-			if err := pkginterfacevrf.TrySetVRF(handle, link, vethPeer.VRFToSet); err != nil {
+			if err := pkgutils.TrySetVRF(handle, link, vethPeer.VRFToSet); err != nil {
 				return fmt.Errorf("failed to set vrf for veth link: %w", err)
 			}
 		}
@@ -88,7 +83,7 @@ func (vethPeer *VethPairPeerChangeSet) Apply(ctx context.Context) error {
 	})
 }
 
-func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec *VethPairConfig, handle *netlink.Handle) (*VethPairPeerChangeSet, error) {
+func NewVethPairPeerChangeSet(spec *VethPairConfig, handle *netlink.Handle) (*VethPairPeerChangeSet, error) {
 
 	if spec.Stub {
 		// stub interface never actually reconciles
@@ -96,16 +91,14 @@ func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec 
 	}
 
 	changeSet := new(VethPairPeerChangeSet)
-	changeSet.ContainerName = containerName
-	changeSet.InterfaceName = interfaceName
 
-	link, err := handle.LinkByName(interfaceName)
+	link, err := handle.LinkByName(spec.Name)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get veth link: %w", err)
 	}
 
 	if spec.VRF != nil {
-		if changeSet.VRFToSet, err = pkginterfacevrf.CheckVRFDiff(handle, link, spec.VRF); err != nil {
+		if changeSet.VRFToSet, err = pkgutils.CheckVRFDiff(handle, link, spec.VRF); err != nil {
 			return nil, fmt.Errorf("failed to check vrf diff: %w", err)
 		}
 	}
@@ -127,8 +120,7 @@ func NewVethPairPeerChangeSet(containerName *string, interfaceName string, spec 
 }
 
 func (vChangeSet *VethPairChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	return vChangeSet.Local.GetNetNsInfo(ctx)
 }
 
 func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
@@ -139,19 +131,9 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 
 	changeSet := new(VethPairChangeSet)
 
-	primaryNetnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
-	}
-
-	secondaryNetnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get secondary netns info: %w", err)
-	}
-
 	// Detecting local changeset
-	err = pkgnetns.WithNsHandleSafe(ctx, primaryNetnsInfo, func(handle *netlink.Handle) error {
-		localChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.ContainerName, vethPairConfig.Name, vethPairConfig, handle)
+	err := pkgnetns.WithNsHandleSafe(ctx, vethPairConfig, func(handle *netlink.Handle) error {
+		localChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig, handle)
 		if err != nil {
 			return fmt.Errorf("failed to detect local changeset: %w", err)
 		}
@@ -163,8 +145,8 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 	}
 
 	// Detecting peer changeset
-	err = pkgnetns.WithNsHandleSafe(ctx, secondaryNetnsInfo, func(handle *netlink.Handle) error {
-		peerChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.Peer.ContainerName, vethPairConfig.Peer.Name, vethPairConfig.Peer, handle)
+	err = pkgnetns.WithNsHandleSafe(ctx, vethPairConfig.Peer, func(handle *netlink.Handle) error {
+		peerChangeSet, err := NewVethPairPeerChangeSet(vethPairConfig.Peer, handle)
 		if err != nil {
 			return fmt.Errorf("failed to detect peer changeset: %w", err)
 		}
@@ -176,10 +158,6 @@ func (vethPairConfig *VethPairConfig) DetectChanges(ctx context.Context) (pkgrec
 	}
 
 	return changeSet, nil
-}
-
-func (vethPairConfig *VethPairConfig) GetContainerName() *string {
-	return vethPairConfig.ContainerName
 }
 
 func (vethPairConfig *VethPairConfig) GetInterfaceName() string {
@@ -241,24 +219,14 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to add veth link: %w", err)
 		}
 
-		primaryNetnsInfo, err := vethPairConfig.GetNetNsInfo(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get primary netns info: %w", err)
-		}
-
-		secondaryNetnsInfo, err := vethPairConfig.Peer.GetNetNsInfo(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get secondary netns info: %w", err)
-		}
-
-		err = pkgnetns.WithNsHandleSafe(ctx, primaryNetnsInfo, func(handle *netlink.Handle) error {
+		err = pkgnetns.WithNsHandleSafe(ctx, vethPairConfig, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(vethPairConfig.Name)
 			if err != nil {
 				return fmt.Errorf("failed to get veth link: %w", err)
 			}
 
 			if vethPairConfig.VRF != nil {
-				if err := pkginterfacevrf.TrySetVRF(handle, link, vethPairConfig.VRF); err != nil {
+				if err := pkgutils.TrySetVRF(handle, link, vethPairConfig.VRF); err != nil {
 					return fmt.Errorf("failed to set vrf for veth link: %w", err)
 				}
 			}
@@ -285,7 +253,7 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to set veth link up (lhs): %w", err)
 		}
 
-		err = pkgnetns.WithNsHandleSafe(ctx, secondaryNetnsInfo, func(handle *netlink.Handle) error {
+		err = pkgnetns.WithNsHandleSafe(ctx, vethPairConfig.Peer, func(handle *netlink.Handle) error {
 			link, err := handle.LinkByName(vethPairConfig.Peer.Name)
 			if err != nil {
 				return fmt.Errorf("failed to get veth link: %w", err)
@@ -294,7 +262,7 @@ func (vethPairConfig *VethPairConfig) Create(ctx context.Context) error {
 			if vethPairConfig.Peer != nil {
 
 				if vethPairConfig.Peer.VRF != nil {
-					if err := pkginterfacevrf.TrySetVRF(handle, link, vethPairConfig.Peer.VRF); err != nil {
+					if err := pkgutils.TrySetVRF(handle, link, vethPairConfig.Peer.VRF); err != nil {
 						return fmt.Errorf("failed to set vrf for veth link: %w", err)
 					}
 				}
@@ -365,6 +333,5 @@ func (vethPairSpec *VethPairConfig) IsSoftDeleted() bool {
 }
 
 func (vethPairSpec *VethPairConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	return vethPairSpec.Container.GetNetNsInfo(ctx)
 }
