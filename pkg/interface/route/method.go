@@ -80,8 +80,7 @@ func (r *RouteConfig) GetTableId(ctx context.Context) uint32 {
 
 func retrieveRouteObject(
 	ctx context.Context,
-	netnsInfo *pkgnetns.NetNsInfo,
-	tableId uint32,
+	res *RouteConfig,
 	destIPNet net.IPNet,
 	proto netlink.RouteProtocol,
 ) (*netlink.Route, error) {

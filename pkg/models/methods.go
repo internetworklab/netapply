@@ -132,6 +132,10 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context, delete bool)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VRF)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.WireGuard)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.BirdBGP)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VXLAN)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VethPair)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.Bridge)
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.Dummy)
 
 	mergedChangeSet := new(WrappedResourceListChangeSet)
 

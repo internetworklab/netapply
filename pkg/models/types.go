@@ -2,7 +2,11 @@ package models
 
 import (
 	pkgbird "github.com/internetworklab/netapply/pkg/bird"
+	pkginterfacebridge "github.com/internetworklab/netapply/pkg/interface/bridge"
+	pkginterfacedummy "github.com/internetworklab/netapply/pkg/interface/dummy"
+	pkginterfaceveth "github.com/internetworklab/netapply/pkg/interface/veth"
 	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
+	pkginterfacevxlan "github.com/internetworklab/netapply/pkg/interface/vxlan"
 	pkginterfacewireguard "github.com/internetworklab/netapply/pkg/interface/wireguard"
 	pkgprotocolbgp "github.com/internetworklab/netapply/pkg/protocol/bgp"
 	pkgprotocolospfv2 "github.com/internetworklab/netapply/pkg/protocol/ospfv2"
@@ -45,10 +49,10 @@ const DefaultStatefulDirRel = ".go-reconciler-state"
 
 type ResourcesConfig struct {
 	// Route     *pkginterfaceroute.RouteConfigurationList         `yaml:"route_list,omitempty" json:"route_list,omitempty"`
-	// VXLAN     *pkginterfacevxlan.VXLANConfigurationList         `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
-	// VethPair  *pkginterfaceveth.VethPairConfigurationList       `yaml:"veth,omitempty" json:"veth,omitempty"`
-	// Bridge    *pkginterfacebridge.BridgeConfigurationList       `yaml:"bridge,omitempty" json:"bridge,omitempty"`
-	// Dummy     *pkginterfacedummy.DummyConfigurationList         `yaml:"dummy,omitempty" json:"dummy,omitempty"`
+	VXLAN     *pkginterfacevxlan.VXLANConfigurationList         `yaml:"vxlan,omitempty" json:"vxlan,omitempty"`
+	VethPair  *pkginterfaceveth.VethPairConfigurationList       `yaml:"veth,omitempty" json:"veth,omitempty"`
+	Bridge    *pkginterfacebridge.BridgeConfigurationList       `yaml:"bridge,omitempty" json:"bridge,omitempty"`
+	Dummy     *pkginterfacedummy.DummyConfigurationList         `yaml:"dummy,omitempty" json:"dummy,omitempty"`
 	VRF       *pkginterfacevrf.VRFConfigurationList             `yaml:"vrf_list,omitempty" json:"vrf_list,omitempty"`
 	WireGuard *pkginterfacewireguard.WireGuardConfigurationList `yaml:"wireguard,omitempty" json:"wireguard,omitempty"`
 	BirdBGP   *pkgbird.BirdBGPConfigurationList                 `yaml:"bird_bgp,omitempty" json:"bird_bgp,omitempty"`
