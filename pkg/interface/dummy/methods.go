@@ -6,18 +6,14 @@ import (
 
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
-	pkginterfacevrf "github.com/internetworklab/netapply/pkg/interface/vrf"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 	"github.com/vishvananda/netlink"
 )
 
-func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetContainerName() *string {
-	return dummyInterfaceChangeSet.ContainerName
-}
-
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetInterfaceName() string {
-	return dummyInterfaceChangeSet.InterfaceName
+	return dummyInterfaceChangeSet.origin.GetInterfaceName()
 }
 
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) HasUpdates() bool {
@@ -33,17 +29,12 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) Apply(ctx context.Contex
 		return nil
 	}
 
-	netnsInfo, err := dummyInterfaceChangeSet.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
-		link, err := handle.LinkByName(dummyInterfaceChangeSet.InterfaceName)
+	err := pkgnetns.WithNsHandle(ctx, dummyInterfaceChangeSet, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(dummyInterfaceChangeSet.origin.GetInterfaceName())
 		if err == nil && link != nil {
 
 			if dummyInterfaceChangeSet.VRFToSet != nil {
-				if err := pkginterfacevrf.TrySetVRF(handle, link, dummyInterfaceChangeSet.VRFToSet); err != nil {
+				if err := pkgutils.TrySetVRF(handle, link, dummyInterfaceChangeSet.VRFToSet); err != nil {
 					return fmt.Errorf("failed to set vrf for dummy link: %w", err)
 				}
 			}
@@ -71,8 +62,7 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) Apply(ctx context.Contex
 }
 
 func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	return dummyInterfaceChangeSet.origin.GetNetNsInfo(ctx)
 }
 
 func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
@@ -85,19 +75,14 @@ func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile
 		changeSet.AddressesToAdd = append(changeSet.AddressesToAdd, nlAddr)
 	}
 
-	netnsInfo, err := dummyConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get primary netns info: %w", err)
-	}
-
-	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandle(ctx, dummyConfig, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(dummyConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get dummy link: %w", err)
 		}
 
 		if dummyConfig.VRF != nil {
-			diff, err := pkginterfacevrf.CheckVRFDiff(handle, link, dummyConfig.VRF)
+			diff, err := pkgutils.CheckVRFDiff(handle, link, dummyConfig.VRF)
 			if err != nil {
 				return fmt.Errorf("failed to check vrf diff: %w", err)
 			}
@@ -119,14 +104,7 @@ func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile
 		return nil, fmt.Errorf("failed to detect changes for dummy config: %w", err)
 	}
 
-	changeSet.ContainerName = dummyConfig.ContainerName
-	changeSet.InterfaceName = dummyConfig.Name
-
 	return changeSet, nil
-}
-
-func (dummyConfig *DummyConfig) GetContainerName() *string {
-	return dummyConfig.ContainerName
 }
 
 func (dummyConfig *DummyConfig) GetInterfaceName() string {
@@ -134,12 +112,7 @@ func (dummyConfig *DummyConfig) GetInterfaceName() string {
 }
 
 func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
-	netnsInfo, err := dummyConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get primary netns info: %w", err)
-	}
-
-	err = pkgnetns.WithNsHandle(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandle(ctx, dummyConfig, func(handle *netlink.Handle) error {
 		link := &netlink.Dummy{
 			LinkAttrs: netlink.LinkAttrs{
 				Name: dummyConfig.Name,
@@ -157,7 +130,7 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 		}
 
 		if dummyConfig.VRF != nil {
-			if err := pkginterfacevrf.TrySetVRF(handle, link, dummyConfig.VRF); err != nil {
+			if err := pkgutils.TrySetVRF(handle, link, dummyConfig.VRF); err != nil {
 				return fmt.Errorf("failed to set vrf for dummy link: %w", err)
 			}
 		}
@@ -182,11 +155,11 @@ func (dummyConfig *DummyConfig) Create(ctx context.Context) error {
 	return nil
 }
 
-func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkginterfacestub.NetnsIdentifiableProvisioner {
 	if dummyCfgsList == nil {
 		return nil
 	}
-	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	provisioners := make([]pkginterfacestub.NetnsIdentifiableProvisioner, 0)
 	for _, dummyCfg := range dummyCfgsList.Dummies {
 		if dummyCfg.IsSoftDeleted() {
 			continue
@@ -196,13 +169,20 @@ func (dummyCfgsList *DummyConfigurationList) GetProvisioners() []pkgreconcile.Re
 	return provisioners
 }
 
-func (dummyCfgsList *DummyConfigurationList) GetType() string {
-	return new(netlink.Dummy).Type()
+func (dummyCfgsList *DummyConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
+	for _, container := range dummyCfgsList.Containers {
+		netnsInfo, err := container.GetNetNsInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get netns info: %w", err)
+		}
+		netnsInfos = append(netnsInfos, *netnsInfo)
+	}
+	return netnsInfos, nil
 }
 
 func (dummyConfig *DummyConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	return dummyConfig.Container.GetNetNsInfo(ctx)
 }
 
 func (dummyConfig *DummyConfig) GetType() string {
@@ -217,9 +197,12 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetType() string {
 	return new(netlink.Dummy).Type()
 }
 
-func (dummyCfgsList *DummyConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	// todo
-	return nil, nil
+func (dummyCfgsList *DummyConfigurationList) GetType() string {
+	return new(netlink.Dummy).Type()
+}
+
+func (dummyCfgsList *DummyConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
+	return pkginterfacestub.DetectChanges(ctx, dummyCfgsList, delete)
 }
 
 func (dummyConfig *DummyConfig) IsSoftDeleted() bool {
