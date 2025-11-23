@@ -35,7 +35,7 @@ type VethPairChangeSet struct {
 }
 
 type VethPairConfigurationList struct {
-	Containers []string         `yaml:"containers" json:"containers"`
+	Containers []pkginterfacecommon.ContainerInfo `yaml:"containers" json:"containers"`
 	VethPairs  []VethPairConfig `yaml:"veth_pairs" json:"veth_pairs"`
 }
 

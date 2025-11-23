@@ -298,11 +298,11 @@ func (vethCfgsList *VethPairConfigurationList) GetType() string {
 	return new(netlink.Veth).Type()
 }
 
-func (vethCfgsList *VethPairConfigurationList) GetProvisioners() []pkgreconcile.ResourceProvisioner {
+func (vethCfgsList *VethPairConfigurationList) GetProvisioners() []pkginterfacestub.NetnsIdentifiableProvisioner {
 	if vethCfgsList == nil {
 		return nil
 	}
-	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
+	provisioners := make([]pkginterfacestub.NetnsIdentifiableProvisioner, 0)
 	for _, vethCfg := range vethCfgsList.VethPairs {
 		if vethCfg.IsSoftDeleted() {
 			continue
@@ -324,8 +324,20 @@ func (vethPairChangeSet *VethPairChangeSet) GetType() string {
 	return new(netlink.Veth).Type()
 }
 
-func (vethCfgsList *VethPairConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
-	return nil, nil
+func (vethCfgsList *VethPairConfigurationList) GetNetNsInfos(ctx context.Context) ([]pkgnetns.NetNsInfo, error) {
+	netnsInfos := make([]pkgnetns.NetNsInfo, 0)
+	for _, container := range vethCfgsList.Containers {
+		netnsInfo, err := container.GetNetNsInfo(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get netns info: %w", err)
+		}
+		netnsInfos = append(netnsInfos, *netnsInfo)
+	}
+	return netnsInfos, nil
+}
+
+func (vethCfgsList *VethPairConfigurationList) DetectChanges(ctx context.Context, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
+	return pkginterfacestub.DetectChanges(ctx, vethCfgsList, delete)
 }
 
 func (vethPairSpec *VethPairConfig) IsSoftDeleted() bool {
