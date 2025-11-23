@@ -7,12 +7,13 @@ import (
 	"io"
 	"log"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -31,52 +32,48 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetChangedItems() map[s
 	return changedItems
 }
 
-func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetInterfaceName() string {
-	return wgInterfaceChangeSet.InterfaceName
-}
-
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) HasUpdates() bool {
 	if wgInterfaceChangeSet == nil {
 		return false
 	}
 
 	if wgInterfaceChangeSet.PrivateKeyToSet != nil {
-		log.Printf("wireguard link %s private key changed to %s", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.PrivateKeyToSet)
+		log.Printf("wireguard link %s private key changed to %s", wgInterfaceChangeSet.GetInterfaceName(), *wgInterfaceChangeSet.PrivateKeyToSet)
 		return true
 	}
 
 	if wgInterfaceChangeSet.MTUToSet != nil {
-		log.Printf("wireguard link %s mtu changed to %d", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.MTUToSet)
+		log.Printf("wireguard link %s mtu changed to %d", wgInterfaceChangeSet.GetInterfaceName(), *wgInterfaceChangeSet.MTUToSet)
 		return true
 	}
 
 	if wgInterfaceChangeSet.ListenPortToSet != nil {
-		log.Printf("wireguard link %s listen port changed to %d", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.ListenPortToSet)
+		log.Printf("wireguard link %s listen port changed to %d", wgInterfaceChangeSet.GetInterfaceName(), *wgInterfaceChangeSet.ListenPortToSet)
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.PeersToRemove) > 0 {
-		log.Printf("wireguard link %s peers removed: %v", wgInterfaceChangeSet.InterfaceName, wgInterfaceChangeSet.PeersToRemove)
+		log.Printf("wireguard link %s peers removed: %v", wgInterfaceChangeSet.GetInterfaceName(), wgInterfaceChangeSet.PeersToRemove)
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.PeersToAdd) > 0 {
-		log.Printf("wireguard link %s peers added: %v", wgInterfaceChangeSet.InterfaceName, wgInterfaceChangeSet.PeersToAdd)
+		log.Printf("wireguard link %s peers added: %v", wgInterfaceChangeSet.GetInterfaceName(), wgInterfaceChangeSet.PeersToAdd)
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.AddressesToAdd) > 0 {
-		log.Printf("wireguard link %s addresses added: %v", wgInterfaceChangeSet.InterfaceName, len(wgInterfaceChangeSet.AddressesToAdd))
+		log.Printf("wireguard link %s addresses added: %v", wgInterfaceChangeSet.GetInterfaceName(), len(wgInterfaceChangeSet.AddressesToAdd))
 		return true
 	}
 
 	if len(wgInterfaceChangeSet.AddressesToRemove) > 0 {
-		log.Printf("wireguard link %s addresses removed: %v", wgInterfaceChangeSet.InterfaceName, len(wgInterfaceChangeSet.AddressesToRemove))
+		log.Printf("wireguard link %s addresses removed: %v", wgInterfaceChangeSet.GetInterfaceName(), len(wgInterfaceChangeSet.AddressesToRemove))
 		return true
 	}
 
 	if wgInterfaceChangeSet.VRFToSet != nil {
-		log.Printf("wireguard link %s vrf changed to %s", wgInterfaceChangeSet.InterfaceName, *wgInterfaceChangeSet.VRFToSet)
+		log.Printf("wireguard link %s vrf changed to %s", wgInterfaceChangeSet.GetInterfaceName(), *wgInterfaceChangeSet.VRFToSet)
 		return true
 	}
 
@@ -87,6 +84,10 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetNetNsInfo(ctx contex
 	return wgInterfaceChangeSet.origin.GetNetNsInfo(ctx)
 }
 
+func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetInterfaceName() string {
+	return wgInterfaceChangeSet.origin.GetInterfaceName()
+}
+
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Context) error {
 	if wgInterfaceChangeSet == nil {
 		return nil
@@ -94,19 +95,19 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 
 	if wgInterfaceChangeSet.PrivateKeyToSet != nil || wgInterfaceChangeSet.ListenPortToSet != nil || wgInterfaceChangeSet.PeersToRemove != nil || wgInterfaceChangeSet.PeersToAdd != nil {
 		err := pkgnetns.WithNetnsWGCli(ctx, wgInterfaceChangeSet, func(wgCtrl *wgctrl.Client) error {
-			currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.InterfaceName)
+			currentConfig, err := wgCtrl.Device(wgInterfaceChangeSet.GetInterfaceName())
 			if err != nil {
 				return fmt.Errorf("failed to get wireguard device: %w", err)
 			}
 
 			if currentConfig == nil {
-				return fmt.Errorf("failed to get wireguard device: %s", wgInterfaceChangeSet.InterfaceName)
+				return fmt.Errorf("failed to get wireguard device: %s", wgInterfaceChangeSet.GetInterfaceName())
 			}
 
 			if wgInterfaceChangeSet.PrivateKeyToSet != nil {
 				patchConfig := new(wgtypes.Config)
 				patchConfig.PrivateKey = wgInterfaceChangeSet.PrivateKeyToSet
-				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.GetInterfaceName(), *patchConfig); err != nil {
 					return fmt.Errorf("failed to patch wireguard config: %w", err)
 				}
 			}
@@ -114,7 +115,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 			if wgInterfaceChangeSet.ListenPortToSet != nil {
 				patchConfig := new(wgtypes.Config)
 				patchConfig.ListenPort = wgInterfaceChangeSet.ListenPortToSet
-				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.GetInterfaceName(), *patchConfig); err != nil {
 					return fmt.Errorf("failed to patch wireguard config: %w", err)
 				}
 			}
@@ -127,7 +128,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 					PublicKey: p.PublicKey,
 					Remove:    true,
 				})
-				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.GetInterfaceName(), *patchConfig); err != nil {
 					return fmt.Errorf("failed to patch wireguard config: %w", err)
 				}
 			}
@@ -137,7 +138,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 				patchConfig.Peers = make([]wgtypes.PeerConfig, 0)
 				patchConfig.ReplacePeers = false
 				patchConfig.Peers = append(patchConfig.Peers, p)
-				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.InterfaceName, *patchConfig); err != nil {
+				if err := wgCtrl.ConfigureDevice(wgInterfaceChangeSet.GetInterfaceName(), *patchConfig); err != nil {
 					return fmt.Errorf("failed to patch wireguard config: %w", err)
 				}
 			}
@@ -151,7 +152,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 	}
 
 	err := pkgnetns.WithNsHandle(ctx, wgInterfaceChangeSet, func(handle *netlink.Handle) error {
-		link, err := handle.LinkByName(wgInterfaceChangeSet.InterfaceName)
+		link, err := handle.LinkByName(wgInterfaceChangeSet.GetInterfaceName())
 		if err != nil {
 			return fmt.Errorf("failed to get wireguard link: %w", err)
 		}
@@ -265,7 +266,6 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 
 	changeSet := new(WireGuardInterfaceChangeSet)
 	changeSet.origin = wgConf
-	changeSet.InterfaceName = wgConf.Name
 
 	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
 	if err != nil {
@@ -288,11 +288,6 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		specPeerConfigs = append(specPeerConfigs, *peercfg)
 	}
 
-	netnsInfo, err := wgConf.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get netns info: %w", err)
-	}
-
 	err = pkgnetns.WithNetnsWGCli(ctx, wgConf, func(wgCtrl *wgctrl.Client) error {
 		currentConfig, err := wgCtrl.Device(wgConf.Name)
 		if err != nil {
@@ -300,7 +295,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		}
 
 		if currentConfig == nil {
-			return fmt.Errorf("failed to get wireguard device: %s in %s", wgConf.Name, pkgutils.GetContainerDisplayName(netnsInfo))
+			return fmt.Errorf("failed to get wireguard device: %s ", wgConf.Name)
 		}
 
 		currPeers := make([]*wgtypes.Peer, 0)
@@ -371,6 +366,99 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 	return changeSet, nil
 }
 
+func getCustomResolver(ctx context.Context) (*net.Resolver, error) {
+	var customResolver *net.Resolver
+
+	resolverEndpoint, err := pkgutils.ResolverEndpointFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get resolver endpoint from context: %w", err)
+	}
+	if resolverEndpoint != "" {
+		customResolver = &net.Resolver{
+			PreferGo: true,
+			Dial: func(ctx context.Context, network, address string) (net.Conn, error) {
+				d := net.Dialer{
+					Timeout: 3 * time.Second,
+				}
+				return d.DialContext(ctx, network, resolverEndpoint) // Replace with your desired DNS server
+			},
+		}
+	}
+
+	return customResolver, nil
+}
+
+func stripPortSuffix(endpoint string) (string, string, error) {
+	pattern, err := regexp.Compile(`:\d+$`)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to compile port suffix pattern: %w", err)
+	}
+	res := pattern.Find([]byte(endpoint))
+	if res == nil {
+		return "", "", fmt.Errorf("no port suffix is found in endpoint %s", endpoint)
+	}
+
+	portStr := string(res)
+	portLen := len(portStr)
+	if portLen+1 >= len(endpoint) {
+		return "", "", fmt.Errorf("invalid endpoint %s", endpoint)
+	}
+
+	ipaddrPart := endpoint[:len(endpoint)-portLen-1]
+
+	// to handle IPv6 addresses, like [2001:db8::1]:1234
+	ipaddrPart = strings.TrimLeft(ipaddrPart, "[")
+	ipaddrPart = strings.TrimRight(ipaddrPart, "]")
+
+	return ipaddrPart, portStr, nil
+}
+
+func tryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net.IP, error) {
+	networks := []string{"ip", "ip4", "ip6"}
+	for _, nw := range networks {
+		ips, err := resolver.LookupNetIP(ctx, nw, host)
+		if err == nil && ips != nil {
+			if ips[0].Is4() {
+				a4 := ips[0].As4()
+				return net.IP(a4[:]), nil
+			}
+			if ips[0].Is6() {
+				a6 := ips[0].As16()
+				return net.IP(a6[:]), nil
+			}
+		}
+	}
+	return nil, fmt.Errorf("failed to resolve IP address for host %s", host)
+}
+
+func resolveWGEndpoint(ctx context.Context, endpoint string, resolver *net.Resolver) (*net.UDPAddr, error) {
+	if resolver == nil {
+		// using system resolver
+		return net.ResolveUDPAddr("udp", endpoint)
+	}
+
+	hostPart, portPart, err := stripPortSuffix(endpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	ip, err := tryResolveIP(ctx, hostPart, resolver)
+	if err != nil {
+		return nil, err
+	}
+
+	portNum, err := strconv.Atoi(portPart)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert port suffix to number: %w", err)
+	}
+
+	udpAddr := &net.UDPAddr{
+		IP:   ip,
+		Port: portNum,
+	}
+	return udpAddr, nil
+}
+
 func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wgtypes.PeerConfig, error) {
 	peercfg := new(wgtypes.PeerConfig)
 
@@ -394,13 +482,15 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wg
 	}
 
 	if wgPeerConfig.Endpoint != nil {
-		udpAddr, err := pkgutils.TryResolveUDPAddrManyTimes(*wgPeerConfig.Endpoint, 1, 3*time.Second)
+		resolver, err := getCustomResolver(ctx)
 		if err != nil {
-			log.Printf("failed to resolve udp address %s: %v", *wgPeerConfig.Endpoint, err)
-			peercfg.Endpoint = nil
-		} else {
-			peercfg.Endpoint = udpAddr
+			return nil, fmt.Errorf("failed to get custom resolver: %w", err)
 		}
+		udpAddr, err := resolveWGEndpoint(ctx, *wgPeerConfig.Endpoint, resolver)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve udp address %s: %w", *wgPeerConfig.Endpoint, err)
+		}
+		peercfg.Endpoint = udpAddr
 	}
 
 	for _, allowedipstr := range wgPeerConfig.AllowedIPs {

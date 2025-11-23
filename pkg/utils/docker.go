@@ -8,8 +8,6 @@ import (
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/client"
 	"github.com/vishvananda/netns"
-
-	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 )
 
 type ContainerKey string
@@ -67,20 +65,4 @@ func GetContainerNSPid(ctx context.Context, cli *client.Client, containerName st
 	}
 
 	return &resp.State.Pid, nil
-}
-
-func GetContainerDisplayName(netnsInfo *pkgnetns.NetNsInfo) string {
-	if netnsInfo == nil {
-		return "host"
-	}
-
-	if netnsInfo.Pid != nil {
-		return fmt.Sprintf("pid %d", *netnsInfo.Pid)
-	}
-
-	if netnsInfo.NetNsPath != nil {
-		return fmt.Sprintf("path %s", *netnsInfo.NetNsPath)
-	}
-
-	return "unknown"
 }

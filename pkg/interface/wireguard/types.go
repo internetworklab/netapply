@@ -35,8 +35,7 @@ type WireGuardConfig struct {
 }
 
 type WireGuardInterfaceChangeSet struct {
-	origin        *WireGuardConfig
-	InterfaceName string
+	origin *WireGuardConfig
 
 	PrivateKeyToSet *wgtypes.Key
 	MTUToSet        *int

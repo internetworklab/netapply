@@ -17,6 +17,7 @@ const CtxKeyVersionMetadata CtxKey = "version_metadata"
 const CtxKeyNodeName CtxKey = "node_name"
 const CtxKeyStartedAt CtxKey = "started_at"
 const CtxKeyUnixSocketPath CtxKey = "unix_socket_path"
+const CtxKeyResolverEndpoint CtxKey = "resolver_endpoint"
 
 type ClientAuth struct {
 	TLSClientCertFile     string
@@ -113,4 +114,16 @@ func StatefulDirFromCtx(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("stateful dir is not set in context")
 	}
 	return statefulDir, nil
+}
+
+func SetResolverEndpointInCtx(ctx context.Context, resolverEndpoint string) context.Context {
+	return context.WithValue(ctx, CtxKeyResolverEndpoint, resolverEndpoint)
+}
+
+func ResolverEndpointFromCtx(ctx context.Context) (string, error) {
+	resolverEndpoint, ok := ctx.Value(CtxKeyResolverEndpoint).(string)
+	if !ok {
+		return "", fmt.Errorf("resolver endpoint is not set in context")
+	}
+	return resolverEndpoint, nil
 }
