@@ -31,12 +31,7 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) Apply(ctx context.Contex
 		return nil
 	}
 
-	netnsInfo, err := vxlanInterfaceChangeSet.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, vxlanInterfaceChangeSet, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vxlanInterfaceChangeSet.InterfaceName)
 		if err != nil {
 			return fmt.Errorf("failed to get vxlan link: %w", err)
@@ -78,15 +73,7 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetChangedItems() map[st
 
 func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 	changeSet := new(VXLANInterfaceChangeSet)
-	changeSet.ContainerName = vxlanConfig.ContainerName
-	changeSet.InterfaceName = vxlanConfig.Name
-
-	netnsInfo, err := vxlanConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	err = pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	err := pkgnetns.WithNsHandleSafe(ctx, vxlanConfig, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vxlanConfig.Name)
 		if err != nil {
 			return fmt.Errorf("failed to get vxlan link: %w", err)
@@ -108,11 +95,11 @@ func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (pkgreconcile
 		return nil
 	})
 
-	return changeSet, nil
-}
+	if err != nil {
+		return nil, fmt.Errorf("failed to detect changeset: %w", err)
+	}
 
-func (vxlanConfig *VXLANConfig) GetContainerName() *string {
-	return vxlanConfig.ContainerName
+	return changeSet, nil
 }
 
 func (vxlanConfig *VXLANConfig) GetInterfaceName() string {
@@ -120,12 +107,7 @@ func (vxlanConfig *VXLANConfig) GetInterfaceName() string {
 }
 
 func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
-	netnsInfo, err := vxlanConfig.GetNetNsInfo(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get netns info: %w", err)
-	}
-
-	return pkgnetns.WithNsHandleSafe(ctx, netnsInfo, func(handle *netlink.Handle) error {
+	return pkgnetns.WithNsHandleSafe(ctx, vxlanConfig, func(handle *netlink.Handle) error {
 
 		link := &netlink.Vxlan{
 			LinkAttrs: netlink.LinkAttrs{
@@ -137,7 +119,7 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 		if vxlanConfig.LocalIP != nil {
 			srcAddr := net.ParseIP(*vxlanConfig.LocalIP)
 			if srcAddr == nil {
-				return fmt.Errorf("failed to parse local ip: %w", err)
+				return fmt.Errorf("failed to parse local ip: %s", *vxlanConfig.LocalIP)
 			}
 			link.SrcAddr = srcAddr
 		}
@@ -163,7 +145,7 @@ func (vxlanConfig *VXLANConfig) Create(ctx context.Context) error {
 			link.Port = int(*vxlanConfig.DestPort)
 		}
 
-		err = handle.LinkAdd(link)
+		err := handle.LinkAdd(link)
 		if err != nil {
 			return fmt.Errorf("failed to add vxlan link: %w", err)
 		}
@@ -208,6 +190,7 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetType() string {
 }
 
 func (vxlanCfgsList *VXLANConfigurationList) DetectChanges(ctx context.Context, delete bool) (*pkgreconcile.ResourceListChangeSet, error) {
+	// todo
 	return nil, nil
 }
 
@@ -216,6 +199,5 @@ func (vxlanConfig *VXLANConfig) IsSoftDeleted() bool {
 }
 
 func (vxlanConfig *VXLANConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
-	// todo
-	return nil, nil
+	return vxlanConfig.Container.GetNetNsInfo(ctx)
 }

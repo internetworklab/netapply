@@ -6,7 +6,8 @@ import (
 )
 
 type VXLANConfig struct {
-	Name string `yaml:"name" json:"name"`
+	Name       string                             `yaml:"name" json:"name"`
+	Container  *pkginterfacecommon.ContainerInfo  `yaml:"container,omitempty" json:"container,omitempty" bson:"container,omitempty"`
 
 	// This is VNI, 24-bits integer, stored in low 24 bits in a uint32
 	VXLANID uint32 `yaml:"vxlan_id" json:"vxlan_id"`
@@ -14,7 +15,6 @@ type VXLANConfig struct {
 	LocalIP       *string                            `yaml:"local_ip,omitempty" json:"local_ip,omitempty"`
 	MTU           *int                               `yaml:"mtu,omitempty" json:"mtu,omitempty"`
 	Nolearning    *bool                              `yaml:"nolearning,omitempty" json:"nolearning,omitempty"`
-	ContainerName *string                            `yaml:"container_name,omitempty" json:"container_name,omitempty"`
 	Addresses     []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty"`
 
 	// To explicitly specify the underlay interface, also to automatically calculate appropriate MTU.
