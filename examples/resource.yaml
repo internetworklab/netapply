@@ -1,0 +1,23 @@
+resources:
+  wireguard:
+    containers:
+      - netns_path: /run/netns/nstest
+    wireguard_configs:
+      - name: utest1
+        # privatekey: IHAS+GZ/QrDfbS8QGddirWlV/64qxgc0HuPefRPA/XU=
+        container:
+          netns_path: /run/netns/nstest
+        peers: []
+        addresses:
+          - peer: "10.23.0.4/32"
+            local: "10.23.0.1"
+        listen_port: 47870
+      - name: utest2
+        # privatekey: KEqdxJS9/tg1FWNGcqyT3d3VUW486Zu1QVu890qYHlA=
+        container:
+          netns_path: /run/netns/nstest
+        peers: []
+        addresses:
+          - peer: "10.23.0.1/32"
+            local: "10.23.0.4"
+        listen_port: 47871

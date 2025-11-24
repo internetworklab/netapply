@@ -39,22 +39,20 @@ func parseCIDR(cidr string) (net.IP, *net.IPNet, error) {
 
 func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 	if addrConfig.Peer != nil && addrConfig.Local != nil {
-		peerIP, peerIPNet, err := parseCIDR(*addrConfig.Peer)
+		localIP := net.ParseIP(*addrConfig.Local)
+		if localIP == nil {
+			return nil, fmt.Errorf("failed to parse local ip: %s", *addrConfig.Local)
+		}
+		peerIPNet, err := netlink.ParseIPNet(*addrConfig.Peer)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse peer ip: %w", err)
 		}
-
-		localIp := net.ParseIP(*addrConfig.Local)
-		if localIp == nil {
-			return nil, fmt.Errorf("failed to parse local ip: %w", err)
-		}
-
 		nlAddr := new(netlink.Addr)
-		nlAddr.Peer = new(net.IPNet)
 		nlAddr.Peer = peerIPNet
-		nlAddr.Peer.IP = peerIP
-		nlAddr.IPNet = new(net.IPNet)
-		nlAddr.IP = localIp
+		nlAddr.IPNet = &net.IPNet{
+			IP:   localIP,
+			Mask: peerIPNet.Mask,
+		}
 
 		return nlAddr, nil
 	}

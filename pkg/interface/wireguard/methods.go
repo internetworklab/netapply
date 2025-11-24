@@ -176,6 +176,7 @@ func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) Apply(ctx context.Conte
 		}
 
 		for _, addr := range wgInterfaceChangeSet.AddressesToAdd {
+			fmt.Println("AddrAdd", addr.String())
 			if err := handle.AddrAdd(link, addr); err != nil {
 				return fmt.Errorf("failed to add wireguard link address: %w", err)
 			}
