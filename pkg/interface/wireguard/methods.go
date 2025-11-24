@@ -204,7 +204,7 @@ func (wgConf *WireGuardConfig) CheckExist(ctx context.Context) (bool, error) {
 }
 
 // returns: (added, removed)
-func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgtypes.Peer, endpointAddrCheckMask map[string]bool) (map[string]wgtypes.PeerConfig, map[string]*wgtypes.Peer) {
+func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgtypes.Peer) (map[string]wgtypes.PeerConfig, map[string]*wgtypes.Peer) {
 
 	commonPeers := make(map[string]wgtypes.PeerConfig)
 	specPeersMap := make(map[string]wgtypes.PeerConfig)
@@ -239,11 +239,9 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 			peersToAdd[k] = spec
 		}
 
-		if shouldCheckEndpoint, ok := endpointAddrCheckMask[k]; ok && shouldCheckEndpoint {
-			if pkgutils.IsUDPAddrNotEqu(spec.Endpoint, peer.Endpoint) {
-				peersToRemove[k] = peer
-				peersToAdd[k] = spec
-			}
+		if spec.Endpoint != nil && peer.Endpoint != nil && spec.Endpoint.String() != peer.Endpoint.String() {
+			peersToRemove[k] = peer
+			peersToAdd[k] = spec
 		}
 
 		if spec.PersistentKeepaliveInterval != nil {
@@ -272,17 +270,11 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 		return nil, fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 	}
 
-	endpointCheckingMask := make(map[string]bool)
-
 	specPeerConfigs := make([]wgtypes.PeerConfig, 0)
 	for _, peer := range wgConf.Peers {
 		peercfg, err := peer.ToWGTypesPeer(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
-		}
-
-		if peer.ForceRecheckEndpoint != nil && *peer.ForceRecheckEndpoint {
-			endpointCheckingMask[peercfg.PublicKey.String()] = true
 		}
 
 		specPeerConfigs = append(specPeerConfigs, *peercfg)
@@ -303,7 +295,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 			currPeers = append(currPeers, &peer)
 		}
 
-		addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers, endpointCheckingMask)
+		addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers)
 		changeSet.PeersToAdd = addedPeers
 		changeSet.PeersToRemove = removedPeers
 

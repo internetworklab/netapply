@@ -19,8 +19,8 @@ type WireGuardConfig struct {
 
 	// If not specified, would be generated randomly from [11024, 65535]
 	ListenPort *int `yaml:"listen_port,omitempty" json:"listen_port,omitempty" bson:"listen_port,omitempty"`
-	
-	MTU        *int `yaml:"mtu,omitempty" json:"mtu,omitempty" bson:"mtu,omitempty"`
+
+	MTU *int `yaml:"mtu,omitempty" json:"mtu,omitempty" bson:"mtu,omitempty"`
 
 	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty" bson:"vrf,omitempty"`
 
@@ -68,10 +68,6 @@ type WireGuardPeerConfig struct {
 
 	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty" bson:"endpoint,omitempty"`
 	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty" bson:"allowedips,omitempty"`
-
-	// When deploy in intranet, the endpoint might not successfully converge to the endpoint specified in the spec,
-	// Enabling this flag might result in the reconciliation failed to converge.
-	ForceRecheckEndpoint *bool `yaml:"force_recheck_endpoint,omitempty" json:"force_recheck_endpoint,omitempty" bson:"force_recheck_endpoint,omitempty"`
 }
 
 type WireGuardConfigurationList struct {

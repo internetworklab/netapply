@@ -11,14 +11,6 @@ import (
 	"time"
 )
 
-func IsUDPAddrNotEqu(spec, curr *net.UDPAddr) bool {
-	if spec == nil || curr == nil {
-		return false
-	}
-
-	return spec.String() != curr.String()
-}
-
 func IsIPNetListNotEqu(lhs, rhs []net.IPNet) bool {
 	lhsStrs := make([]string, 0)
 	for _, allowedIP := range lhs {
