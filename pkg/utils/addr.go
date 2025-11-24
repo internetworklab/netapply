@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	vnetns "github.com/vishvananda/netns"
 )
 
@@ -161,8 +162,6 @@ func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.R
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve name to ip: %w", err)
 	}
-	currentNs, err := vnetns.Get()
-	fmt.Printf("Current netns: %s\n", currentNs.UniqueId())
 
 	portNum, err := strconv.Atoi(portPart)
 	if err != nil {

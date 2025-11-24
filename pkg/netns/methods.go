@@ -166,7 +166,6 @@ func WithNetnsWGCli(ctx context.Context, res NetNsAwareResource, hook func(wgCtr
 		return fmt.Errorf("failed to get host netns handle: %w", err)
 	}
 	defer func() {
-		fmt.Printf("Restoring netns to host: %s\n", hostNsHandle.UniqueId())
 		vnetns.Set(hostNsHandle)
 		hostNsHandle.Close()
 	}()
@@ -183,7 +182,6 @@ func WithNetnsWGCli(ctx context.Context, res NetNsAwareResource, hook func(wgCtr
 		return fmt.Errorf("failed to get netns handle: %w", err)
 	}
 	defer nsHandle.Close()
-	fmt.Printf("Switching to netns: %s\n", nsHandle.UniqueId())
 	vnetns.Set(nsHandle)
 
 	wgCtrlCli, err = wgctrl.New()
