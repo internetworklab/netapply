@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -460,11 +461,18 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 
 	wgtypesConf.ListenPort = wgConf.ListenPort
 
-	pk, err := getKeyObj(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse private key of interface %s: %w", wgConf.Name, err)
+	var pk *wgtypes.Key
+	var err error
+	if wgConf.PrivateKey != "" || wgConf.PrivateKeyFrom != nil {
+		pk, err = getKeyObj(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse private key of interface %s: %w", wgConf.Name, err)
+		}
 	}
-	wgtypesConf.PrivateKey = pk
+
+	if pk != nil {
+		wgtypesConf.PrivateKey = pk
+	}
 
 	for _, peer := range wgConf.Peers {
 		peercfg, err := peer.ToWGTypesPeer(ctx)
@@ -481,6 +489,21 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
+	}
+
+	if wgtypesConf.PrivateKey == nil {
+		keyObj, err := wgtypes.GeneratePrivateKey()
+		if err != nil {
+			return fmt.Errorf("failed to generate private key: %w", err)
+		}
+		log.Printf("Randomly generated privatekey for interface %s", wgConf.Name)
+		wgtypesConf.PrivateKey = &keyObj
+	}
+
+	if wgtypesConf.ListenPort == nil {
+		listenPort := rand.Intn(65535-11024+1) + 11024
+		wgtypesConf.ListenPort = &listenPort
+		log.Printf("Randomly generated listen port for interface %s", wgConf.Name)
 	}
 
 	wgLink := &netlink.Wireguard{

@@ -17,7 +17,9 @@ type WireGuardConfig struct {
 	Addresses      []pkginterfacecommon.AddressConfig `yaml:"addresses,omitempty" json:"addresses,omitempty" bson:"addresses,omitempty"`
 	Container      *pkginterfacecommon.ContainerInfo  `yaml:"container,omitempty" json:"container,omitempty" bson:"container,omitempty"`
 
+	// If not specified, would be generated randomly from [11024, 65535]
 	ListenPort *int `yaml:"listen_port,omitempty" json:"listen_port,omitempty" bson:"listen_port,omitempty"`
+	
 	MTU        *int `yaml:"mtu,omitempty" json:"mtu,omitempty" bson:"mtu,omitempty"`
 
 	VRF *string `yaml:"vrf,omitempty" json:"vrf,omitempty" bson:"vrf,omitempty"`
