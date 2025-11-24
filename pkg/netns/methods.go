@@ -3,6 +3,8 @@ package netns
 import (
 	"context"
 	"fmt"
+	"os"
+	"runtime"
 
 	"github.com/vishvananda/netlink"
 	vnetns "github.com/vishvananda/netns"
@@ -155,6 +157,20 @@ func WithNsHandleSafe(ctx context.Context, res NetNsAwareResource, f func(h *net
 }
 
 func WithNetnsWGCli(ctx context.Context, res NetNsAwareResource, hook func(wgCtrlCli *wgctrl.Client) error) error {
+	runtime.LockOSThread()         // Lock the main goroutine to its OS thread
+	defer runtime.UnlockOSThread() // Ensure unlock when main exits
+
+	currentPid := os.Getpid()
+	hostNsHandle, err := vnetns.GetFromPid(currentPid)
+	if err != nil {
+		return fmt.Errorf("failed to get host netns handle: %w", err)
+	}
+	defer func() {
+		fmt.Printf("Restoring netns to host: %s\n", hostNsHandle.UniqueId())
+		vnetns.Set(hostNsHandle)
+		hostNsHandle.Close()
+	}()
+
 	netnsInfo, err := res.GetNetNsInfo(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get netns info: %w", err)
@@ -167,15 +183,8 @@ func WithNetnsWGCli(ctx context.Context, res NetNsAwareResource, hook func(wgCtr
 		return fmt.Errorf("failed to get netns handle: %w", err)
 	}
 	defer nsHandle.Close()
-
-	hostNsHandle, err := vnetns.Get()
-	if err != nil {
-		return fmt.Errorf("failed to get host netns handle: %w", err)
-	}
-	defer hostNsHandle.Close()
-
+	fmt.Printf("Switching to netns: %s\n", nsHandle.UniqueId())
 	vnetns.Set(nsHandle)
-	defer vnetns.Set(hostNsHandle)
 
 	wgCtrlCli, err = wgctrl.New()
 	if err != nil {

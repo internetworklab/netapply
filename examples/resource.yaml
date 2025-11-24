@@ -16,7 +16,12 @@ resources:
         # privatekey: KEqdxJS9/tg1FWNGcqyT3d3VUW486Zu1QVu890qYHlA=
         container:
           netns_path: /run/netns/nstest
-        peers: []
+        peers:
+          - publickey: "QIaQuAx3jonWgUK9ZorQtp0IFhVvgbwI5iTHtNtYqjY="
+            allowedips:
+              - "0.0.0.0/0"
+              - "::/0"
+            endpoint: "vie1.exploro.one:47870"
         addresses:
           - peer: "10.23.0.1/32"
             local: "10.23.0.4"

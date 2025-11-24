@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
+	vnetns "github.com/vishvananda/netns"
 )
 
 func IsIPNetListNotEqu(lhs, rhs []net.IPNet) bool {
@@ -125,8 +127,10 @@ func StripPortSuffix(endpoint string) (string, string, error) {
 
 func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net.IP, error) {
 	networks := []string{"ip", "ip4", "ip6"}
+	var err error
+	var ips []netip.Addr
 	for _, nw := range networks {
-		ips, err := resolver.LookupNetIP(ctx, nw, host)
+		ips, err = resolver.LookupNetIP(ctx, nw, host)
 		if err == nil && ips != nil {
 			if ips[0].Is4() {
 				a4 := ips[0].As4()
@@ -138,7 +142,8 @@ func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net
 			}
 		}
 	}
-	return nil, fmt.Errorf("failed to resolve IP address for host %s", host)
+	currentNs, err := vnetns.Get()
+	return nil, fmt.Errorf("failed to resolve IP address for host %s, last error: %w, current netns: %s", host, err, currentNs.UniqueId())
 }
 
 func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.Resolver) (*net.UDPAddr, error) {
@@ -154,8 +159,10 @@ func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.R
 
 	ip, err := TryResolveIP(ctx, hostPart, resolver)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to resolve name to ip: %w", err)
 	}
+	currentNs, err := vnetns.Get()
+	fmt.Printf("Current netns: %s\n", currentNs.UniqueId())
 
 	portNum, err := strconv.Atoi(portPart)
 	if err != nil {
