@@ -36,6 +36,12 @@ type WireGuardConfig struct {
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
 }
 
+type WireGuardInterfaceStatus struct {
+	InterfaceStatus *pkginterfacecommon.CommonInterfaceStatus `yaml:"interface_status" json:"interface_status" bson:"interface_status"`
+	PublicKey       string                                    `yaml:"public_key" json:"public_key" bson:"public_key"`
+	ListenPort      int                                       `yaml:"listen_port" json:"listen_port" bson:"listen_port"`
+}
+
 type WireGuardInterfaceChangeSet struct {
 	origin *WireGuardConfig
 

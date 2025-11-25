@@ -9,22 +9,6 @@ import (
 	netlink "github.com/vishvananda/netlink"
 )
 
-type NetnsIdentifiableProvisioner interface {
-	pkgreconcile.ResourceProvisioner
-	pkgnetns.NetNsAwareResource
-}
-
-type StubProvisionersList interface {
-	pkgnetns.MultiNetnsResource
-	GetProvisioners() []NetnsIdentifiableProvisioner
-	GetType() string
-}
-
-type StubInterfaceCanceller struct {
-	InterfaceName string
-	NetnsInfo     *pkgnetns.NetNsInfo
-	Type          string
-}
 
 func (canceller *StubInterfaceCanceller) GetInterfaceName() string {
 	return canceller.InterfaceName
@@ -51,11 +35,6 @@ func (canceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
 	})
 }
 
-type StubResourceListChangeSet struct {
-	addedResources   []NetnsIdentifiableProvisioner
-	removedResources []pkgreconcile.ResourceCanceller
-	updatedResources []pkgreconcile.InterfaceChangeSet
-}
 
 func (changeSet *StubResourceListChangeSet) GetAddedResources() []pkgreconcile.ResourceProvisioner {
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)

@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sort"
 
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
+
+	pkgstub "github.com/internetworklab/netapply/pkg/interface/stub"
 
 	"github.com/vishvananda/netlink"
 )
@@ -169,4 +172,65 @@ func (containerInfo *ContainerInfo) GetNetNsInfo(ctx context.Context) (*pkgnetns
 	}
 
 	return nil, fmt.Errorf("no container info found")
+}
+
+func CommonInterfaceStatusFromRes(ctx context.Context, res pkgstub.NetnsAwaredResource) (*CommonInterfaceStatus, error) {
+	addressesStatus := new(CommonInterfaceStatus)
+	err := pkgnetns.WithNsHandleSafe(ctx, res, func(handle *netlink.Handle) error {
+		link, err := handle.LinkByName(res.GetInterfaceName())
+		if err != nil {
+			return fmt.Errorf("failed to get link by name: %w", err)
+		}
+		actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
+		if err != nil {
+			return fmt.Errorf("failed to list wireguard link addresses: %w", err)
+		}
+		addresses := make([]string, 0)
+		for _, addr := range actualAddrs {
+			if addr.Peer != nil {
+				addresses = append(addresses, fmt.Sprintf("%s -> %s", addr.IP.String(), addr.Peer.String()))
+			} else if addr.IPNet != nil {
+				addresses = append(addresses, addr.IPNet.String())
+			} else {
+				addresses = append(addresses, addr.String())
+			}
+		}
+		addressesStatus.Addresses = addresses
+
+		addressesStatus.MTU = link.Attrs().MTU
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get addresses status from link: %w", err)
+	}
+	return addressesStatus, nil
+}
+
+func (addressesStatus *CommonInterfaceStatus) IsEqual(other *CommonInterfaceStatus) bool {
+	if addressesStatus == nil {
+		return other == nil
+	}
+
+	// Compare addresses
+	lhs := make([]string, 0)
+	lhs = append(lhs, addressesStatus.Addresses...)
+	rhs := make([]string, 0)
+	rhs = append(rhs, other.Addresses...)
+	sort.Strings(lhs)
+	sort.Strings(rhs)
+	if len(lhs) != len(rhs) {
+		return false
+	}
+	for i := range lhs {
+		if lhs[i] != rhs[i] {
+			return false
+		}
+	}
+
+	// Compare MTU
+	if addressesStatus.MTU != other.MTU {
+		return false
+	}
+	return true
 }

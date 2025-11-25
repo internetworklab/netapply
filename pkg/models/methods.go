@@ -9,6 +9,7 @@ import (
 
 	"sort"
 
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 )
 
@@ -20,6 +21,35 @@ func (nodeConfig *NodeConfig) Up(ctx context.Context, delete bool) error {
 		}
 	}
 	return nil
+}
+
+func (nodeConfig *NodeConfig) ToStatus(ctx context.Context) ([]*pkginterfacestub.StatusWrapper, error) {
+	statuses := make([]*pkginterfacestub.StatusWrapper, 0)
+	if nodeConfig.Resources == nil {
+		return statuses, nil
+	}
+
+	if nodeConfig.Resources.WireGuard != nil {
+		for _, wgCfg := range nodeConfig.Resources.WireGuard.WireGuardConfigs {
+			statusWrapper, err := pkginterfacestub.ToStatusWrapper(ctx, &wgCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get status wrapper for wireguard config: %w", err)
+			}
+			statuses = append(statuses, statusWrapper)
+		}
+	}
+
+	if nodeConfig.Resources.VRF != nil {
+		for _, vrfCfg := range nodeConfig.Resources.VRF.VRFs {
+			statusWrapper, err := pkginterfacestub.ToStatusWrapper(ctx, &vrfCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get status wrapper for vrf config: %w", err)
+			}
+			statuses = append(statuses, statusWrapper)
+		}
+	}
+
+	return statuses, nil
 }
 
 func appendNoNil(targets []pkgreconcile.ResourceProvisionersList, target pkgreconcile.ResourceProvisionersList) []pkgreconcile.ResourceProvisionersList {

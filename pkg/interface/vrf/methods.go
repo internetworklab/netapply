@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
-	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkginterfacecommon "github.com/internetworklab/netapply/pkg/interface/common"
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -173,4 +173,52 @@ func (vrfConfig *VRFConfig) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsIn
 	}
 
 	return nil, fmt.Errorf("no container info found")
+}
+
+func (vrfConfig *VRFConfig) ToStatus(ctx context.Context) (pkginterfacestub.InterfaceStatus, error) {
+	addressStatus, err := pkginterfacecommon.CommonInterfaceStatusFromRes(ctx, vrfConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get common interface status from vrf config: %w", err)
+	}
+
+	status := &VRFInterfaceStatus{InterfaceStatus: addressStatus}
+
+	err = pkgnetns.WithNsHandleSafe(ctx, vrfConfig, func(handle *netlink.Handle) error {
+		lk, err := handle.LinkByName(vrfConfig.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get vrf link: %w", err)
+		}
+		if vrfLk, ok := lk.(*netlink.Vrf); ok {
+			status.TableId = vrfLk.Table
+		} else {
+			return fmt.Errorf("failed to get link then convert to vrf link: %s", vrfConfig.Name)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get vrf table id: %w", err)
+	}
+	return status, nil
+}
+
+func (vrfInterfaceStatus *VRFInterfaceStatus) IsEqual(other pkginterfacestub.InterfaceStatus) bool {
+	if vrfInterfaceStatus == nil {
+		return other == nil
+	}
+
+	rhs, ok := other.(*VRFInterfaceStatus)
+	if !ok {
+		// not the same kind, hence not equal
+		return false
+	}
+
+	if !vrfInterfaceStatus.InterfaceStatus.IsEqual(rhs.InterfaceStatus) {
+		return false
+	}
+
+	if vrfInterfaceStatus.TableId != rhs.TableId {
+		return false
+	}
+
+	return true
 }

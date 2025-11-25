@@ -1,17 +1,12 @@
 package stub
 
 import (
-	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	context "context"
-	netlink "github.com/vishvananda/netlink"
 	"fmt"
-)
 
-type NetnsAwaredResource interface {
-	pkgnetns.NetNsAwareResource
-	GetInterfaceName() string
-	GetType() string
-}
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
+	netlink "github.com/vishvananda/netlink"
+)
 
 func CheckExist(ctx context.Context, res NetnsAwaredResource) (bool, error) {
 	var exist *bool = new(bool)
@@ -29,4 +24,21 @@ func CheckExist(ctx context.Context, res NetnsAwaredResource) (bool, error) {
 		return nil
 	})
 	return *exist, err
+}
+
+func ToStatusWrapper(ctx context.Context, res NetnsAwaredProbable) (*StatusWrapper, error) {
+	name := res.GetInterfaceName()
+	ty := res.GetType()
+	exist, err := CheckExist(ctx, res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check if resource exists: %w", err)
+	}
+	if !exist {
+		return &StatusWrapper{Name: name, Type: ty, Exists: false}, nil
+	}
+	status, err := res.ToStatus(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get status of resource: %w", err)
+	}
+	return &StatusWrapper{Name: name, Type: ty, Exists: true, Status: status}, nil
 }

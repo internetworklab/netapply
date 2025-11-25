@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"encoding/json"
-	"log"
 	"net/http"
 	"strings"
 
@@ -22,24 +21,22 @@ func extractDeleteFromRequest(r *http.Request) bool {
 	return r.URL.Query().Get(paramKeyDelete) == "true"
 }
 
-func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-
+func getNodeConfigFromRequest(r *http.Request) (*pkgmodels.NodeConfig, error) {
 	nodeConfig := new(pkgmodels.NodeConfig)
-
 	contentType := r.Header.Get("Content-Type")
 	var err error
-
 	if strings.HasPrefix(contentType, "application/yaml") {
-		log.Printf("decoding yaml\n")
 		err = yaml.NewDecoder(r.Body).Decode(nodeConfig)
 	} else if strings.HasPrefix(contentType, "application/json") {
-		log.Printf("decoding json\n")
 		err = json.NewDecoder(r.Body).Decode(nodeConfig)
 	} else {
-		log.Printf("decoding json\n")
 		err = json.NewDecoder(r.Body).Decode(nodeConfig)
 	}
+	return nodeConfig, err
+}
 
+func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	nodeConfig, err := getNodeConfigFromRequest(r)
 	if err != nil {
 		RespondWithError(w, err, http.StatusBadRequest)
 		return
@@ -51,7 +48,23 @@ func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Req
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
 
+func handleGetResourceStatus(ctx context.Context, w http.ResponseWriter, r *http.Request) {
+	nodeConfig, err := getNodeConfigFromRequest(r)
+	if err != nil {
+		RespondWithError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	statuses, err := nodeConfig.ToStatus(ctx)
+	if err != nil {
+		RespondWithError(w, err, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(statuses)
 }
 
 func NewResourceHandler(ctx context.Context) *ResourceHandler {
@@ -60,6 +73,9 @@ func NewResourceHandler(ctx context.Context) *ResourceHandler {
 	resourceHandler.Mux = http.NewServeMux()
 	resourceHandler.Mux.HandleFunc("/resources/apply", func(w http.ResponseWriter, r *http.Request) {
 		handleApplyResource(ctx, w, r)
+	})
+	resourceHandler.Mux.HandleFunc("/resources/status", func(w http.ResponseWriter, r *http.Request) {
+		handleGetResourceStatus(ctx, w, r)
 	})
 
 	return resourceHandler

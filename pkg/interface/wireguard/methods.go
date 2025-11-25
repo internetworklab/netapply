@@ -22,6 +22,49 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+func (wgInterfaceStatus *WireGuardInterfaceStatus) IsEqual(other pkginterfacestub.InterfaceStatus) bool {
+	if wgInterfaceStatus == nil {
+		return other == nil
+	}
+
+	rhs, ok := other.(*WireGuardInterfaceStatus)
+	if !ok {
+		// not the same kind, hence not equal
+		return false
+	}
+
+	if !wgInterfaceStatus.InterfaceStatus.IsEqual(rhs.InterfaceStatus) {
+		return false
+	}
+
+	if wgInterfaceStatus.PublicKey != rhs.PublicKey {
+		return false
+	}
+
+	return true
+}
+
+func (wgConfig *WireGuardConfig) ToStatus(ctx context.Context) (pkginterfacestub.InterfaceStatus, error) {
+	addressStatus, err := pkginterfacecommon.CommonInterfaceStatusFromRes(ctx, wgConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get common interface status from wireguard config: %w", err)
+	}
+	status := &WireGuardInterfaceStatus{InterfaceStatus: addressStatus}
+	err = pkgnetns.WithNetnsWGCli(ctx, wgConfig, func(wgCtrl *wgctrl.Client) error {
+		currentConfig, err := wgCtrl.Device(wgConfig.Name)
+		if err != nil {
+			return fmt.Errorf("failed to get wireguard device: %w", err)
+		}
+		status.PublicKey = currentConfig.PublicKey.String()
+		status.ListenPort = currentConfig.ListenPort
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get wireguard public key: %w", err)
+	}
+	return status, nil
+}
+
 func (wgInterfaceChangeSet *WireGuardInterfaceChangeSet) GetChangedItems() map[string]bool {
 	changedItems := make(map[string]bool)
 	changedItems["PrivateKey"] = wgInterfaceChangeSet.PrivateKeyToSet != nil

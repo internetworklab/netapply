@@ -29,3 +29,8 @@ type VRFChangeSet struct {
 	AddressesToRemove []*netlink.Addr
 	NeedToSetUp       bool
 }
+
+type VRFInterfaceStatus struct {
+	InterfaceStatus *pkginterfacecommon.CommonInterfaceStatus `yaml:"interface_status" json:"interface_status" bson:"interface_status"`
+	TableId         uint32                                    `yaml:"table_id" json:"table_id" bson:"table_id"`
+}
