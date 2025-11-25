@@ -61,7 +61,15 @@ func (vrfChangeSet *VRFChangeSet) HasUpdates() bool {
 		return false
 	}
 
-	return len(vrfChangeSet.AddressesToAdd)+len(vrfChangeSet.AddressesToRemove) > 0
+	if len(vrfChangeSet.AddressesToAdd) > 0 {
+		return true
+	}
+
+	if len(vrfChangeSet.AddressesToRemove) > 0 {
+		return true
+	}
+
+	return false
 }
 
 func (vrfChangeSet *VRFChangeSet) GetInterfaceName() string {

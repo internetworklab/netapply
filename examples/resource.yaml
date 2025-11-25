@@ -1,4 +1,12 @@
 resources:
+  vrf_list:
+    containers:
+      - netns_path: /run/netns/nstest
+    vrfs:
+      - name: vrf101
+        table_id: 101
+        container:
+          netns_path: /run/netns/nstest
   wireguard:
     containers:
       - netns_path: /run/netns/nstest

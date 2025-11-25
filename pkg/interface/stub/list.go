@@ -9,7 +9,6 @@ import (
 	netlink "github.com/vishvananda/netlink"
 )
 
-
 func (canceller *StubInterfaceCanceller) GetInterfaceName() string {
 	return canceller.InterfaceName
 }
@@ -35,7 +34,6 @@ func (canceller *StubInterfaceCanceller) Cancel(ctx context.Context) error {
 	})
 }
 
-
 func (changeSet *StubResourceListChangeSet) GetAddedResources() []pkgreconcile.ResourceProvisioner {
 	provisioners := make([]pkgreconcile.ResourceProvisioner, 0)
 	for _, provisioner := range changeSet.addedResources {
@@ -57,7 +55,17 @@ func (changeSet *StubResourceListChangeSet) HasUpdates() bool {
 		return false
 	}
 
-	return len(changeSet.addedResources) > 0 || len(changeSet.removedResources) > 0 || len(changeSet.updatedResources) > 0
+	if len(changeSet.addedResources) > 0 {
+		return true
+	}
+	if len(changeSet.removedResources) > 0 {
+		return true
+	}
+	if len(changeSet.updatedResources) > 0 {
+		return true
+	}
+
+	return false
 }
 
 func DetectChanges(ctx context.Context, stubProvisionersList StubProvisionersList, delete bool) (pkgreconcile.ResourceListChangeSet, error) {
@@ -92,7 +100,7 @@ func DetectChanges(ctx context.Context, stubProvisionersList StubProvisionersLis
 		closureWrapperPtr.commonSet[netnsKey] = make(map[string]NetnsIdentifiableProvisioner)
 	}
 
-	ty := new(netlink.Wireguard).Type()
+	ty := stubProvisionersList.GetType()
 	err := pkgnetns.WithMultiNetnsHandle(ctx, stubProvisionersList, func(h *netlink.Handle, netnsInfo *pkgnetns.NetNsInfo) error {
 		netnsKey, err := netnsInfo.ToNetnsKey()
 		if err != nil {
