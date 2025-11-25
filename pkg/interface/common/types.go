@@ -24,4 +24,6 @@ type ContainerInfo struct {
 type CommonInterfaceStatus struct {
 	Addresses []string `yaml:"addresses" json:"addresses" bson:"addresses"`
 	MTU       int      `yaml:"mtu" json:"mtu" bson:"mtu"`
+	OperState string   `yaml:"oper_state" json:"oper_state" bson:"oper_state"`
+	Flags     string   `yaml:"flags" json:"flags" bson:"flags"`
 }

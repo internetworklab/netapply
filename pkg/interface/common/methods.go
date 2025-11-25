@@ -181,6 +181,8 @@ func CommonInterfaceStatusFromRes(ctx context.Context, res pkgstub.NetnsAwaredRe
 		if err != nil {
 			return fmt.Errorf("failed to get link by name: %w", err)
 		}
+		addressesStatus.OperState = link.Attrs().OperState.String()
+		addressesStatus.Flags = link.Attrs().Flags.String()
 		actualAddrs, err := handle.AddrList(link, netlink.FAMILY_ALL)
 		if err != nil {
 			return fmt.Errorf("failed to list wireguard link addresses: %w", err)
