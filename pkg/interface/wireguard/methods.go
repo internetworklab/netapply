@@ -88,6 +88,20 @@ func (wgInterfaceStatus *WireGuardInterfaceStatus) IsEqual(other pkginterfacestu
 	return true
 }
 
+func (wgConfig *WireGuardConfig) Delete(ctx context.Context) error {
+	nsInfo, err := wgConfig.GetNetNsInfo(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get netns info for wireguard config: %w", err)
+	}
+
+	canceller := pkginterfacestub.StubInterfaceCanceller{
+		InterfaceName: wgConfig.GetInterfaceName(),
+		NetnsInfo:     nsInfo,
+		Type:          wgConfig.GetType(),
+	}
+	return canceller.Cancel(ctx)
+}
+
 func (wgConfig *WireGuardConfig) ToStatus(ctx context.Context) (pkginterfacestub.InterfaceStatus, error) {
 	addressStatus, err := pkginterfacecommon.CommonInterfaceStatusFromRes(ctx, wgConfig)
 	if err != nil {

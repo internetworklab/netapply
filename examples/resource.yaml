@@ -15,7 +15,7 @@ resources:
         container:
           netns_path: /run/netns/nstest
         peers:
-          - publickey: "DYCdo/eJvtNcwem69QQ48wtrXezqPYiYCfpsq7+suGA="
+          - publickey: "yzeaLryeUz9ZXc0ipTc7ZjlXPGc5qdNcfbNif9vJzho="
             allowedips:
               - "0.0.0.0/0"
               - "::/0"
