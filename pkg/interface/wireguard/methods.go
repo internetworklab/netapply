@@ -22,6 +22,46 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
+func (wgPeerStatus *WireGuardPeerStatus) IsEqual(other *WireGuardPeerStatus) bool {
+	if wgPeerStatus == nil {
+		return other == nil
+	}
+
+	if wgPeerStatus.PublicKey != other.PublicKey {
+		return false
+	}
+
+	if !pkgutils.CompareStringPointers(wgPeerStatus.Endpoint, other.Endpoint) {
+		return false
+	}
+
+	if !pkgutils.CompareStringSlices(wgPeerStatus.AllowedIPs, other.AllowedIPs) {
+		return false
+	}
+
+	if !pkgutils.CompareIntPointers(wgPeerStatus.PersistentKeepalive, other.PersistentKeepalive) {
+		return false
+	}
+
+	if !pkgutils.CompareStringPointers(wgPeerStatus.PresharedKey, other.PresharedKey) {
+		return false
+	}
+
+	return true
+}
+
+func comparePeers(specPeers []WireGuardPeerStatus, currentPeers []WireGuardPeerStatus) bool {
+	if len(specPeers) != len(currentPeers) {
+		return false
+	}
+	for i := range specPeers {
+		if !specPeers[i].IsEqual(&currentPeers[i]) {
+			return false
+		}
+	}
+	return true
+}
+
 func (wgInterfaceStatus *WireGuardInterfaceStatus) IsEqual(other pkginterfacestub.InterfaceStatus) bool {
 	if wgInterfaceStatus == nil {
 		return other == nil
@@ -41,6 +81,10 @@ func (wgInterfaceStatus *WireGuardInterfaceStatus) IsEqual(other pkginterfacestu
 		return false
 	}
 
+	if !comparePeers(wgInterfaceStatus.Peers, rhs.Peers) {
+		return false
+	}
+
 	return true
 }
 
@@ -57,6 +101,28 @@ func (wgConfig *WireGuardConfig) ToStatus(ctx context.Context) (pkginterfacestub
 		}
 		status.PublicKey = currentConfig.PublicKey.String()
 		status.ListenPort = currentConfig.ListenPort
+
+		for _, peer := range currentConfig.Peers {
+			peerStatus := WireGuardPeerStatus{}
+			peerStatus.PublicKey = peer.PublicKey.String()
+			if peer.Endpoint != nil {
+				s := peer.Endpoint.String()
+				peerStatus.Endpoint = &s
+			}
+			if peer.PersistentKeepaliveInterval.Seconds() > 0 {
+				sec := int(peer.PersistentKeepaliveInterval.Seconds())
+				peerStatus.PersistentKeepalive = &sec
+			}
+			if !pkgutils.IsAllZeroKey(peer.PresharedKey) {
+				s := peer.PresharedKey.String()
+				peerStatus.PresharedKey = &s
+			}
+			for _, allowedIP := range peer.AllowedIPs {
+				peerStatus.AllowedIPs = append(peerStatus.AllowedIPs, allowedIP.String())
+			}
+			status.Peers = append(status.Peers, peerStatus)
+		}
+
 		return nil
 	})
 	if err != nil {

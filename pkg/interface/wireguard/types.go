@@ -36,10 +36,21 @@ type WireGuardConfig struct {
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
 }
 
+type WireGuardPeerStatus struct {
+	PublicKey           string   `yaml:"public_key" json:"public_key" bson:"public_key"`
+	Endpoint            *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty" bson:"endpoint,omitempty"`
+	AllowedIPs          []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty" bson:"allowedips,omitempty"`
+
+	// Seconds of PKL
+	PersistentKeepalive *int     `yaml:"persistent_keepalive,omitempty" json:"persistent_keepalive,omitempty" bson:"persistent_keepalive,omitempty"`
+	PresharedKey        *string  `yaml:"preshared_key,omitempty" json:"preshared_key,omitempty" bson:"preshared_key,omitempty"`
+}
+
 type WireGuardInterfaceStatus struct {
 	InterfaceStatus *pkginterfacecommon.CommonInterfaceStatus `yaml:"interface_status" json:"interface_status" bson:"interface_status"`
 	PublicKey       string                                    `yaml:"public_key" json:"public_key" bson:"public_key"`
 	ListenPort      int                                       `yaml:"listen_port" json:"listen_port" bson:"listen_port"`
+	Peers           []WireGuardPeerStatus                     `yaml:"peers" json:"peers" bson:"peers"`
 }
 
 type WireGuardInterfaceChangeSet struct {
