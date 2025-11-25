@@ -46,6 +46,7 @@ type WireGuardPeerStatus struct {
 	PresharedKey        *string  `yaml:"preshared_key,omitempty" json:"preshared_key,omitempty" bson:"preshared_key,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type WireGuardInterfaceStatus struct {
 	InterfaceStatus *pkginterfacecommon.CommonInterfaceStatus `yaml:"interface_status" json:"interface_status" bson:"interface_status"`
 	PublicKey       string                                    `yaml:"public_key" json:"public_key" bson:"public_key"`

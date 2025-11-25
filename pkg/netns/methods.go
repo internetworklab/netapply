@@ -57,12 +57,6 @@ func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h 
 		return fmt.Errorf("failed to get netns infos: %w", err)
 	}
 
-	if len(netnsInfos) == 0 {
-		return withHostNetnsHandle(func(h *netlink.Handle) error {
-			return f(h, nil)
-		})
-	}
-
 	for _, netnsInfo := range netnsInfos {
 		err = func() error {
 			nshandle, err := netnsInfo.ToNsHandle()
