@@ -123,7 +123,7 @@ func SetResolverEndpointInCtx(ctx context.Context, resolverEndpoint string) cont
 func ResolverEndpointFromCtx(ctx context.Context) (string, error) {
 	resolverEndpoint, ok := ctx.Value(CtxKeyResolverEndpoint).(string)
 	if !ok {
-		return "", fmt.Errorf("resolver endpoint is not set in context")
+		return "", nil
 	}
 	return resolverEndpoint, nil
 }
