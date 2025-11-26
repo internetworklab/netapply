@@ -4,6 +4,7 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+// +k8s:deepcopy-gen=true
 type AddressConfig struct {
 	Peer  *string `yaml:"peer,omitempty" json:"peer,omitempty" bson:"peer,omitempty"`
 	Local *string `yaml:"local,omitempty" json:"local,omitempty" bson:"local,omitempty"`
@@ -15,6 +16,7 @@ type AddrsChangeSet struct {
 	AddressesToRemove []*netlink.Addr
 }
 
+// +k8s:deepcopy-gen=true
 type ContainerInfo struct {
 	Docker    *string `yaml:"docker,omitempty" json:"docker,omitempty" bson:"docker,omitempty"`
 	Podman    *string `yaml:"podman,omitempty" json:"podman,omitempty" bson:"podman,omitempty"`
