@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"os"
 	"sort"
 
 	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
@@ -169,6 +170,11 @@ func (containerInfo *ContainerInfo) GetNetNsInfo(ctx context.Context) (*pkgnetns
 
 	if containerInfo.NetnsPath != nil {
 		return &pkgnetns.NetNsInfo{NetNsPath: containerInfo.NetnsPath}, nil
+	}
+
+	if containerInfo.HostNetns != nil && *containerInfo.HostNetns {
+		pid := os.Getpid()
+		return &pkgnetns.NetNsInfo{Pid: &pid}, nil
 	}
 
 	return nil, fmt.Errorf("no container info found")

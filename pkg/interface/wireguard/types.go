@@ -36,6 +36,7 @@ type WireGuardConfig struct {
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type WireGuardPeerStatus struct {
 	PublicKey           string   `yaml:"public_key" json:"public_key" bson:"public_key"`
 	Endpoint            *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty" bson:"endpoint,omitempty"`

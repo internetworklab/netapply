@@ -17,6 +17,13 @@ Or you may build it from the source:
 ```shell
 git clone github.com/internetworklab/netapply
 cd netapply
+
+# also make sure that $GOPATH/bin is in the $PATH
+go install k8s.io/code-generator/cmd/deepcopy-gen@latest
+
+deepcopy-gen ./pkg/interface/wireguard
+deepcopy-gen ./pkg/interface/common
+
 go build -o bin/netapply ./main.go
 ```
 

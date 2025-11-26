@@ -19,8 +19,12 @@ type ContainerInfo struct {
 	Docker    *string `yaml:"docker,omitempty" json:"docker,omitempty" bson:"docker,omitempty"`
 	Podman    *string `yaml:"podman,omitempty" json:"podman,omitempty" bson:"podman,omitempty"`
 	NetnsPath *string `yaml:"netns_path,omitempty" json:"netns_path,omitempty" bson:"netns_path,omitempty"`
+
+	// When specified, would use host netns, however, mostly you should not use this, it's dangerous.
+	HostNetns *bool   `yaml:"host_netns,omitempty" json:"host_netns,omitempty" bson:"host_netns,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type CommonInterfaceStatus struct {
 	Addresses []string `yaml:"addresses" json:"addresses" bson:"addresses"`
 	MTU       int      `yaml:"mtu" json:"mtu" bson:"mtu"`

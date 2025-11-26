@@ -41,15 +41,6 @@ func (netnsInfo *NetNsInfo) ToNetnsKey() (string, error) {
 	return nsId, nil
 }
 
-func withHostNetnsHandle(f func(h *netlink.Handle) error) error {
-	handle, err := netlink.NewHandle()
-	if err != nil {
-		return fmt.Errorf("failed to create netlink handle: %w", err)
-	}
-	defer handle.Close()
-	return f(handle)
-}
-
 func WithMultiNetnsHandle(ctx context.Context, res MultiNetnsResource, f func(h *netlink.Handle, netnsInfo *NetNsInfo) error) error {
 
 	netnsInfos, err := res.GetNetNsInfos(ctx)
