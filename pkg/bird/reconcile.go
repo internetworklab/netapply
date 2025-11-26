@@ -8,7 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkgnetns "github.com/internetworklab/netapply/pkg/netns"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 const ResourceTypeBirdEBGPEBGP = "bird-ebgp"
@@ -325,4 +328,86 @@ func (proto *BGPProtocol) Cancel(ctx context.Context) error {
 		return fmt.Errorf("failed to run reloader shell command: %w", err)
 	}
 	return nil
+}
+
+func (proto *BGPProtocol) GetNetNsInfo(ctx context.Context) (*pkgnetns.NetNsInfo, error) {
+	pid := os.Getpid()
+	return &pkgnetns.NetNsInfo{Pid: &pid}, nil
+}
+
+func (proto *BGPProtocol) ToStatus(ctx context.Context) (pkginterfacestub.InterfaceStatus, error) {
+	if proto == nil {
+		return nil, fmt.Errorf("you are calling ToStatus on a nil BGPProtocol which is considered as an undefined behavior")
+	}
+	if proto.ConfigDirectory == "" {
+		return nil, fmt.Errorf("the BGPProtocol on which you are calling ToStatus does not assigned a actual file path")
+	}
+	fullpath, err := proto.ToFilePath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
+	}
+
+	config, err := FromFile(fullpath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse config file %s: %w", fullpath, err)
+	}
+	status := &BirdBGPProtocolStatus{
+		CurrentConfig: config,
+	}
+	return status, nil
+}
+
+func (bgpProto *BGPProtocol) IsEqual(other *BGPProtocol) bool {
+	if bgpProto == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	if bgpProto.Name != other.Name {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(bgpProto.Template, other.Template) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(bgpProto.Interface, other.Interface) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(bgpProto.LocalAddress, other.LocalAddress) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(bgpProto.PeerAddress, other.PeerAddress) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(bgpProto.LocalASN, other.LocalASN) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(bgpProto.PeerASN, other.PeerASN) {
+		return false
+	}
+	if !pkgutils.CompareBoolPointers(bgpProto.PeerExternal, other.PeerExternal) {
+		return false
+	}
+	if !pkgutils.CompareBoolPointers(bgpProto.PeerInternal, other.PeerInternal) {
+		return false
+	}
+	return true
+}
+
+func (bgpStatus *BirdBGPProtocolStatus) IsEqual(other pkginterfacestub.InterfaceStatus) bool {
+	if bgpStatus == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	rhs, ok := other.(*BirdBGPProtocolStatus)
+	if !ok {
+		return false
+	}
+	if rhs == nil {
+		return false
+	}
+
+	return bgpStatus.CurrentConfig.IsEqual(rhs.CurrentConfig)
 }

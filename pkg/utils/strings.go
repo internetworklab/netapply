@@ -20,7 +20,7 @@ func CompareStringPointers(lhs, rhs *string) bool {
 	}
 
 	if rhs == nil {
-		return lhs == nil
+		return false
 	}
 
 	return *lhs == *rhs
@@ -32,9 +32,19 @@ func CompareIntPointers(lhs, rhs *int) bool {
 	}
 
 	if rhs == nil {
-		return lhs == nil
+		return false
 	}
 
+	return *lhs == *rhs
+}
+
+func CompareBoolPointers(lhs, rhs *bool) bool {
+	if lhs == nil {
+		return rhs == nil
+	}
+	if rhs == nil {
+		return false
+	}
 	return *lhs == *rhs
 }
 

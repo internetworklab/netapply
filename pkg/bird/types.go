@@ -6,6 +6,12 @@ type BirdBGPConfigurationList struct {
 	EBGPProtocols         []BGPProtocol `yaml:"ebgp_protocols" json:"ebgp_protocols" bson:"ebgp_protocols"`
 }
 
+// +k8s:deepcopy-gen=true
+type BirdBGPProtocolStatus struct {
+	// CurrentConfig is the current configuration parsed from file in the disk.
+	CurrentConfig *BGPProtocol `yaml:"current_config,omitempty" json:"current_config,omitempty" bson:"current_config,omitempty"`
+}
+
 type BGPProtocol struct {
 	Name         string  `yaml:"name" json:"name" bson:"name"`
 	Template     *string `yaml:"template,omitempty" json:"template,omitempty" bson:"template,omitempty"`

@@ -49,6 +49,16 @@ func (nodeConfig *NodeConfig) ToStatus(ctx context.Context) ([]*pkginterfacestub
 		}
 	}
 
+	if nodeConfig.Resources.BirdBGP != nil {
+		for _, bgpCfg := range nodeConfig.Resources.BirdBGP.EBGPProtocols {
+			statusWrapper, err := pkginterfacestub.ToStatusWrapper(ctx, &bgpCfg)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get status wrapper for bird bgp config: %w", err)
+			}
+			statuses = append(statuses, statusWrapper)
+		}
+	}
+
 	return statuses, nil
 }
 
