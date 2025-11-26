@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math/rand"
 	"net"
 	"strconv"
 	"strings"
@@ -73,7 +72,7 @@ func (wgInterfaceStatus *WireGuardInterfaceStatus) IsEqual(other pkginterfacestu
 	if other == nil {
 		return false
 	}
-	
+
 	rhs, ok := other.(*WireGuardInterfaceStatus)
 	if !ok {
 		// not the same kind, hence not equal
@@ -627,9 +626,13 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 	}
 
 	if wgtypesConf.ListenPort == nil {
-		listenPort := rand.Intn(65535-11024+1) + 11024
+		log.Printf("Port is unspecified for wg interface %s, will generate a random free port", wgConf.Name)
+		listenPort, err := pkgutils.GetRandomFreeUDPPort()
+		if err != nil {
+			return fmt.Errorf("failed to get random free port for interface %s: %w", wgConf.Name, err)
+		}
 		wgtypesConf.ListenPort = &listenPort
-		log.Printf("Randomly generated listen port for interface %s", wgConf.Name)
+		log.Printf("Generated a random free port %d for interface %s", listenPort, wgConf.Name)
 	}
 
 	wgLink := &netlink.Wireguard{

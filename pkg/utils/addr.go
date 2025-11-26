@@ -174,3 +174,22 @@ func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.R
 	}
 	return udpAddr, nil
 }
+
+func GetRandomFreeUDPPort() (int, error) {
+	// Listen on UDP port 0, which means the OS will assign a free port.
+	addr, err := net.ResolveUDPAddr("udp", "localhost:0")
+	if err != nil {
+		return 0, fmt.Errorf("failed to resolve UDP address: %w", err)
+	}
+
+	conn, err := net.ListenUDP("udp", addr)
+	if err != nil {
+		return 0, fmt.Errorf("failed to listen on UDP port: %w", err)
+	}
+	defer conn.Close() // Ensure the connection is closed when done.
+
+	// Get the assigned local address, which includes the free port.
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	port := localAddr.Port
+	return port, nil
+}
