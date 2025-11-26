@@ -1,0 +1,43 @@
+resources:
+  bird_bgp:
+    reloader_shell_command:
+      - "true"
+    target_config_directory: /root/projects/go-projects/netapply/examples/test_bgp_peers
+    ebgp_protocols:
+      - name: bgp1
+        template: dnpeers_dualstack
+        interface: utun1
+        local_address: fe80::afaf:bfbf:cdcf:2f%utun1
+        peer_address: fe80::2923%utun1
+        local_asn: OWNAS
+        peer_asn: "4242422923"
+      - name: bgp2
+        template: dnpeers_dualstack
+        interface: utun2
+        local_address: fe80::afaf:bfbf:cdcf:7%utun2
+        peer_address: fe80::ffff:2092%utun2
+        local_asn: OWNAS
+        peer_asn: "4242422092"
+      - name: bgp3
+        template: dnpeers_dualstack
+        interface: utun3
+        local_address: fe80::9742:2d02:f225:e5a7%utun3
+        peer_address: fe80::1221:2:1%utun3
+        local_asn: OWNAS
+        peer_asn: "4242421221"
+      - name: bgp4
+        template: dnpeers_dualstack
+        interface: utun4
+        local_address: fe80::4258:3cd4:5b39:e476%utun4
+        peer_address: fe80::1732%utun4
+        local_asn: OWNAS
+        peer_asn: "4242421732"
+      - name: bgp5
+        template: dnpeers_dualstack
+        interface: utun5
+        local_address: fdda:8ca4:1556:a000:fffe:0:1:1771
+        peer_address: fd64:8964:8964::3
+        local_asn: OWNAS
+        peer_external: true
+        peer_asn: "4242423264"
+

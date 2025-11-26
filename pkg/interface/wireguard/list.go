@@ -16,6 +16,10 @@ func (wgCfgsList *WireGuardConfigurationList) GetType() string {
 }
 
 func (wgCfgsList *WireGuardConfigurationList) GetProvisioners() []pkginterfacestub.NetnsIdentifiableProvisioner {
+	if wgCfgsList == nil {
+		return nil
+	}
+
 	provisioners := make([]pkginterfacestub.NetnsIdentifiableProvisioner, 0)
 	for _, wgCfg := range wgCfgsList.WireGuardConfigs {
 		if wgCfg.IsSoftDeleted() {

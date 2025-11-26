@@ -123,6 +123,14 @@ func FromFile(filename string) (*BGPProtocol, error) {
 					peerASN := lineWords[3]
 					peerASN = trimLiteralStr(peerASN)
 					result.PeerASN = &peerASN
+					if len(lineWords) >= 5 {
+						peerType := trimLiteralStr(lineWords[4])
+						if peerType == "external" {
+							result.PeerExternal = truePtr()
+						} else if peerType == "internal" {
+							result.PeerInternal = truePtr()
+						}
+					}
 				} else if len(lineWords) >= 3 {
 					peerType := trimLiteralStr(lineWords[2])
 					if peerType == "external" {
