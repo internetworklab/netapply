@@ -49,10 +49,10 @@ type WireGuardPeerStatus struct {
 
 // +k8s:deepcopy-gen=true
 type WireGuardInterfaceStatus struct {
-	InterfaceStatus *pkginterfacecommon.CommonInterfaceStatus `yaml:"interface_status" json:"interface_status" bson:"interface_status"`
+	InterfaceStatus *pkginterfacecommon.CommonInterfaceStatus `yaml:"interface_status,omitempty" json:"interface_status,omitempty" bson:"interface_status,omitempty"`
 	PublicKey       string                                    `yaml:"public_key" json:"public_key" bson:"public_key"`
 	ListenPort      int                                       `yaml:"listen_port" json:"listen_port" bson:"listen_port"`
-	Peers           []WireGuardPeerStatus                     `yaml:"peers" json:"peers" bson:"peers"`
+	Peers           []WireGuardPeerStatus                     `yaml:"peers,omitempty" json:"peers,omitempty" bson:"peers,omitempty"`
 }
 
 type WireGuardInterfaceChangeSet struct {

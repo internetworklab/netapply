@@ -15,32 +15,6 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func parseCIDR(cidr string) (net.IP, *net.IPNet, error) {
-	ip, ipnet, err := net.ParseCIDR(cidr)
-	if err == nil {
-		return ip, ipnet, nil
-	}
-
-	ip = net.ParseIP(cidr)
-	if ip == nil {
-		return nil, nil, fmt.Errorf("failed to parse cidr: %w", err)
-	}
-
-	ip4 := ip.To4()
-	if ip4 != nil {
-		ipnet = &net.IPNet{
-			IP:   ip4,
-			Mask: net.CIDRMask(32, 32),
-		}
-		return ip4, ipnet, nil
-	}
-	ipnet = &net.IPNet{
-		IP:   ip,
-		Mask: net.CIDRMask(128, 128),
-	}
-	return ip, ipnet, nil
-}
-
 func (addrConfig *AddressConfig) ToNetlinkAddr() (*netlink.Addr, error) {
 	if addrConfig.Peer != nil && addrConfig.Local != nil {
 		localIP := net.ParseIP(*addrConfig.Local)
@@ -218,6 +192,9 @@ func CommonInterfaceStatusFromRes(ctx context.Context, res pkgstub.NetnsAwaredRe
 func (addressesStatus *CommonInterfaceStatus) IsEqual(other *CommonInterfaceStatus) bool {
 	if addressesStatus == nil {
 		return other == nil
+	}
+	if other == nil {
+		return false
 	}
 
 	// Compare addresses

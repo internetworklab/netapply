@@ -26,6 +26,9 @@ func (wgPeerStatus *WireGuardPeerStatus) IsEqual(other *WireGuardPeerStatus) boo
 	if wgPeerStatus == nil {
 		return other == nil
 	}
+	if other == nil {
+		return false
+	}
 
 	if wgPeerStatus.PublicKey != other.PublicKey {
 		return false
@@ -67,9 +70,17 @@ func (wgInterfaceStatus *WireGuardInterfaceStatus) IsEqual(other pkginterfacestu
 		return other == nil
 	}
 
+	if other == nil {
+		return false
+	}
+	
 	rhs, ok := other.(*WireGuardInterfaceStatus)
 	if !ok {
 		// not the same kind, hence not equal
+		return false
+	}
+
+	if rhs == nil {
 		return false
 	}
 
