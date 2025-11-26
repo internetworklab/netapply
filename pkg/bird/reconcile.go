@@ -151,7 +151,7 @@ func (changeSet *BirdEBGPChangeSet) Apply(ctx context.Context) error {
 		return fmt.Errorf("failed to generate config for protocol %s: %w", changeSet.resource.Name, err)
 	}
 
-	fullpath, err := changeSet.resource.ToFilePath()
+	fullpath, err := changeSet.resource.ToFilePath(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get file path for protocol %s: %w", changeSet.resource.Name, err)
 	}
@@ -194,7 +194,7 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to generate config for protocol %s: %w", proto.Name, err)
 	}
 
-	fullpath, err := proto.ToFilePath()
+	fullpath, err := proto.ToFilePath(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
@@ -216,7 +216,7 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 }
 
 func (proto *BGPProtocol) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
-	fullpath, err := proto.ToFilePath()
+	fullpath, err := proto.ToFilePath(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
@@ -285,7 +285,7 @@ func (proto *BGPProtocol) GetInterfaceName() string {
 }
 
 func (proto *BGPProtocol) CheckExist(ctx context.Context) (bool, error) {
-	fullpath, err := proto.ToFilePath()
+	fullpath, err := proto.ToFilePath(ctx)
 	if err != nil {
 		return false, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
@@ -308,7 +308,7 @@ func (proto *BGPProtocol) IsSoftDeleted() bool {
 }
 
 func (proto *BGPProtocol) Cancel(ctx context.Context) error {
-	fullpath, err := proto.ToFilePath()
+	fullpath, err := proto.ToFilePath(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}
@@ -339,10 +339,8 @@ func (proto *BGPProtocol) ToStatus(ctx context.Context) (pkginterfacestub.Interf
 	if proto == nil {
 		return nil, fmt.Errorf("you are calling ToStatus on a nil BGPProtocol which is considered as an undefined behavior")
 	}
-	if proto.ConfigDirectory == "" {
-		return nil, fmt.Errorf("the BGPProtocol on which you are calling ToStatus does not assigned a actual file path")
-	}
-	fullpath, err := proto.ToFilePath()
+	
+	fullpath, err := proto.ToFilePath(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
 	}

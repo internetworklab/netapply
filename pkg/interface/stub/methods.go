@@ -29,7 +29,7 @@ func CheckExist(ctx context.Context, res NetnsAwaredResource) (bool, error) {
 func ToStatusWrapper(ctx context.Context, res NetnsAwaredProbable) (*StatusWrapper, error) {
 	name := res.GetInterfaceName()
 	ty := res.GetType()
-	exist, err := CheckExist(ctx, res)
+	exist, err := res.CheckExist(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check if resource exists: %w", err)
 	}

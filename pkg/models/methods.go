@@ -11,6 +11,7 @@ import (
 
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgreconcile "github.com/internetworklab/netapply/pkg/reconcile"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func (nodeConfig *NodeConfig) Up(ctx context.Context, delete bool) error {
@@ -50,6 +51,7 @@ func (nodeConfig *NodeConfig) ToStatus(ctx context.Context) ([]*pkginterfacestub
 	}
 
 	if nodeConfig.Resources.BirdBGP != nil {
+		ctx = pkgutils.SetBirdBGPConfigDirInCtx(ctx, nodeConfig.Resources.BirdBGP.TargetConfigDirectory)
 		for _, bgpCfg := range nodeConfig.Resources.BirdBGP.EBGPProtocols {
 			statusWrapper, err := pkginterfacestub.ToStatusWrapper(ctx, &bgpCfg)
 			if err != nil {

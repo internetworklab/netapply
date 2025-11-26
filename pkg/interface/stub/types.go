@@ -19,6 +19,7 @@ type InterfaceStatus interface {
 
 type NetnsAwaredProbable interface {
 	NetnsAwaredResource
+	CheckExist(ctx context.Context) (bool, error)
 	ToStatus(ctx context.Context) (InterfaceStatus, error)
 }
 
