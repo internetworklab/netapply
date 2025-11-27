@@ -3,6 +3,7 @@ package bird
 type BirdBGPConfigurationList struct {
 	ReloaderShellCommand  []string      `yaml:"reloader_shell_command" json:"reloader_shell_command" bson:"reloader_shell_command"`
 	TargetConfigDirectory string        `yaml:"target_config_directory" json:"target_config_directory" bson:"target_config_directory"`
+	BirdSocketPath        string        `yaml:"bird_socket_path" json:"bird_socket_path" bson:"bird_socket_path"`
 	EBGPProtocols         []BGPProtocol `yaml:"ebgp_protocols" json:"ebgp_protocols" bson:"ebgp_protocols"`
 }
 
@@ -10,6 +11,9 @@ type BirdBGPConfigurationList struct {
 type BirdBGPProtocolStatus struct {
 	// CurrentConfig is the current configuration parsed from file in the disk.
 	CurrentConfig *BGPProtocol `yaml:"current_config,omitempty" json:"current_config,omitempty" bson:"current_config,omitempty"`
+
+	// Current Bird BGP Protocol information gathered from `birdc show protocols all <name>`
+	ProtocolStatus *BGPProtoInfo `yaml:"protocol_status,omitempty" json:"protocol_status,omitempty" bson:"protocol_status,omitempty"`
 }
 
 type BGPProtocol struct {

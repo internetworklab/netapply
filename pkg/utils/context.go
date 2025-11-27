@@ -19,6 +19,7 @@ const CtxKeyStartedAt CtxKey = "started_at"
 const CtxKeyUnixSocketPath CtxKey = "unix_socket_path"
 const CtxKeyResolverEndpoint CtxKey = "resolver_endpoint"
 const CtxKeyBirdBGPConfigDir CtxKey = "bird_bgp_config_dir"
+const CtxKeyBirdControlSocket CtxKey = "bird_control_socket"
 
 type ClientAuth struct {
 	TLSClientCertFile     string
@@ -99,6 +100,18 @@ func BirdBGPConfigDirFromCtx(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("bird bgp config directory is not set in context")
 	}
 	return configDir, nil
+}
+
+func BirdControlSocketFromCtx(ctx context.Context) (string, error) {
+	controlSocket, ok := ctx.Value(CtxKeyBirdControlSocket).(string)
+	if !ok {
+		return "", fmt.Errorf("bird control socket is not set in context")
+	}
+	return controlSocket, nil
+}
+
+func SetBirdControlSocketInCtx(ctx context.Context, controlSocket string) context.Context {
+	return context.WithValue(ctx, CtxKeyBirdControlSocket, controlSocket)
 }
 
 func SetDockerCliInCtx(ctx context.Context, cli *client.Client) context.Context {

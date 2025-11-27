@@ -339,7 +339,7 @@ func (proto *BGPProtocol) ToStatus(ctx context.Context) (pkginterfacestub.Interf
 	if proto == nil {
 		return nil, fmt.Errorf("you are calling ToStatus on a nil BGPProtocol which is considered as an undefined behavior")
 	}
-	
+
 	fullpath, err := proto.ToFilePath(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get file path for protocol %s: %w", proto.Name, err)
@@ -349,8 +349,24 @@ func (proto *BGPProtocol) ToStatus(ctx context.Context) (pkginterfacestub.Interf
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse config file %s: %w", fullpath, err)
 	}
+
+	birdSocket, err := pkgutils.BirdControlSocketFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bird control socket: %w", err)
+	}
+	birdCli := NewBirdClientFromSocket(birdSocket)
+	if err := birdCli.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect to bird: %w", err)
+	}
+	defer birdCli.Close()
+	protocolStatus, err := birdCli.ShowBGPProtocolInfo(ctx, proto.Name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bird protocol status: %w", err)
+	}
+
 	status := &BirdBGPProtocolStatus{
-		CurrentConfig: config,
+		CurrentConfig:  config,
+		ProtocolStatus: protocolStatus,
 	}
 	return status, nil
 }

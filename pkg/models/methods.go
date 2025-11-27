@@ -52,6 +52,7 @@ func (nodeConfig *NodeConfig) ToStatus(ctx context.Context) ([]*pkginterfacestub
 
 	if nodeConfig.Resources.BirdBGP != nil {
 		ctx = pkgutils.SetBirdBGPConfigDirInCtx(ctx, nodeConfig.Resources.BirdBGP.TargetConfigDirectory)
+		ctx = pkgutils.SetBirdControlSocketInCtx(ctx, nodeConfig.Resources.BirdBGP.BirdSocketPath)
 		for _, bgpCfg := range nodeConfig.Resources.BirdBGP.EBGPProtocols {
 			statusWrapper, err := pkginterfacestub.ToStatusWrapper(ctx, &bgpCfg)
 			if err != nil {
