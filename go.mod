@@ -1,6 +1,6 @@
 module github.com/internetworklab/netapply
 
-go 1.24.1
+go 1.23.1
 
 require (
 	github.com/alecthomas/kong v1.12.1

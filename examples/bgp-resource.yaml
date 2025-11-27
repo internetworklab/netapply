@@ -1,8 +1,10 @@
+---
 resources:
   bird_bgp:
     reloader_shell_command:
-      - "true"
-    target_config_directory: /root/projects/go-projects/netapply/examples/test_bgp_peers
+      - true
+    target_config_directory: /etc/bird/ebgp_peers
+    bird_socket_path: /var/run/bird/bird.ctl
     ebgp_protocols:
       - name: bgp1
         template: dnpeers_dualstack
@@ -38,6 +40,4 @@ resources:
         local_address: fdda:8ca4:1556:a000:fffe:0:1:1771
         peer_address: fd64:8964:8964::3
         local_asn: OWNAS
-        peer_external: true
         peer_asn: "4242423264"
-
