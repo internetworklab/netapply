@@ -24,6 +24,7 @@ func test() error {
 		"[fe80::1771]:1771",
 		"iedon.net:23438",
 		"hkg1.exploro.one:57870",
+		"github.com:13134",
 	}
 
 	for _, resolverEndpoint := range resolverEndpoints {

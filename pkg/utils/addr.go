@@ -150,10 +150,10 @@ func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net
 
 // IPv6 wherever possible, IPv4 otherwise
 func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.Resolver) (*net.UDPAddr, error) {
-	hostPart, portPart, err := StripPortSuffix(endpoint)
-	if err != nil {
-		return nil, err
-	}
+
+	// note: there is better std impl
+	// net.SplitHostPort
+	// net.JoinHostPort (though we don't need that)
 
 	if resolver == nil {
 		udpAddr, err := net.ResolveUDPAddr("udp6", endpoint)
@@ -165,6 +165,11 @@ func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.R
 			return udpAddr, nil
 		}
 		return nil, fmt.Errorf("failed to resolve UDP address for endpoint %s", endpoint)
+	}
+
+	hostPart, portPart, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		return nil, err
 	}
 
 	ip, err := TryResolveIP(ctx, hostPart, resolver)
