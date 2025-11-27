@@ -1,13 +1,25 @@
 package utils
 
-import "golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+import (
+	"sort"
+
+	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+)
 
 func CompareStringSlices(lhs, rhs []string) bool {
 	if len(lhs) != len(rhs) {
 		return false
 	}
-	for i := range lhs {
-		if lhs[i] != rhs[i] {
+
+	lhsSorted := make([]string, 0)
+	lhsSorted = append(lhsSorted, lhs...)
+	rhsSorted := make([]string, 0)
+	rhsSorted = append(rhsSorted, rhs...)
+	sort.Strings(lhsSorted)
+	sort.Strings(rhsSorted)
+
+	for i := range lhsSorted {
+		if lhsSorted[i] != rhsSorted[i] {
 			return false
 		}
 	}

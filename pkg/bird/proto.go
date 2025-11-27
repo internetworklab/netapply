@@ -10,6 +10,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
+	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
 func SplitBy(seq []byte) bufio.SplitFunc {
@@ -601,4 +604,189 @@ func (client *BirdClient) ShowBGPProtocolInfo(ctx context.Context, protocolName 
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	}
+}
+
+func (basics *BGPProtoBasics) IsEqual(other *BGPProtoBasics) bool {
+	if basics == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return basics.Name == other.Name &&
+		basics.Proto == other.Proto &&
+		basics.Table == other.Table &&
+		basics.State == other.State &&
+		basics.Since == other.Since &&
+		basics.Info == other.Info
+}
+
+func (routesStat *ChannelRoutesStat) IsEqual(other *ChannelRoutesStat) bool {
+	if routesStat == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return routesStat.Imported == other.Imported &&
+		routesStat.Filtered == other.Filtered &&
+		routesStat.Exported == other.Exported &&
+		routesStat.Preferred == other.Preferred
+}
+
+func (routeChangesStatEntry *ChannelRouteChangesStatEntry) IsEqual(other *ChannelRouteChangesStatEntry) bool {
+	if routeChangesStatEntry == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return pkgutils.CompareIntPointers(routeChangesStatEntry.Received, other.Received) &&
+		pkgutils.CompareIntPointers(routeChangesStatEntry.Rejected, other.Rejected) &&
+		pkgutils.CompareIntPointers(routeChangesStatEntry.Filtered, other.Filtered) &&
+		pkgutils.CompareIntPointers(routeChangesStatEntry.Ignored, other.Ignored) &&
+		pkgutils.CompareIntPointers(routeChangesStatEntry.Accepted, other.Accepted)
+}
+
+func (routeUpdatesState *ChannelRouteChangesStat) IsEqual(other *ChannelRouteChangesStat) bool {
+	if routeUpdatesState == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	return routeUpdatesState.ImportUpdates.IsEqual(other.ImportUpdates) &&
+		routeUpdatesState.ImportWithdraws.IsEqual(other.ImportWithdraws) &&
+		routeUpdatesState.ExportUpdates.IsEqual(other.ExportUpdates) &&
+		routeUpdatesState.ExportWithdraws.IsEqual(other.ExportWithdraws)
+}
+
+func (channelInfo *ChannelInfo) IsEqual(other *ChannelInfo) bool {
+	if channelInfo == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	if channelInfo.Name != other.Name {
+		return false
+	}
+	if channelInfo.State != other.State {
+		return false
+	}
+	if !pkgutils.CompareIntPointers(channelInfo.Preference, other.Preference) {
+		return false
+	}
+	if channelInfo.InputFilter != other.InputFilter {
+		return false
+	}
+	if channelInfo.OutputFilter != other.OutputFilter {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(channelInfo.BGPNextHop, other.BGPNextHop) {
+		return false
+	}
+
+	if !channelInfo.RoutesStat.IsEqual(other.RoutesStat) {
+		return false
+	}
+
+	if !channelInfo.RouteChangesStat.IsEqual(other.RouteChangesStat) {
+		return false
+	}
+
+	return true
+}
+
+func compareChannels(lhs, rhs map[string]ChannelInfo) bool {
+	if len(lhs) != len(rhs) {
+		return false
+	}
+
+	commonSet := make(map[string]*ChannelInfo)
+	for k, v_left := range lhs {
+		if _, ok := rhs[k]; ok {
+			commonSet[k] = &v_left
+		}
+	}
+
+	if len(commonSet) != len(lhs) || len(commonSet) != len(rhs) {
+		return false
+	}
+
+	for k, v_right := range rhs {
+		v_left, ok := commonSet[k]
+		if !ok {
+			return false
+		}
+		if !v_left.IsEqual(&v_right) {
+			return false
+		}
+	}
+	return true
+}
+
+func (info *BGPProtoInfo) IsEqual(other pkginterfacestub.InterfaceStatus) bool {
+	if info == nil {
+		return other == nil
+	}
+	if other == nil {
+		return false
+	}
+	rhs, ok := other.(*BGPProtoInfo)
+	if !ok {
+		return false
+	}
+	if rhs == nil {
+		return false
+	}
+	if !info.Basics.IsEqual(rhs.Basics) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.VRF, rhs.VRF) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.BGPState, rhs.BGPState) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.NeighborAddress, rhs.NeighborAddress) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.NeighborAS, rhs.NeighborAS) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.LocalAS, rhs.LocalAS) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.NeighborID, rhs.NeighborID) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.Session, rhs.Session) {
+		return false
+	}
+	if !pkgutils.CompareStringPointers(info.SourceAddress, rhs.SourceAddress) {
+		return false
+	}
+
+	localCaps := make([]string, 0)
+	if info.LocalCapabilities != nil {
+		for _, cap := range info.LocalCapabilities {
+			localCaps = append(localCaps, cap)
+		}
+	}
+	neighborCaps := make([]string, 0)
+	if rhs.LocalCapabilities != nil {
+		for _, cap := range rhs.LocalCapabilities {
+			neighborCaps = append(neighborCaps, cap)
+		}
+	}
+	if !pkgutils.CompareStringSlices(localCaps, neighborCaps) {
+		return false
+	}
+
+	if !compareChannels(info.Channels, rhs.Channels) {
+		return false
+	}
+
+	return true
 }

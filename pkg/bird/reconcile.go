@@ -422,6 +422,11 @@ func (bgpStatus *BirdBGPProtocolStatus) IsEqual(other pkginterfacestub.Interface
 	if rhs == nil {
 		return false
 	}
-
-	return bgpStatus.CurrentConfig.IsEqual(rhs.CurrentConfig)
+	if !bgpStatus.CurrentConfig.IsEqual(rhs.CurrentConfig) {
+		return false
+	}
+	if !bgpStatus.ProtocolStatus.IsEqual(rhs.ProtocolStatus) {
+		return false
+	}
+	return true
 }
