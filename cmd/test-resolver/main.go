@@ -9,6 +9,7 @@ import (
 
 func test() error {
 	resolverEndpoints := []string{
+		"", // use system resolver
 		"1.1.1.1:53",
 		"8.8.8.8:53",
 		"[2606:4700:4700::1111]:53",
@@ -17,6 +18,7 @@ func test() error {
 		"[2001:4860:4860::8844]:53",
 	}
 	udpEndpoints := []string{
+		"lax1.exploro.one:12312",
 		"www.google.com:443",
 		"1.2.3.4:21771",
 		"[fe80::1771]:1771",

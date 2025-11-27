@@ -126,8 +126,9 @@ func StripPortSuffix(endpoint string) (string, string, error) {
 	return ipaddrPart, portStr, nil
 }
 
+// Will always try obtain AAAA record first, fallback to A otherwise.
 func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net.IP, error) {
-	networks := []string{"ip", "ip4", "ip6"}
+	networks := []string{"ip6", "ip", "ip4"}
 	var err error
 	var ips []netip.Addr
 	for _, nw := range networks {
@@ -147,15 +148,23 @@ func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net
 	return nil, fmt.Errorf("failed to resolve IP address for host %s, last error: %w, current netns: %s", host, err, currentNs.UniqueId())
 }
 
+// IPv6 wherever possible, IPv4 otherwise
 func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.Resolver) (*net.UDPAddr, error) {
-	if resolver == nil {
-		// using system resolver
-		return net.ResolveUDPAddr("udp", endpoint)
-	}
-
 	hostPart, portPart, err := StripPortSuffix(endpoint)
 	if err != nil {
 		return nil, err
+	}
+
+	if resolver == nil {
+		udpAddr, err := net.ResolveUDPAddr("udp6", endpoint)
+		if err == nil && udpAddr.IP.To4() == nil {
+			return udpAddr, nil
+		}
+		udpAddr, err = net.ResolveUDPAddr("udp", endpoint)
+		if err == nil && udpAddr.IP.To4() != nil {
+			return udpAddr, nil
+		}
+		return nil, fmt.Errorf("failed to resolve UDP address for endpoint %s", endpoint)
 	}
 
 	ip, err := TryResolveIP(ctx, hostPart, resolver)
