@@ -38,13 +38,16 @@ type WireGuardConfig struct {
 
 // +k8s:deepcopy-gen=true
 type WireGuardPeerStatus struct {
-	PublicKey           string   `yaml:"public_key" json:"public_key" bson:"public_key"`
-	Endpoint            *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty" bson:"endpoint,omitempty"`
-	AllowedIPs          []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty" bson:"allowedips,omitempty"`
+	PublicKey  string   `yaml:"public_key" json:"public_key" bson:"public_key"`
+	Endpoint   *string  `yaml:"endpoint,omitempty" json:"endpoint,omitempty" bson:"endpoint,omitempty"`
+	AllowedIPs []string `yaml:"allowedips,omitempty" json:"allowedips,omitempty" bson:"allowedips,omitempty"`
 
 	// Seconds of PKL
-	PersistentKeepalive *int     `yaml:"persistent_keepalive,omitempty" json:"persistent_keepalive,omitempty" bson:"persistent_keepalive,omitempty"`
-	PresharedKey        *string  `yaml:"preshared_key,omitempty" json:"preshared_key,omitempty" bson:"preshared_key,omitempty"`
+	PersistentKeepalive *int    `yaml:"persistent_keepalive,omitempty" json:"persistent_keepalive,omitempty" bson:"persistent_keepalive,omitempty"`
+	PresharedKey        *string `yaml:"preshared_key,omitempty" json:"preshared_key,omitempty" bson:"preshared_key,omitempty"`
+
+	// Optional field, might not necessarily be present. In unit of seconds.
+	LastHandshakeAt *int64 `yaml:"last_handshake_at,omitempty" json:"last_handshake_at,omitempty" bson:"last_handshake_at,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

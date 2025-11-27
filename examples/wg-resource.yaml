@@ -11,28 +11,28 @@ resources:
     containers:
       - netns_path: /run/netns/nstest
     wireguard_configs:
-      - name: utest1
+      - name: wg1
         container:
           netns_path: /run/netns/nstest
         peers:
-          - publickey: "yzeaLryeUz9ZXc0ipTc7ZjlXPGc5qdNcfbNif9vJzho="
+          - publickey: "5vSikDIhhag80D+/IcGez86giTwnAHyEc8/TtWtJXTQ="
             allowedips:
               - "0.0.0.0/0"
               - "::/0"
-            endpoint: "vie1.exploro.one:57132"
+            endpoint: "vie1.exploro.one:53906"
         addresses:
           - peer: "10.23.0.4/32"
             local: "10.23.0.1"
           - cidr: "fe80::123/64"
-      - name: utest2
+      - name: wg2
         container:
           netns_path: /run/netns/nstest
         peers:
-          - publickey: "pHobLkR1/9XSIpsZqYUdIc7aCHADGVNJv9NgfHPaTWI="
+          - publickey: "l6gkYsi+i8lOlq6+oYQylqk/iU+hyyhYHQXX63d2TjQ="
             allowedips:
               - "0.0.0.0/0"
               - "::/0"
-            endpoint: "vie1.exploro.one:35158"
+            endpoint: "vie1.exploro.one:53906"
         addresses:
           - peer: "10.23.0.1/32"
             local: "10.23.0.4"

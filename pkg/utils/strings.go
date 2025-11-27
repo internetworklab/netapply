@@ -38,6 +38,18 @@ func CompareStringPointers(lhs, rhs *string) bool {
 	return *lhs == *rhs
 }
 
+func CompareInt64Pointers(lhs, rhs *int64) bool {
+	if lhs == nil {
+		return rhs == nil
+	}
+
+	if rhs == nil {
+		return false
+	}
+
+	return *lhs == *rhs
+}
+
 func CompareIntPointers(lhs, rhs *int) bool {
 	if lhs == nil {
 		return rhs == nil

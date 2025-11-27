@@ -49,6 +49,10 @@ func (wgPeerStatus *WireGuardPeerStatus) IsEqual(other *WireGuardPeerStatus) boo
 		return false
 	}
 
+	if !pkgutils.CompareInt64Pointers(wgPeerStatus.LastHandshakeAt, other.LastHandshakeAt) {
+		return false
+	}
+
 	return true
 }
 
@@ -144,6 +148,12 @@ func (wgConfig *WireGuardConfig) ToStatus(ctx context.Context) (pkginterfacestub
 			for _, allowedIP := range peer.AllowedIPs {
 				peerStatus.AllowedIPs = append(peerStatus.AllowedIPs, allowedIP.String())
 			}
+
+			if !peer.LastHandshakeTime.IsZero() {
+				lastHS := peer.LastHandshakeTime.Unix()
+				peerStatus.LastHandshakeAt = &lastHS
+			}
+
 			status.Peers = append(status.Peers, peerStatus)
 		}
 
