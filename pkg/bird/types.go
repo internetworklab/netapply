@@ -16,6 +16,7 @@ type BirdBGPProtocolStatus struct {
 	ProtocolStatus *BGPProtoInfo `yaml:"protocol_status,omitempty" json:"protocol_status,omitempty" bson:"protocol_status,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type BGPProtocol struct {
 	Name         string  `yaml:"name" json:"name" bson:"name"`
 	Template     *string `yaml:"template,omitempty" json:"template,omitempty" bson:"template,omitempty"`

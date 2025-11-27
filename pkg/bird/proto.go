@@ -101,6 +101,7 @@ type Block struct {
 	Lines      []Line `json:"lines"`
 }
 
+// +k8s:deepcopy-gen=true
 type ChannelRoutesStat struct {
 	Imported  int `json:"imported"`
 	Filtered  int `json:"filtered"`
@@ -108,6 +109,7 @@ type ChannelRoutesStat struct {
 	Preferred int `json:"preferred"`
 }
 
+// +k8s:deepcopy-gen=true
 type ChannelRouteChangesStatEntry struct {
 	Received *int `json:"received,omitempty"`
 	Rejected *int `json:"rejected,omitempty"`
@@ -116,6 +118,7 @@ type ChannelRouteChangesStatEntry struct {
 	Accepted *int `json:"accepted,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type ChannelRouteChangesStat struct {
 	ImportUpdates   *ChannelRouteChangesStatEntry `json:"import_updates,omitempty"`
 	ImportWithdraws *ChannelRouteChangesStatEntry `json:"import_withdraws,omitempty"`
@@ -123,8 +126,10 @@ type ChannelRouteChangesStat struct {
 	ExportWithdraws *ChannelRouteChangesStatEntry `json:"export_withdraws,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type BGPCapabilitiesInfo []string
 
+// +k8s:deepcopy-gen=true
 type ChannelInfo struct {
 	Name             string                   `json:"name"`
 	State            string                   `json:"state"`
@@ -136,6 +141,7 @@ type ChannelInfo struct {
 	BGPNextHop       *string                  `json:"bgp_next_hop,omitempty"`
 }
 
+// +k8s:deepcopy-gen=true
 type BGPProtoBasics struct {
 	Name  string `json:"name"`
 	Proto string `json:"proto"`
@@ -145,6 +151,7 @@ type BGPProtoBasics struct {
 	Info  string `json:"info"`
 }
 
+// +k8s:deepcopy-gen=true
 type BGPProtoInfo struct {
 	Basics *BGPProtoBasics `json:"basics,omitempty"`
 

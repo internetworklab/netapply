@@ -60,6 +60,11 @@ func (in *WireGuardPeerStatus) DeepCopyInto(out *WireGuardPeerStatus) {
 		*out = new(string)
 		**out = **in
 	}
+	if in.LastHandshakeAt != nil {
+		in, out := &in.LastHandshakeAt, &out.LastHandshakeAt
+		*out = new(int64)
+		**out = **in
+	}
 	return
 }
 
