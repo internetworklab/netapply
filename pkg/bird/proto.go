@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	pkginterfacestub "github.com/internetworklab/netapply/pkg/interface/stub"
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
@@ -45,8 +46,33 @@ type Line struct {
 const maxTokenSize = 1024 * 1024
 
 type RawMessages struct {
-	Lines  []Line  `json:"lines"`
-	Blocks []Block `json:"blocks"`
+	Lines        []Line  `json:"lines"`
+	Blocks       []Block `json:"blocks"`
+	numLinesRead int     `json:"-"`
+}
+
+func (msgs *RawMessages) Init() {
+	msgs.Lines = make([]Line, 0)
+}
+
+func (msgs *RawMessages) Ingest(line string) *Block {
+	lineObj := Line{LineIdx: len(msgs.Lines), Raw: line, LineGroupIdx: len(msgs.Blocks)}
+	lineObj.Metadata = testForGroupSep(line)
+	lineObj.Meaning = ReplyMeaningFromCode(lineObj.Metadata.Code)
+	lineObj.Content = lineObj.Raw[lineObj.Metadata.ContentOffset:]
+	lineObj.Indent = countIndent(lineObj.Content)
+	lineObj.TrimmedLine = strings.TrimSpace(lineObj.Content)
+	msgs.Lines = append(msgs.Lines, lineObj)
+	if lineObj.Metadata.HasGroupSeperator && lineObj.Metadata.EndOfReply {
+		blockObj := Block{
+			BlockIndex: len(msgs.Blocks),
+			Lines:      msgs.Lines[msgs.numLinesRead:],
+		}
+		msgs.Blocks = append(msgs.Blocks, blockObj)
+		msgs.numLinesRead = len(msgs.Lines)
+		return &blockObj
+	}
+	return nil
 }
 
 type LineMetadata struct {
@@ -514,8 +540,7 @@ func NewBirdBGPProtoInfoParser(reader io.Reader) *BirdBGPProtoInfoParser {
 
 func (parser *BirdBGPProtoInfoParser) Parse() *BGPProtoInfo {
 	msgs := new(RawMessages)
-	msgs.Lines = make([]Line, 0)
-	numLinesRead := 0
+	msgs.Init()
 
 	scanner := bufio.NewScanner(parser.reader)
 	scanBuf := make([]byte, maxTokenSize)
@@ -523,21 +548,7 @@ func (parser *BirdBGPProtoInfoParser) Parse() *BGPProtoInfo {
 	scanner.Split(SplitBy([]byte{'\n'}))
 	for scanner.Scan() {
 		line := scanner.Text()
-		lineObj := Line{LineIdx: len(msgs.Lines), Raw: line, LineGroupIdx: len(msgs.Blocks)}
-		lineObj.Metadata = testForGroupSep(line)
-		lineObj.Meaning = ReplyMeaningFromCode(lineObj.Metadata.Code)
-		lineObj.Content = lineObj.Raw[lineObj.Metadata.ContentOffset:]
-		lineObj.Indent = countIndent(lineObj.Content)
-		lineObj.TrimmedLine = strings.TrimSpace(lineObj.Content)
-		msgs.Lines = append(msgs.Lines, lineObj)
-		if lineObj.Metadata.HasGroupSeperator && lineObj.Metadata.EndOfReply {
-			blockObj := Block{
-				BlockIndex: len(msgs.Blocks),
-				Lines:      msgs.Lines[numLinesRead:],
-			}
-			msgs.Blocks = append(msgs.Blocks, blockObj)
-			numLinesRead = len(msgs.Lines)
-
+		if blockObj := msgs.Ingest(line); blockObj != nil {
 			protoInfo := parseBGPProtoInfo(blockObj.Lines)
 			if protoInfo != nil {
 				return protoInfo
@@ -576,9 +587,55 @@ func (client *BirdClient) Close() error {
 	return client.conn.Close()
 }
 
-func (client *BirdClient) SendCommand(ctx context.Context, command string) error {
-	_, err := fmt.Fprintf(client.conn, "%s\n", command)
-	return err
+func (client *BirdClient) SendOneOffCommand(ctx context.Context, command string) (replies []string, err error) {
+	resultsChan := make(chan []string)
+
+	go func() {
+		defer close(resultsChan)
+		msgs := new(RawMessages)
+		msgs.Init()
+		scanner := bufio.NewScanner(client.conn)
+		scanBuf := make([]byte, maxTokenSize)
+		scanner.Buffer(scanBuf, maxTokenSize)
+		scanner.Split(SplitBy([]byte{'\n'}))
+		for scanner.Scan() {
+			line := scanner.Text()
+			fmt.Printf("[DBG] Got line from bird: %s\n", line)
+			if blockObj := msgs.Ingest(line); blockObj != nil {
+				if findLineIdx(blockObj.Lines, `^Reconfig`) >= 0 {
+					lines := make([]string, 0)
+					for _, lineObj := range msgs.Lines {
+						lines = append(lines, lineObj.Content)
+					}
+					resultsChan <- lines
+					return
+				}
+			}
+		}
+		resultsChan <- nil
+	}()
+
+	_, err = fmt.Fprintf(client.conn, "%s\n", command)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send command %s to bird: %w", command, err)
+	}
+
+	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
+	defer cancelTimeout()
+
+	fmt.Printf("[DBG] Sent command %s to bird, waiting for replies...\n", command)
+	select {
+	case replies = <-resultsChan:
+		fmt.Printf("[DBG] Got replies from bird:\n")
+		for _, reply := range replies {
+			fmt.Printf("[DBG] reply: %s\n", reply)
+		}
+	case <-timeoutCtx.Done():
+		fmt.Printf("[DBG] Timeout waiting for replies from bird\n")
+		return nil, timeoutCtx.Err()
+	}
+
+	return replies, nil
 }
 
 func (client *BirdClient) GetConnection() net.Conn {
@@ -603,7 +660,11 @@ func (client *BirdClient) ShowBGPProtocolInfo(ctx context.Context, protocolName 
 		protoInfoChan <- nil
 	}()
 
-	client.SendCommand(ctx, fmt.Sprintf("show protocols all %s", protocolName))
+	cmd := fmt.Sprintf("show protocols all %s", protocolName)
+	_, err := fmt.Fprintf(client.conn, "%s\n", cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send command %s to bird: %w", cmd, err)
+	}
 
 	select {
 	case protoInfo := <-protoInfoChan:

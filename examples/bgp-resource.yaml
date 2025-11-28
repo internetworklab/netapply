@@ -42,7 +42,7 @@ resources:
       - name: bgp6
         template: dnpeers_dualstack
         interface: utun6
-        local_address: fe80::1771%utun6
-        peer_address: fe80::1772%utun6
+        local_address: fe80::1774%utun6
+        peer_address: fe80::1771%utun6
         local_asn: OWNAS
         peer_asn: "4242423265"

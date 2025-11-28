@@ -204,7 +204,7 @@ func ReloadBirdConfiguration(ctx context.Context) error {
 	}
 	defer birdCli.Close()
 
-	err = birdCli.SendCommand(ctx, "configure")
+	_, err = birdCli.SendOneOffCommand(ctx, "configure")
 	if err != nil {
 		return fmt.Errorf("failed to refresh protocol: %w", err)
 	}
