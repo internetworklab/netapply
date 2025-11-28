@@ -600,7 +600,6 @@ func (client *BirdClient) SendOneOffCommand(ctx context.Context, command string)
 		scanner.Split(SplitBy([]byte{'\n'}))
 		for scanner.Scan() {
 			line := scanner.Text()
-			fmt.Printf("[DBG] Got line from bird: %s\n", line)
 			if blockObj := msgs.Ingest(line); blockObj != nil {
 				if findLineIdx(blockObj.Lines, `^Reconfig`) >= 0 {
 					lines := make([]string, 0)
@@ -623,19 +622,12 @@ func (client *BirdClient) SendOneOffCommand(ctx context.Context, command string)
 	timeoutCtx, cancelTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelTimeout()
 
-	fmt.Printf("[DBG] Sent command %s to bird, waiting for replies...\n", command)
 	select {
 	case replies = <-resultsChan:
-		fmt.Printf("[DBG] Got replies from bird:\n")
-		for _, reply := range replies {
-			fmt.Printf("[DBG] reply: %s\n", reply)
-		}
+		return replies, nil
 	case <-timeoutCtx.Done():
-		fmt.Printf("[DBG] Timeout waiting for replies from bird\n")
 		return nil, timeoutCtx.Err()
 	}
-
-	return replies, nil
 }
 
 func (client *BirdClient) GetConnection() net.Conn {
