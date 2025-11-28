@@ -14,14 +14,15 @@ import (
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
 
-func (nodeConfig *NodeConfig) Up(ctx context.Context, delete bool) error {
+func (nodeConfig *NodeConfig) Up(ctx context.Context, delete bool) (converged bool, err error) {
 	if nodeConfig.Resources != nil {
 		log.Println("Setting up dataplane ...")
-		if err := nodeConfig.Resources.Reconcile(ctx, delete); err != nil {
-			return fmt.Errorf("failed to reconcile dataplane: %w", err)
+		converged, err = nodeConfig.Resources.Reconcile(ctx, delete)
+		if err != nil {
+			return converged, fmt.Errorf("failed to reconcile dataplane: %w", err)
 		}
 	}
-	return nil
+	return converged, nil
 }
 
 func (nodeConfig *NodeConfig) ToStatus(ctx context.Context) ([]*pkginterfacestub.StatusWrapper, error) {
@@ -222,13 +223,13 @@ func ApplyChanges(ctx context.Context, changeset pkgreconcile.ResourceListChange
 	return nil
 }
 
-func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context, delete bool) error {
+func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context, delete bool) (converged bool, err error) {
 	if dpConfig.BirdBGP != nil {
 		if dpConfig.BirdBGP.TargetConfigDirectory == "" {
-			return fmt.Errorf("bird bgp target config directory is not set")
+			return false, fmt.Errorf("bird bgp target config directory is not set")
 		}
 		if dpConfig.BirdBGP.BirdSocketPath == "" {
-			return fmt.Errorf("bird bgp bird socket path is not set")
+			return false, fmt.Errorf("bird bgp bird socket path is not set")
 		}
 		ctx = pkgutils.SetBirdBGPConfigDirInCtx(ctx, dpConfig.BirdBGP.TargetConfigDirectory)
 		ctx = pkgutils.SetBirdControlSocketInCtx(ctx, dpConfig.BirdBGP.BirdSocketPath)
@@ -237,31 +238,27 @@ func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context, delete bool) err
 	log.Println("Detecting changes for dataplane config ...")
 	changeSet, err := dpConfig.DetectChanges(ctx, delete)
 	if err != nil {
-		return fmt.Errorf("failed to detect changes: %w", err)
+		return false, fmt.Errorf("failed to detect changes: %w", err)
 	}
 
-	maxLoop := 10
-	iterId := 0
-
-	for changeSet != nil && changeSet.HasUpdates() && maxLoop > 0 {
-
+	if changeSet != nil && changeSet.HasUpdates() {
 		log.Println("Applying changes for dataplane config ...")
 		if err := ApplyChanges(ctx, changeSet); err != nil {
-			return fmt.Errorf("failed to apply changes: %w", err)
+			return false, fmt.Errorf("failed to apply changes: %w", err)
 		}
-
-		log.Println("Changeset is applied to dataplane config, detecting changes again ...")
-		changeSet, err = dpConfig.DetectChanges(ctx, delete)
-		if err != nil {
-			return fmt.Errorf("failed to detect changes: %w", err)
-		}
-		maxLoop--
-		iterId++
 	}
 
-	if maxLoop == 0 && changeSet != nil && changeSet.HasUpdates() {
-		return fmt.Errorf("failed to reconcile dataplane config, max loop reached")
+	log.Println("Changeset is applied to dataplane config, detecting changes again ...")
+	changeSet, err = dpConfig.DetectChanges(ctx, delete)
+	if err != nil {
+		return false, fmt.Errorf("failed to detect changes: %w", err)
 	}
 
-	return nil
+	if changeSet != nil && changeSet.HasUpdates() {
+		log.Println("Still has to be reconciled")
+		return false, nil
+	} else {
+		log.Println("All done.")
+		return true, nil
+	}
 }

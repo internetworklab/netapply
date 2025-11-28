@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
 
@@ -35,6 +36,11 @@ func getNodeConfigFromRequest(r *http.Request) (*pkgmodels.NodeConfig, error) {
 	return nodeConfig, err
 }
 
+type ReconvergeStatus struct {
+	Converged bool   `json:"converged"`
+	Error     string `json:"error"`
+}
+
 func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Request) {
 	nodeConfig, err := getNodeConfigFromRequest(r)
 	if err != nil {
@@ -42,12 +48,14 @@ func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if err := nodeConfig.Up(ctx, extractDeleteFromRequest(r)); err != nil {
-		RespondWithError(w, err, http.StatusBadRequest)
-		return
+	converged, err := nodeConfig.Up(ctx, extractDeleteFromRequest(r))
+	reconvergeStatus := ReconvergeStatus{
+		Converged: converged,
+		Error:     err.Error(),
 	}
-
-	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(reconvergeStatus); err != nil {
+		log.Println("Failed to encode reconverge status:", err)
+	}
 }
 
 func handleGetResourceStatus(ctx context.Context, w http.ResponseWriter, r *http.Request) {
