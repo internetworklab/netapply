@@ -37,8 +37,8 @@ func getNodeConfigFromRequest(r *http.Request) (*pkgmodels.NodeConfig, error) {
 }
 
 type ReconvergeStatus struct {
-	Converged bool   `json:"converged"`
-	Error     string `json:"error"`
+	Converged bool    `json:"converged"`
+	Error     *string `json:"error,omitempty"`
 }
 
 func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Request) {
@@ -51,7 +51,10 @@ func handleApplyResource(ctx context.Context, w http.ResponseWriter, r *http.Req
 	converged, err := nodeConfig.Up(ctx, extractDeleteFromRequest(r))
 	reconvergeStatus := ReconvergeStatus{
 		Converged: converged,
-		Error:     err.Error(),
+	}
+	if err != nil {
+		errStr := err.Error()
+		reconvergeStatus.Error = &errStr
 	}
 	if err := json.NewEncoder(w).Encode(reconvergeStatus); err != nil {
 		log.Println("Failed to encode reconverge status:", err)
