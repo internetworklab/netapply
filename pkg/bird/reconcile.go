@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -47,13 +46,20 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 		return nil, nil
 	}
 
-	directory := bgpConfigList.TargetConfigDirectory
-	if directory == "" {
-		return nil, fmt.Errorf("bird bgp config directory is not set")
+	directory, err := pkgutils.BirdBGPConfigDirFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bird bgp config directory from context: %w", err)
 	}
-	reloaderShellCommand := bgpConfigList.ReloaderShellCommand
-	if reloaderShellCommand == nil {
-		return nil, fmt.Errorf("bird bgp reloader shell command is not set")
+	if directory == "" {
+		return nil, fmt.Errorf("bird bgp config directory is not set in context")
+	}
+
+	controlSocket, err := pkgutils.BirdControlSocketFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get bird control socket from context: %w", err)
+	}
+	if controlSocket == "" {
+		return nil, fmt.Errorf("bird control socket is not set in context")
 	}
 
 	files, err := os.ReadDir(directory)
@@ -73,9 +79,6 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse config file %s: %w", filepath.Join(directory, file.Name()), err)
 		}
-		cfg.Reloader = reloaderShellCommand
-		cfg.ConfigDirectory = directory
-
 		currResources[cfg.Name] = *cfg
 	}
 
@@ -85,8 +88,6 @@ func (bgpConfigList *BirdBGPConfigurationList) DetectChanges(ctx context.Context
 			continue
 		}
 
-		proto.Reloader = reloaderShellCommand
-		proto.ConfigDirectory = directory
 		specResources[proto.Name] = proto
 	}
 
@@ -187,6 +188,25 @@ func (changeSet *BirdEBGPChangeSet) GetType() string {
 	return ResourceTypeBirdEBGPEBGP
 }
 
+func ReloadBirdConfiguration(ctx context.Context) error {
+	birdCtrlSocket, err := pkgutils.BirdControlSocketFromCtx(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get bird control socket: %w", err)
+	}
+	birdCli := NewBirdClientFromSocket(birdCtrlSocket)
+	if err := birdCli.Connect(ctx); err != nil {
+		return fmt.Errorf("failed to connect to bird: %w", err)
+	}
+	defer birdCli.Close()
+
+	err = birdCli.SendCommand(ctx, "configure")
+	if err != nil {
+		return fmt.Errorf("failed to refresh protocol: %w", err)
+	}
+
+	return nil
+}
+
 func (proto *BGPProtocol) Create(ctx context.Context) error {
 
 	config, err := proto.ToConfig()
@@ -203,13 +223,7 @@ func (proto *BGPProtocol) Create(ctx context.Context) error {
 		return fmt.Errorf("failed to write config to file %s: %w", fullpath, err)
 	}
 
-	reloaderShellCommand := proto.Reloader
-	if reloaderShellCommand == nil {
-		return fmt.Errorf("bird bgp reloader shell command is not set")
-	}
-
-	command := exec.Command(reloaderShellCommand[0], reloaderShellCommand[1:]...)
-	if err := command.Run(); err != nil {
+	if err := ReloadBirdConfiguration(ctx); err != nil {
 		return fmt.Errorf("failed to run reloader shell command: %w", err)
 	}
 	return nil
@@ -318,13 +332,7 @@ func (proto *BGPProtocol) Cancel(ctx context.Context) error {
 		return fmt.Errorf("failed to remove config file %s: %w", fullpath, err)
 	}
 
-	reloaderShellCommand := proto.Reloader
-	if reloaderShellCommand == nil {
-		return fmt.Errorf("bird bgp reloader shell command is not set")
-	}
-
-	command := exec.Command(reloaderShellCommand[0], reloaderShellCommand[1:]...)
-	if err := command.Run(); err != nil {
+	if err := ReloadBirdConfiguration(ctx); err != nil {
 		return fmt.Errorf("failed to run reloader shell command: %w", err)
 	}
 	return nil
@@ -429,4 +437,21 @@ func (bgpStatus *BirdBGPProtocolStatus) IsEqual(other pkginterfacestub.Interface
 		return false
 	}
 	return true
+}
+
+func (bgpProto *BGPProtocol) Delete(ctx context.Context) error {
+	filePath, err := bgpProto.ToFilePath(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get file path for protocol %s: %w", bgpProto.Name, err)
+	}
+
+	err = os.Remove(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to remove config file %s: %w", filePath, err)
+	}
+
+	if err := ReloadBirdConfiguration(ctx); err != nil {
+		return fmt.Errorf("failed to run reloader shell command: %w", err)
+	}
+	return nil
 }

@@ -1,10 +1,15 @@
 package bird
 
 type BirdBGPConfigurationList struct {
-	ReloaderShellCommand  []string      `yaml:"reloader_shell_command" json:"reloader_shell_command" bson:"reloader_shell_command"`
-	TargetConfigDirectory string        `yaml:"target_config_directory" json:"target_config_directory" bson:"target_config_directory"`
-	BirdSocketPath        string        `yaml:"bird_socket_path" json:"bird_socket_path" bson:"bird_socket_path"`
-	EBGPProtocols         []BGPProtocol `yaml:"ebgp_protocols" json:"ebgp_protocols" bson:"ebgp_protocols"`
+	// This is the directory where the bird bgp protocol configuration files are stored, each file should
+	// be named as the pattern `<name>.conf`.
+	TargetConfigDirectory string `yaml:"target_config_directory" json:"target_config_directory" bson:"target_config_directory"`
+
+	// The controller/agent will connect to this socket and send command to the bird daemon to reload the new configuration.
+	BirdSocketPath string `yaml:"bird_socket_path" json:"bird_socket_path" bson:"bird_socket_path"`
+
+	// The list of BGPProtocol resources that are just parsed as the desired state, and will use in the reconciliation process.
+	EBGPProtocols []BGPProtocol `yaml:"ebgp_protocols" json:"ebgp_protocols" bson:"ebgp_protocols"`
 }
 
 // +k8s:deepcopy-gen=true
@@ -36,9 +41,6 @@ type BGPProtocol struct {
 
 	// To support soft-deletion.
 	Deleted bool `yaml:"deleted,omitempty" json:"deleted,omitempty" bson:"deleted,omitempty"`
-
-	Reloader        []string `yaml:"-" json:"-" bson:"-"`
-	ConfigDirectory string   `yaml:"-" json:"-" bson:"-"`
 }
 
 const patternWildCard = "*"

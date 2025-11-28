@@ -283,16 +283,12 @@ func (proto *BGPProtocol) ToBaseName() string {
 func (proto *BGPProtocol) ToFilePath(ctx context.Context) (string, error) {
 	baseName := proto.ToBaseName()
 
-	// Note: better not to use "" as current directory, it might be confusing.
-	// use "." instead.
-
-	directory := proto.ConfigDirectory
-	if directory == "" {
-		dirFromCtx, err := pkgutils.BirdBGPConfigDirFromCtx(ctx)
-		if err != nil {
-			return "", fmt.Errorf("failed to get bird bgp config directory from context either: %w", err)
-		}
-		return filepath.Join(dirFromCtx, baseName), nil
+	dirFromCtx, err := pkgutils.BirdBGPConfigDirFromCtx(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get bird bgp config directory from context either: %w", err)
 	}
-	return filepath.Join(directory, baseName), nil
+	if dirFromCtx == "" {
+		return "", fmt.Errorf("bird bgp config directory is not set in context")
+	}
+	return filepath.Join(dirFromCtx, baseName), nil
 }
