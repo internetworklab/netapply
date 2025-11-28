@@ -25,6 +25,7 @@ func (cmd *ServeLocalCmd) Run(globalCLIConfig *CLI) error {
 	ctx = pkgutils.SetStartedAtInCtx(ctx, uint64(time.Now().Unix()))
 	ctx = pkgutils.SetUnixSocketPathInCtx(ctx, cmd.BindUnixSocket)
 	ctx = pkgutils.SetResolverEndpointInCtx(ctx, cmd.ResolverEndpoint)
+	ctx = pkgutils.SetV6AvailableInCtx(ctx, cmd.V6Available)
 
 	if cmd.BindUnixSocket == "" {
 		return fmt.Errorf("bind unix socket is not set")

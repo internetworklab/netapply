@@ -15,8 +15,9 @@ type CLI struct {
 }
 
 type ServeLocalCmd struct {
-	BindUnixSocket string `help:"Path to the unix socket to bind" type:"path"`
+	BindUnixSocket   string `help:"Path to the unix socket to bind" type:"path"`
 	ResolverEndpoint string `help:"Endpoint to use for resolving DNS, for example, 1.1.1.1:53" type:"string"`
+	V6Available      bool   `help:"Whether IPv6 is available" default:"false"`
 }
 
 type ServeCollectionCmd struct {

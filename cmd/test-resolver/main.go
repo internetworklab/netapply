@@ -3,9 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
+
+	"flag"
 
 	pkgutils "github.com/internetworklab/netapply/pkg/utils"
 )
+
+var v6Available = flag.Bool("v6-available", false, "whether IPv6 is available")
+
+func init() {
+	flag.Parse()
+}
 
 func test() error {
 	resolverEndpoints := []string{
@@ -27,16 +36,22 @@ func test() error {
 		"github.com:13134",
 	}
 
+	ctx := context.TODO()
+	ctx = pkgutils.SetV6AvailableInCtx(ctx, *v6Available)
+
 	for _, resolverEndpoint := range resolverEndpoints {
 		for _, udpEndpoint := range udpEndpoints {
 			resolver, err := pkgutils.GetCustomResolver(resolverEndpoint)
 			if err != nil {
 				return fmt.Errorf("failed to get custom resolver: %w", err)
 			}
-			udpAddr, err := pkgutils.TryResolveUDPEndpoint(context.TODO(), udpEndpoint, resolver)
+
+			ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
+			udpAddr, err := pkgutils.TryResolveUDPEndpoint(ctx, udpEndpoint, resolver)
 			if err != nil {
-				return fmt.Errorf("failed to resolve udp address %s: %w", udpEndpoint, err)
+				fmt.Printf("failed to resolve udp address %s: %v", udpEndpoint, err)
 			}
+			cancel()
 			fmt.Printf("Resolver: %s, UDP Endpoint: %s, Resolved To: %s\n", resolverEndpoint, udpEndpoint, udpAddr.String())
 		}
 	}

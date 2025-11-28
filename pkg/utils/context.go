@@ -20,6 +20,7 @@ const CtxKeyUnixSocketPath CtxKey = "unix_socket_path"
 const CtxKeyResolverEndpoint CtxKey = "resolver_endpoint"
 const CtxKeyBirdBGPConfigDir CtxKey = "bird_bgp_config_dir"
 const CtxKeyBirdControlSocket CtxKey = "bird_control_socket"
+const CtxKeyV6Available CtxKey = "v6_available"
 
 type ClientAuth struct {
 	TLSClientCertFile     string
@@ -35,6 +36,18 @@ func UnixSocketPathFromCtx(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("unix socket path is not set in context")
 	}
 	return unixSocketPath, nil
+}
+
+func V6AvailableFromCtx(ctx context.Context) (bool, error) {
+	v6Available, ok := ctx.Value(CtxKeyV6Available).(bool)
+	if !ok {
+		return false, fmt.Errorf("v6 available is not set in context")
+	}
+	return v6Available, nil
+}
+
+func SetV6AvailableInCtx(ctx context.Context, v6Available bool) context.Context {
+	return context.WithValue(ctx, CtxKeyV6Available, v6Available)
 }
 
 func SetUnixSocketPathInCtx(ctx context.Context, unixSocketPath string) context.Context {

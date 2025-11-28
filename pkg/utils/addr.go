@@ -128,8 +128,15 @@ func StripPortSuffix(endpoint string) (string, string, error) {
 
 // Will always try obtain AAAA record first, fallback to A otherwise.
 func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net.IP, error) {
+	v6Available, err := V6AvailableFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get v6 available from context: %w", err)
+	}
+
 	networks := []string{"ip6", "ip", "ip4"}
-	var err error
+	if !v6Available {
+		networks = []string{"ip4", "ip"}
+	}
 	var ips []netip.Addr
 	for _, nw := range networks {
 		ips, err = resolver.LookupNetIP(ctx, nw, host)
@@ -155,12 +162,20 @@ func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.R
 	// net.SplitHostPort
 	// net.JoinHostPort (though we don't need that)
 
+	v6Available, err := V6AvailableFromCtx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get v6 available from context: %w", err)
+	}
+
 	if resolver == nil {
-		udpAddr, err := net.ResolveUDPAddr("udp6", endpoint)
-		if err == nil && udpAddr.IP.To4() == nil {
-			return udpAddr, nil
+		if v6Available {
+			udpAddr, err := net.ResolveUDPAddr("udp6", endpoint)
+			if err == nil && udpAddr.IP.To4() == nil {
+				return udpAddr, nil
+			}
 		}
-		udpAddr, err = net.ResolveUDPAddr("udp", endpoint)
+
+		udpAddr, err := net.ResolveUDPAddr("udp", endpoint)
 		if err == nil && udpAddr.IP.To4() != nil {
 			return udpAddr, nil
 		}
