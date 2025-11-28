@@ -162,6 +162,11 @@ func (changeSet *BirdEBGPChangeSet) Apply(ctx context.Context) error {
 		return fmt.Errorf("failed to write config to file %s: %w", fullpath, err)
 	}
 
+	err = ReloadBirdConfiguration(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to reload bird configuration: %w", err)
+	}
+
 	return nil
 }
 

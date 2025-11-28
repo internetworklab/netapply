@@ -1,8 +1,6 @@
 ---
 resources:
   bird_bgp:
-    reloader_shell_command:
-      - true
     target_config_directory: /etc/bird/ebgp_peers
     bird_socket_path: /var/run/bird/bird.ctl
     ebgp_protocols:
@@ -41,3 +39,10 @@ resources:
         peer_address: fd64:8964:8964::3
         local_asn: OWNAS
         peer_asn: "4242423264"
+      - name: bgp6
+        template: dnpeers_dualstack
+        interface: utun6
+        local_address: fe80::1771%utun6
+        peer_address: fe80::1772%utun6
+        local_asn: OWNAS
+        peer_asn: "4242423265"

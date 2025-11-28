@@ -187,11 +187,6 @@ func (in *BGPProtocol) DeepCopyInto(out *BGPProtocol) {
 		*out = new(string)
 		**out = **in
 	}
-	if in.Reloader != nil {
-		in, out := &in.Reloader, &out.Reloader
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	return
 }
 

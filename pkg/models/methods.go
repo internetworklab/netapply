@@ -174,17 +174,7 @@ func (dpConfig *ResourcesConfig) DetectChanges(ctx context.Context, delete bool)
 	reconcileTargets := make([]pkgreconcile.ResourceProvisionersList, 0)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VRF)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.WireGuard)
-	if dpConfig.BirdBGP != nil {
-		if dpConfig.BirdBGP.TargetConfigDirectory == "" {
-			return nil, fmt.Errorf("bird bgp target config directory is not set")
-		}
-		if dpConfig.BirdBGP.BirdSocketPath == "" {
-			return nil, fmt.Errorf("bird bgp bird socket path is not set")
-		}
-		reconcileTargets = appendNoNil(reconcileTargets, dpConfig.BirdBGP)
-		ctx = pkgutils.SetBirdBGPConfigDirInCtx(ctx, dpConfig.BirdBGP.TargetConfigDirectory)
-		ctx = pkgutils.SetBirdControlSocketInCtx(ctx, dpConfig.BirdBGP.BirdSocketPath)
-	}
+	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.BirdBGP)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VXLAN)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.VethPair)
 	reconcileTargets = appendNoNil(reconcileTargets, dpConfig.Bridge)
@@ -233,6 +223,17 @@ func ApplyChanges(ctx context.Context, changeset pkgreconcile.ResourceListChange
 }
 
 func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context, delete bool) error {
+	if dpConfig.BirdBGP != nil {
+		if dpConfig.BirdBGP.TargetConfigDirectory == "" {
+			return fmt.Errorf("bird bgp target config directory is not set")
+		}
+		if dpConfig.BirdBGP.BirdSocketPath == "" {
+			return fmt.Errorf("bird bgp bird socket path is not set")
+		}
+		ctx = pkgutils.SetBirdBGPConfigDirInCtx(ctx, dpConfig.BirdBGP.TargetConfigDirectory)
+		ctx = pkgutils.SetBirdControlSocketInCtx(ctx, dpConfig.BirdBGP.BirdSocketPath)
+	}
+
 	log.Println("Detecting changes for dataplane config ...")
 	changeSet, err := dpConfig.DetectChanges(ctx, delete)
 	if err != nil {
