@@ -397,10 +397,12 @@ func checkWGPeersDifference(wgConfig *wgtypes.Config, endpointCache *PeerEndpoin
 		}
 
 		if spec.Endpoint != nil {
-			if !endpointCache.IsExist(k, peer.Endpoint) {
-				peersToRemove[k] = peer
-				peersToAdd[k] = spec
-				logEndpointChange(k, peer.Endpoint, spec.Endpoint, endpointCache)
+			if peer.LastHandshakeTime.IsZero() || time.Since(peer.LastHandshakeTime) > 60*time.Second {
+				if !endpointCache.IsExist(k, peer.Endpoint) {
+					peersToRemove[k] = peer
+					peersToAdd[k] = spec
+					logEndpointChange(k, peer.Endpoint, spec.Endpoint, endpointCache)
+				}
 			}
 		}
 

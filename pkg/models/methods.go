@@ -246,19 +246,21 @@ func (dpConfig *ResourcesConfig) Reconcile(ctx context.Context, delete bool) (co
 		if err := ApplyChanges(ctx, changeSet); err != nil {
 			return false, fmt.Errorf("failed to apply changes: %w", err)
 		}
+		log.Println("Changeset is applied to dataplane config, detecting changes again ...")
+		changeSet, err = dpConfig.DetectChanges(ctx, delete)
+		if err != nil {
+			return false, fmt.Errorf("failed to detect changes: %w", err)
+		}
+
+		if changeSet != nil && changeSet.HasUpdates() {
+			log.Println("Still has to be reconciled")
+			return false, nil
+		} else {
+			log.Println("All done.")
+			return true, nil
+		}
 	}
 
-	log.Println("Changeset is applied to dataplane config, detecting changes again ...")
-	changeSet, err = dpConfig.DetectChanges(ctx, delete)
-	if err != nil {
-		return false, fmt.Errorf("failed to detect changes: %w", err)
-	}
-
-	if changeSet != nil && changeSet.HasUpdates() {
-		log.Println("Still has to be reconciled")
-		return false, nil
-	} else {
-		log.Println("All done.")
-		return true, nil
-	}
+	log.Println("Nothing to update.")
+	return true, nil
 }
