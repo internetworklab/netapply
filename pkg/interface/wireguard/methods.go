@@ -347,7 +347,7 @@ func (wgConf *WireGuardConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, wgConf)
 }
 
-func logEndpointChange(key string, currEndpoint *net.UDPAddr, newEndpoint *net.UDPAddr) {
+func logEndpointChange(key string, currEndpoint *net.UDPAddr, newEndpoint *net.UDPAddr, endpointCache *PeerEndpointCache) {
 	curr := "<nil>"
 	next := "<nil>"
 	if currEndpoint != nil {
@@ -356,7 +356,8 @@ func logEndpointChange(key string, currEndpoint *net.UDPAddr, newEndpoint *net.U
 	if newEndpoint != nil {
 		next = newEndpoint.String()
 	}
-	log.Printf("will update endpoint for peer %s from %s to %s", key, curr, next)
+	endpointsSet := endpointCache.GetAll(key)
+	log.Printf("will update endpoint for peer %s from %s to %s, expected endpoints: %v", key, curr, next, strings.Join(endpointsSet, ","))
 }
 
 // returns: (added, removed)
@@ -399,7 +400,7 @@ func checkWGPeersDifference(wgConfig *wgtypes.Config, endpointCache *PeerEndpoin
 			if !endpointCache.IsExist(k, peer.Endpoint) {
 				peersToRemove[k] = peer
 				peersToAdd[k] = spec
-				logEndpointChange(k, peer.Endpoint, spec.Endpoint)
+				logEndpointChange(k, peer.Endpoint, spec.Endpoint, endpointCache)
 			}
 		}
 
@@ -548,6 +549,17 @@ func (cache *PeerEndpointCache) GetPrimary(key string, preferV6 bool) *net.UDPAd
 	}
 
 	return nil
+}
+
+func (cache *PeerEndpointCache) GetAll(key string) []string {
+	endpoints := make([]string, 0)
+	if cache != nil {
+		for _, addrObj := range cache.data[key] {
+			endpoints = append(endpoints, addrObj.String())
+		}
+	}
+	sort.Strings(endpoints)
+	return endpoints
 }
 
 func (cache *PeerEndpointCache) Append(ctx context.Context, key string, endpoint string, resolver *net.Resolver) error {
