@@ -8,8 +8,13 @@ docker run \
   -v bird-run-vol:/var/run/bird \
   -v /var/run/netapply-local-test:/shared-socks \
   -v /etc/bird/ebgp_peers:/etc/bird/ebgp_peers \
+  -v /run/netns:/run/netns \
+  -v /var/run/docker.sock:/var/run/docker.sock \
   --rm \
   -it \
+  --network host \
+  --pid host \
+  --privileged \
   --name netapply-test \
   debian:trixie \
   netapply \

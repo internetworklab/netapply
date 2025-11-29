@@ -1,0 +1,160 @@
+---
+resources:
+  wireguard:
+    containers:
+      - docker: bird
+    wireguard_configs:
+      - name: utun1
+        privatekey: kNbHSlUWy4OQEg7tB0vpcwbnM8GKyZqvrdtBOjL3P0M=
+        peers:
+          - publickey: QUXCMHqTrTxThDfQ5ny0G8E+Gpa5+JIkLrSSBrVBEiY=
+            presharedkey: z5pNkSkb8IvvM0KxdvdcIMVLihpJLIZ1BQRELYrq41I=
+            endpoint: silvermoon.mk16.de:51771
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fe80::2923/64
+            local: fe80::afaf:bfbf:cdcf:2f
+        container:
+          docker: bird
+        listen_port: 32581
+        vrf: vrf42
+        additionals:
+          asn: "4242422923"
+          contact: email:dn42@mk16.de
+          endpoint: silvermoon.mk16.de:21771
+          linklocal: fe80::afaf:bfbf:cdcf:2f
+          peerlinklocal: fe80::2923
+          vrf: vrf42
+          website: https://bandura-comm.mk16.de/dn42-nn-peering-policy/
+      - name: utun2
+        privatekey: GIYR3PTap4mq9hHTS0jkGo4L8W8Y6YTGciQ0aNVMWG0=
+        peers:
+          - publickey: 2P4mlqVgUkS+sA/bq/xsIbqQYDKripOwuTl4TZYg41o=
+            endpoint: at0.dn42.pebkac.gr:51771
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fe80::ffff:2092/64
+            local: fe80::afaf:bfbf:cdcf:7
+        container:
+          docker: bird
+        listen_port: 32582
+        vrf: vrf42
+        additionals:
+          asn: "4242422092"
+          contact: email:dn42@pebkac.gr
+          endpoint: at0.dn42.pebkac.gr:51771
+          linklocal: fe80::afaf:bfbf:cdcf:7
+          peerlinklocal: fe80::ffff:2092
+          vrf: vrf42
+          website: https://dn42.pebkac.gr/
+      - name: utun3
+        privatekey: MFEoNZWgsgUE0ekKy+f/mayw715EfbAmcEk8ZcE7s3k=
+        peers:
+          - publickey: tq5yX+/lggWDGdCEzw15wWmClWyq+dGREW9Gn1jSfmI=
+            endpoint: "[2a01:110f:4525:8601:be24:11ff:fed1:1a23]:40044"
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fe80::1221:2:1/64
+            local: fe80::9742:2d02:f225:e5a7
+        container:
+          docker: bird
+        listen_port: 32583
+        vrf: vrf42
+        additionals:
+          asn: "4242421221"
+          contact: email:network@octogan.net
+          endpoint: "[2a01:110f:4525:8601:be24:11ff:fed1:1a23]:40044"
+          host: 2a01:110f:4525:8601:be24:11ff:fed1:1a23
+          linklocal: fe80::9742:2d02:f225:e5a7
+          mtu: "1420"
+          peerlinklocal: fe80::1221:2:1
+          port: "40044"
+          vrf: vrf42
+      - name: utun4
+        privatekey: kGxctGygOENvn9ewMMLhxeoSfJxdFOfUbagYB+QkvFk=
+        peers:
+          - publickey: Jtj8tfNYiOjJI0qK9s49IDoghA0i+uFbXLBonNUudmQ=
+            endpoint: chr-lv01.as215887.net:21771
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fe80::1732/64
+            local: fe80::4258:3cd4:5b39:e476
+        container:
+          docker: bird
+        listen_port: 32584
+        vrf: vrf42
+        additionals:
+          asn: "4242421732"
+          contact: email:root@as215887.net
+          endpoint: chr-lv01.as215887.net:21771
+          host: chr-lv01.as215887.net
+          linklocal: fe80::4258:3cd4:5b39:e476
+          mtu: "1420"
+          peerlinklocal: fe80::1732
+          port: "21771"
+          vrf: vrf42
+      - name: utun5
+        privatekey: OLUt7zarYUydFgat5qVEnA/CJ7N62MVxqidfxwDziFU=
+        peers:
+          - publickey: SvqHkAH691jL29dy66gF+MzxaumA6839+WBxIafvSjA=
+            endpoint: 152.67.90.136:51820
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fd64:8964:8964::3/64
+            local: fdda:8ca4:1556:a000:fffe:0:1:1771
+        container:
+          docker: bird
+        listen_port: 32585
+        vrf: vrf42
+        additionals:
+          asn: "4242423264"
+          contact: telegram:@Depressed_LeslieAlexander
+          endpoint: 152.67.90.136:51820
+          host: 152.67.90.136
+          linklocal: fdda:8ca4:1556:a000:fffe:0:1:1771
+          mtu: "1420"
+          peerlinklocal: fd64:8964:8964::3
+          port: "51820"
+          vrf: vrf42
+      - name: utest1
+        deleted: true
+        privatekey: SCt4gDcZHRQswkI83rW/Y9HL4wdk0KTfoquSBNlS0mw=
+        listen_port: 32586
+        container:
+          docker: bird
+        vrf: vrf42
+        peers:
+          - publickey: "c5kWJQim7zRKDBQfmVvNZSpy26MltJ87P3K1PUzMb1A="
+            endpoint: vie1.exploro.one:32587
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fe80::1772/64
+            local: fe80::1771
+      - name: utest2
+        deleted: true
+        privatekey: yLgVeDWnYAYKY3cE3QGFom0XU8AJZG1tzV8jfuGWFWE=
+        listen_port: 32587
+        container:
+          docker: bird
+        vrf: vrf42
+        peers:
+          - publickey: ZN3LXTuEvU6U1LezrIGknfvqd1meFEuVytaS7DIA02s=
+            endpoint: vie1.exploro.one:32586
+            allowedips:
+              - 0.0.0.0/0
+              - ::/0
+        addresses:
+          - peer: fe80::1771/64
+            local: fe80::1772

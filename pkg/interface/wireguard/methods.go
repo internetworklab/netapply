@@ -511,6 +511,12 @@ type PeerEndpointCache struct {
 	data map[string]map[string]net.UDPAddr
 }
 
+func NewPeerEndpointCache() *PeerEndpointCache {
+	return &PeerEndpointCache{
+		data: make(map[string]map[string]net.UDPAddr),
+	}
+}
+
 func sortOutUsableAddrs(addrObjs map[string]net.UDPAddr) (sorted []net.UDPAddr, v6Only []net.UDPAddr) {
 	sorted = make([]net.UDPAddr, 0)
 	v6Only = make([]net.UDPAddr, 0)
@@ -709,7 +715,7 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 		wgtypesConf.PrivateKey = pk
 	}
 
-	endpointCache := new(PeerEndpointCache)
+	endpointCache := NewPeerEndpointCache()
 
 	for _, peer := range wgConf.Peers {
 		var peercfg *wgtypes.PeerConfig
