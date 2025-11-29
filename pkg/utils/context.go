@@ -41,7 +41,7 @@ func UnixSocketPathFromCtx(ctx context.Context) (string, error) {
 func V6AvailableFromCtx(ctx context.Context) (bool, error) {
 	v6Available, ok := ctx.Value(CtxKeyV6Available).(bool)
 	if !ok {
-		return false, fmt.Errorf("v6 available is not set in context")
+		return false, nil
 	}
 	return v6Available, nil
 }

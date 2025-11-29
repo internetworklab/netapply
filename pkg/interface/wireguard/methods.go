@@ -652,7 +652,7 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context, endp
 
 		preferV6, err := pkgutils.V6AvailableFromCtx(ctx)
 		if err != nil {
-			log.Printf("can't determine if v6 is preferred, assumed: no, error: %v", err.Error())
+			log.Printf("can't determine if v6 is preferred, assumed: no")
 		}
 
 		if primaryAddr := endpointCache.GetPrimary(wgPeerConfig.PublicKey, err == nil && preferV6); primaryAddr != nil {
