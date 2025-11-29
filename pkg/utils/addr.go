@@ -4,14 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"net/netip"
-	"regexp"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
-
-	vnetns "github.com/vishvananda/netns"
 )
 
 func IsIPNetListNotEqu(lhs, rhs []net.IPNet) bool {
@@ -98,110 +92,6 @@ func GetCustomResolver(resolverEndpoint string) (*net.Resolver, error) {
 	}
 
 	return customResolver, nil
-}
-
-func StripPortSuffix(endpoint string) (string, string, error) {
-	pattern, err := regexp.Compile(`:\d+$`)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to compile port suffix pattern: %w", err)
-	}
-	res := pattern.Find([]byte(endpoint))
-	if res == nil {
-		return "", "", fmt.Errorf("no port suffix is found in endpoint %s", endpoint)
-	}
-	res = res[1:]
-
-	portStr := string(res)
-	portLen := len(portStr)
-	if portLen+1 >= len(endpoint) {
-		return "", "", fmt.Errorf("invalid endpoint %s", endpoint)
-	}
-
-	ipaddrPart := endpoint[:len(endpoint)-portLen-1]
-
-	// to handle IPv6 addresses, like [2001:db8::1]:1234
-	ipaddrPart = strings.TrimLeft(ipaddrPart, "[")
-	ipaddrPart = strings.TrimRight(ipaddrPart, "]")
-
-	return ipaddrPart, portStr, nil
-}
-
-// Will always try obtain AAAA record first, fallback to A otherwise.
-func TryResolveIP(ctx context.Context, host string, resolver *net.Resolver) (net.IP, error) {
-	v6Available, err := V6AvailableFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get v6 available from context: %w", err)
-	}
-
-	networks := []string{"ip6", "ip", "ip4"}
-	if !v6Available {
-		networks = []string{"ip4", "ip"}
-	}
-	var ips []netip.Addr
-	for _, nw := range networks {
-		ips, err = resolver.LookupNetIP(ctx, nw, host)
-		if err == nil && ips != nil {
-			if ips[0].Is4() {
-				a4 := ips[0].As4()
-				return net.IP(a4[:]), nil
-			}
-			if ips[0].Is6() {
-				a6 := ips[0].As16()
-				return net.IP(a6[:]), nil
-			}
-		}
-	}
-	currentNs, err := vnetns.Get()
-	return nil, fmt.Errorf("failed to resolve IP address for host %s, last error: %w, current netns: %s", host, err, currentNs.UniqueId())
-}
-
-// IPv6 wherever possible, IPv4 otherwise
-func TryResolveUDPEndpoint(ctx context.Context, endpoint string, resolver *net.Resolver) (*net.UDPAddr, error) {
-
-	// note: there is better std impl
-	// net.SplitHostPort
-	// net.JoinHostPort (though we don't need that)
-
-	v6Available, err := V6AvailableFromCtx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get v6 available from context: %w", err)
-	}
-
-	if resolver == nil {
-		if v6Available {
-			udpAddr, err := net.ResolveUDPAddr("udp6", endpoint)
-			if err == nil && udpAddr.IP.To4() == nil {
-				return udpAddr, nil
-			}
-		}
-
-		udpAddr, err := net.ResolveUDPAddr("udp", endpoint)
-		if err == nil && udpAddr.IP.To4() != nil {
-			return udpAddr, nil
-		}
-		return nil, fmt.Errorf("failed to resolve UDP address for endpoint %s", endpoint)
-	}
-
-	hostPart, portPart, err := net.SplitHostPort(endpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	ip, err := TryResolveIP(ctx, hostPart, resolver)
-	if err != nil {
-		return nil, fmt.Errorf("failed to resolve name to ip: %w", err)
-	}
-
-	portNum, err := strconv.Atoi(portPart)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert port suffix to number: %w", err)
-	}
-
-	udpAddr := &net.UDPAddr{
-		IP:   ip,
-		Port: portNum,
-	}
-	return udpAddr, nil
 }
 
 func GetRandomFreeUDPPort() (int, error) {

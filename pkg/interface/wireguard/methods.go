@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -346,8 +347,20 @@ func (wgConf *WireGuardConfig) CheckExist(ctx context.Context) (bool, error) {
 	return pkginterfacestub.CheckExist(ctx, wgConf)
 }
 
+func logEndpointChange(key string, currEndpoint *net.UDPAddr, newEndpoint *net.UDPAddr) {
+	curr := "<nil>"
+	next := "<nil>"
+	if currEndpoint != nil {
+		curr = currEndpoint.String()
+	}
+	if newEndpoint != nil {
+		next = newEndpoint.String()
+	}
+	log.Printf("will update endpoint for peer %s from %s to %s", key, curr, next)
+}
+
 // returns: (added, removed)
-func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgtypes.Peer) (map[string]wgtypes.PeerConfig, map[string]*wgtypes.Peer) {
+func checkWGPeersDifference(wgConfig *wgtypes.Config, endpointCache *PeerEndpointCache, currentPeers []*wgtypes.Peer) (map[string]wgtypes.PeerConfig, map[string]*wgtypes.Peer) {
 
 	commonPeers := make(map[string]wgtypes.PeerConfig)
 	specPeersMap := make(map[string]wgtypes.PeerConfig)
@@ -355,7 +368,7 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 	peersToRemove := make(map[string]*wgtypes.Peer)
 	peersToAdd := make(map[string]wgtypes.PeerConfig)
 
-	for _, peer := range specPeers {
+	for _, peer := range wgConfig.Peers {
 		specPeersMap[peer.PublicKey.String()] = peer
 	}
 
@@ -369,7 +382,7 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 		}
 	}
 
-	for _, peer := range specPeers {
+	for _, peer := range wgConfig.Peers {
 		if _, ok := currentPeersMap[peer.PublicKey.String()]; !ok {
 			peersToAdd[peer.PublicKey.String()] = peer
 		}
@@ -382,9 +395,12 @@ func checkWGPeersDifference(specPeers []wgtypes.PeerConfig, currentPeers []*wgty
 			peersToAdd[k] = spec
 		}
 
-		if spec.Endpoint != nil && peer.Endpoint != nil && spec.Endpoint.String() != peer.Endpoint.String() {
-			peersToRemove[k] = peer
-			peersToAdd[k] = spec
+		if spec.Endpoint != nil {
+			if !endpointCache.IsExist(k, peer.Endpoint) {
+				peersToRemove[k] = peer
+				peersToAdd[k] = spec
+				logEndpointChange(k, peer.Endpoint, spec.Endpoint)
+			}
 		}
 
 		if spec.PersistentKeepaliveInterval != nil {
@@ -408,19 +424,9 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 	changeSet := new(WireGuardInterfaceChangeSet)
 	changeSet.origin = wgConf
 
-	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
+	wgtypesConf, endpointCache, err := wgConf.ToWGTypesConfig(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
-	}
-
-	specPeerConfigs := make([]wgtypes.PeerConfig, 0)
-	for _, peer := range wgConf.Peers {
-		peercfg, err := peer.ToWGTypesPeer(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
-		}
-
-		specPeerConfigs = append(specPeerConfigs, *peercfg)
 	}
 
 	err = pkgnetns.WithNetnsWGCli(ctx, wgConf, func(wgCtrl *wgctrl.Client) error {
@@ -438,7 +444,7 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 			currPeers = append(currPeers, &peer)
 		}
 
-		addedPeers, removedPeers := checkWGPeersDifference(specPeerConfigs, currPeers)
+		addedPeers, removedPeers := checkWGPeersDifference(wgtypesConf, endpointCache, currPeers)
 		changeSet.PeersToAdd = addedPeers
 		changeSet.PeersToRemove = removedPeers
 
@@ -501,19 +507,104 @@ func (wgConf *WireGuardConfig) DetectChanges(ctx context.Context) (pkgreconcile.
 	return changeSet, nil
 }
 
-func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wgtypes.PeerConfig, error) {
+type PeerEndpointCache struct {
+	data map[string]map[string]net.UDPAddr
+}
+
+func sortOutUsableAddrs(addrObjs map[string]net.UDPAddr) (sorted []net.UDPAddr, v6Only []net.UDPAddr) {
+	sorted = make([]net.UDPAddr, 0)
+	v6Only = make([]net.UDPAddr, 0)
+	for _, addrObj := range addrObjs {
+		if addrObj.IP.To4() == nil {
+			v6Only = append(v6Only, addrObj)
+		}
+		sorted = append(sorted, addrObj)
+	}
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].IP.String() < sorted[j].IP.String()
+	})
+	sort.Slice(v6Only, func(i, j int) bool {
+		return v6Only[i].IP.String() < v6Only[j].IP.String()
+	})
+	return sorted, v6Only
+}
+
+func (cache *PeerEndpointCache) GetPrimary(key string, preferV6 bool) *net.UDPAddr {
+
+	if addrObjs, ok := cache.data[key]; ok {
+		usableAddrs, usableV6Addrs := sortOutUsableAddrs(addrObjs)
+		if preferV6 && len(usableV6Addrs) > 0 {
+			return &usableV6Addrs[0]
+		}
+		if len(usableAddrs) > 0 {
+			return &usableAddrs[0]
+		}
+	}
+
+	return nil
+}
+
+func (cache *PeerEndpointCache) Append(ctx context.Context, key string, endpoint string, resolver *net.Resolver) error {
+	hostPart, portPart, err := net.SplitHostPort(endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to split host and port from endpoint %s: %w", endpoint, err)
+	}
+	if hostPart == "" || portPart == "" {
+		return fmt.Errorf("invalid endpoint %s, can't not split into host and port", endpoint)
+	}
+	portNum, err := strconv.Atoi(portPart)
+	if err != nil {
+		return fmt.Errorf("failed to convert port suffix to number: %w", err)
+	}
+	addrObjs, err := resolver.LookupIPAddr(ctx, hostPart)
+	if err != nil {
+		return fmt.Errorf("failed to lookup ip addresses for host %s: %w", hostPart, err)
+	}
+	for _, addrObj := range addrObjs {
+		udpAddr := &net.UDPAddr{
+			IP:   addrObj.IP,
+			Port: portNum,
+		}
+		cache.AppendUDPAddr(key, udpAddr)
+	}
+	return nil
+}
+
+func (cache *PeerEndpointCache) IsExist(key string, udpAddr *net.UDPAddr) bool {
+	if udpAddr == nil {
+		return false
+	}
+	if addrObjs, ok := cache.data[key]; ok {
+		if _, ok := addrObjs[udpAddr.String()]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func (cache *PeerEndpointCache) AppendUDPAddr(key string, udpAddr *net.UDPAddr) {
+	if _, ok := cache.data[key]; !ok {
+		cache.data[key] = make(map[string]net.UDPAddr)
+	}
+	cache.data[key][udpAddr.String()] = *udpAddr
+}
+
+func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context, endpointCache *PeerEndpointCache) (*wgtypes.PeerConfig, *PeerEndpointCache, error) {
 	peercfg := new(wgtypes.PeerConfig)
 
 	pkObj, err := getKeyObj(ctx, wgPeerConfig.PublicKey, wgPeerConfig.PublicKeyFrom)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get key object: %w", err)
+		return nil, endpointCache, fmt.Errorf("failed to get key object: %w", err)
 	}
 	peercfg.PublicKey = *pkObj
+	if pkgutils.IsAllZeroKey(*pkObj) {
+		return nil, endpointCache, fmt.Errorf("public key is all zero")
+	}
 
 	if wgPeerConfig.PresharedKey != "" || wgPeerConfig.PresharedKeyFrom != nil {
 		pskObj, err := getKeyObj(ctx, wgPeerConfig.PresharedKey, wgPeerConfig.PresharedKeyFrom)
 		if err != nil {
-			return nil, fmt.Errorf("psk specified, but failed to get preshared key object: %w", err)
+			return nil, endpointCache, fmt.Errorf("psk specified, but failed to get preshared key object: %w", err)
 		}
 		peercfg.PresharedKey = pskObj
 	}
@@ -526,29 +617,38 @@ func (wgPeerConfig *WireGuardPeerConfig) ToWGTypesPeer(ctx context.Context) (*wg
 	if wgPeerConfig.Endpoint != nil {
 		resolverEndpoint, err := pkgutils.ResolverEndpointFromCtx(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get resolver endpoint from context: %w", err)
+			return nil, endpointCache, fmt.Errorf("failed to get resolver endpoint from context: %w", err)
 		}
 
 		resolver, err := pkgutils.GetCustomResolver(resolverEndpoint)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get custom resolver: %w", err)
+			return nil, endpointCache, fmt.Errorf("failed to get custom resolver: %w", err)
 		}
-		udpAddr, err := pkgutils.TryResolveUDPEndpoint(ctx, *wgPeerConfig.Endpoint, resolver)
+
+		err = endpointCache.Append(ctx, wgPeerConfig.PublicKey, *wgPeerConfig.Endpoint, resolver)
 		if err != nil {
-			return nil, fmt.Errorf("failed to resolve udp address %s: %w", *wgPeerConfig.Endpoint, err)
+			log.Printf("failed to resolve endpoint %s for peer %s, will not use it: %v", *wgPeerConfig.Endpoint, wgPeerConfig.PublicKey, err)
 		}
-		peercfg.Endpoint = udpAddr
+
+		preferV6, err := pkgutils.V6AvailableFromCtx(ctx)
+		if err != nil {
+			log.Printf("can't determine if v6 is preferred, assumed: no, error: %v", err.Error())
+		}
+
+		if primaryAddr := endpointCache.GetPrimary(wgPeerConfig.PublicKey, err == nil && preferV6); primaryAddr != nil {
+			peercfg.Endpoint = primaryAddr
+		}
 	}
 
 	for _, allowedipstr := range wgPeerConfig.AllowedIPs {
 		_, ipnet, err := net.ParseCIDR(allowedipstr)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse allowed ip: %w", err)
+			return nil, endpointCache, fmt.Errorf("failed to parse allowed ip: %w", err)
 		}
 		peercfg.AllowedIPs = append(peercfg.AllowedIPs, *ipnet)
 	}
 
-	return peercfg, nil
+	return peercfg, endpointCache, nil
 }
 
 func getKeyObj(ctx context.Context, pkB64 string, pkURL *string) (*wgtypes.Key, error) {
@@ -591,7 +691,7 @@ func getKeyObj(ctx context.Context, pkB64 string, pkURL *string) (*wgtypes.Key, 
 	return nil, fmt.Errorf("private key is not set")
 }
 
-func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Config, error) {
+func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Config, *PeerEndpointCache, error) {
 	wgtypesConf := new(wgtypes.Config)
 
 	wgtypesConf.ListenPort = wgConf.ListenPort
@@ -601,7 +701,7 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 	if wgConf.PrivateKey != "" || wgConf.PrivateKeyFrom != nil {
 		pk, err = getKeyObj(ctx, wgConf.PrivateKey, wgConf.PrivateKeyFrom)
 		if err != nil {
-			return nil, fmt.Errorf("failed to parse private key of interface %s: %w", wgConf.Name, err)
+			return nil, nil, fmt.Errorf("failed to parse private key of interface %s: %w", wgConf.Name, err)
 		}
 	}
 
@@ -609,19 +709,22 @@ func (wgConf *WireGuardConfig) ToWGTypesConfig(ctx context.Context) (*wgtypes.Co
 		wgtypesConf.PrivateKey = pk
 	}
 
+	endpointCache := new(PeerEndpointCache)
+
 	for _, peer := range wgConf.Peers {
-		peercfg, err := peer.ToWGTypesPeer(ctx)
+		var peercfg *wgtypes.PeerConfig
+		peercfg, endpointCache, err = peer.ToWGTypesPeer(ctx, endpointCache)
 		if err != nil {
-			return nil, fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
+			return nil, nil, fmt.Errorf("failed to convert peer to wgtypes peer of interface %s: %w", wgConf.Name, err)
 		}
 		wgtypesConf.Peers = append(wgtypesConf.Peers, *peercfg)
 	}
 
-	return wgtypesConf, nil
+	return wgtypesConf, endpointCache, nil
 }
 
 func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
-	wgtypesConf, err := wgConf.ToWGTypesConfig(ctx)
+	wgtypesConf, _, err := wgConf.ToWGTypesConfig(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to convert wireguard config to wgtypes config: %w", err)
 	}
