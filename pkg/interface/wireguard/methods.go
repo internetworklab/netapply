@@ -823,6 +823,12 @@ func (wgConf *WireGuardConfig) Create(ctx context.Context) error {
 			return fmt.Errorf("failed to set wireguard link up: %w", err)
 		}
 
+		if wgConf.VRF != nil {
+			if err := pkgutils.TrySetVRF(handle, link, wgConf.VRF); err != nil {
+				return fmt.Errorf("failed to set vrf for wireguard link: %w", err)
+			}
+		}
+
 		for _, peer := range wgConf.Addresses {
 			nlAddr, err := peer.ToNetlinkAddr()
 			if err != nil {
