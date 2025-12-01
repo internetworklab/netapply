@@ -6,7 +6,7 @@ scriptDir=$(dirname $scriptPath)
 docker run \
   -v $scriptDir/../bin/netapply:/usr/local/bin/netapply \
   -v bird-run-vol:/var/run/bird \
-  -v /var/run/netapply-local-test:/shared-socks \
+  -v /var/run/netapply:/shared-socks \
   -v /etc/bird/ebgp_peers:/etc/bird/ebgp_peers \
   -v /run/netns:/run/netns \
   -v /var/run/docker.sock:/var/run/docker.sock \

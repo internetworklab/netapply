@@ -30,8 +30,6 @@ type VXLANInterfaceChangeSet struct {
 	AddressesToAdd    []*netlink.Addr
 	AddressedToRemove []*netlink.Addr
 	MTUToSet          *int
-	ContainerName     *string
-	InterfaceName     string
 }
 
 type VXLANConfigurationList struct {

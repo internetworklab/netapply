@@ -66,7 +66,13 @@ func (dummyInterfaceChangeSet *DummyInterfaceChangeSet) GetNetNsInfo(ctx context
 }
 
 func (dummyConfig *DummyConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
+	if dummyConfig == nil {
+		return nil, nil
+	}
+
 	changeSet := new(DummyInterfaceChangeSet)
+	changeSet.origin = dummyConfig
+
 	for _, addr := range dummyConfig.Addresses {
 		nlAddr, err := addr.ToNetlinkAddr()
 		if err != nil {

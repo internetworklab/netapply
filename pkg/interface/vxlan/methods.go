@@ -12,12 +12,8 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
-func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetContainerName() *string {
-	return vxlanInterfaceChangeSet.ContainerName
-}
-
 func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetInterfaceName() string {
-	return vxlanInterfaceChangeSet.InterfaceName
+	return vxlanInterfaceChangeSet.origin.GetInterfaceName()
 }
 
 func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) HasUpdates() bool {
@@ -32,7 +28,7 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) Apply(ctx context.Contex
 	}
 
 	return pkgnetns.WithNsHandleSafe(ctx, vxlanInterfaceChangeSet, func(handle *netlink.Handle) error {
-		link, err := handle.LinkByName(vxlanInterfaceChangeSet.InterfaceName)
+		link, err := handle.LinkByName(vxlanInterfaceChangeSet.GetInterfaceName())
 		if err != nil {
 			return fmt.Errorf("failed to get vxlan link: %w", err)
 		}
@@ -72,6 +68,7 @@ func (vxlanInterfaceChangeSet *VXLANInterfaceChangeSet) GetChangedItems() map[st
 
 func (vxlanConfig *VXLANConfig) DetectChanges(ctx context.Context) (pkgreconcile.InterfaceChangeSet, error) {
 	changeSet := new(VXLANInterfaceChangeSet)
+	changeSet.origin = vxlanConfig
 	err := pkgnetns.WithNsHandleSafe(ctx, vxlanConfig, func(handle *netlink.Handle) error {
 		link, err := handle.LinkByName(vxlanConfig.Name)
 		if err != nil {
