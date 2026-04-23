@@ -1,953 +1,333 @@
 # Netapply
 
+A **resource-centric**, declarative, netns-aware infrastructure-as-code tool for Linux networking. Define network resources in YAML and reconcile them against the kernel via netlink through a local HTTP API.
+
 ## What is This
 
-Netapply is a declarative network configuration utility. You define the desired state of network configuration in structured text like YAML, then netapply will apply such configuration for you and ensure that the actual state eventually converge to the spec.
+Netapply is a network configuration daemon that treats network interfaces and protocol configurations as reconcilable resources. You declare the desired state of your network in structured YAML or JSON, send it to the local agent over HTTP, and netapply ensures the actual system state converges to the spec.
 
-## How to Install
+Supported resource types:
 
-Currently only linux systems are supported:
+- **Dummy** — Dummy interfaces with IP addresses
+- **Veth** — Virtual Ethernet pairs across network namespaces
+- **Bridge** — Linux bridges with slave interfaces
+- **VXLAN** — VXLAN tunnels
+- **WireGuard** — WireGuard VPN tunnels
+- **VRF** — Virtual Routing and Forwarding instances
+- **BIRD BGP** — BIRD BGP protocol configuration snippets
+
+## Architecture
+
+Netapply runs as an HTTP server over a Unix domain socket. It operates in two modes:
+
+### `serve-local` — Node Agent
+
+Runs on each node and reconciles resources directly via netlink.
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/resources/apply?delete=true\|false` | Apply a `NodeConfig` payload |
+| `POST` | `/resources/status` | Return status of resources in the payload |
+| `GET`  | `/basicinfo/version` | Build/version metadata |
+| `GET`  | `/basicinfo/basicinfo` | Node basic information |
+
+### `serve-collection` — Collection Manager
+
+Manages resource collections backed by MongoDB. Useful for centralized WireGuard or BGP peer management.
+
+Endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/collections/wg/` | Write WireGuard configs |
+| `GET`  | `/collections/wg/` | Read WireGuard configs |
+| `POST` | `/collections/bgp/` | Write BIRD BGP configs |
+| `GET`  | `/collections/bgp/` | Read BIRD BGP configs |
+| `GET`  | `/basicinfo/version` | Build/version metadata |
+| `GET`  | `/basicinfo/basicinfo` | Node basic information |
+
+Query parameters for collection reads:
+
+- `includedeleted=true` — Include soft-deleted documents
+- Node name is extracted from the URL path: `/collections/<name>/nodes/<node_name>/...`
+
+## Installation
+
+Currently only Linux systems are supported.
+
+Build from source:
 
 ```shell
-go install github.com/internetworklab/netapply@latest
+git clone https://github.com/internetworklab/netapply
+cd netapply
+go build -o bin/netapply ./cmd/netapply/main.go
 ```
 
-Or you may build it from the source:
+## Usage
+
+### Start the local node agent
 
 ```shell
-git clone github.com/internetworklab/netapply
-cd netapply
+./bin/netapply serve-local \
+  --bind-unix-socket /var/run/netapply.sock \
+  --node mynode \
+  --v6-available
+```
 
-# also make sure that $GOPATH/bin is in the $PATH
-go install k8s.io/code-generator/cmd/deepcopy-gen@latest
+### Start the collection manager
 
-deepcopy-gen ./pkg/interface/wireguard
-deepcopy-gen ./pkg/interface/common
+```shell
+./bin/netapply serve-collection \
+  --bind-unix-socket /var/run/netapply-collection.sock \
+  --mongodb-uri "mongodb://localhost:27017" \
+  --node mynode
+```
 
-go build -o bin/netapply ./main.go
+### Show version
+
+```shell
+./bin/netapply version
+```
+
+### Apply a resource manifest
+
+```shell
+curl -X POST \
+  --unix-socket /var/run/netapply.sock \
+  -H "Content-Type: application/yaml" \
+  --data-binary @examples/dummy.yaml \
+  "http://localhost/resources/apply"
+```
+
+With soft-deletion enabled (remove unmanaged resources):
+
+```shell
+curl -X POST \
+  --unix-socket /var/run/netapply.sock \
+  -H "Content-Type: application/yaml" \
+  --data-binary @examples/dummy.yaml \
+  "http://localhost/resources/apply?delete=true"
+```
+
+## Configuration Format
+
+The top-level payload for `/resources/apply` is a `NodeConfig`. It contains a single `resources` block:
+
+```yaml
+resources:
+  dummy:
+    containers: []
+    dummies:
+      - name: dummy0
+        addresses:
+          - cidr: "10.0.0.1/24"
+  wireguard:
+    containers: []
+    wireguard_configs:
+      - name: wg0
+        privatekey: "..."
+        listen_port: 51820
+        peers:
+          - publickey: "..."
+            endpoint: "peer.example.com:51820"
+            allowedips:
+              - "0.0.0.0/0"
+        addresses:
+          - cidr: "192.168.1.1/24"
+```
+
+### Common fields
+
+Most interface resources share these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Interface name |
+| `container` | object | Target netns (see below) |
+| `addresses` | list | IP addresses (`cidr`, `local`, `peer`) |
+| `vrf` | string | Attach interface to a VRF |
+| `mtu` | int | MTU |
+| `deleted` | bool | Soft-delete flag |
+
+### Container / Netns Selection
+
+The `container` object selects the target network namespace:
+
+```yaml
+container:
+  docker: frr          # Docker container name
+  podman: frr          # Podman container name
+  netns_path: /run/netns/ns1   # Direct netns path
+  host_netns: true     # Host namespace (dangerous)
+```
+
+Resource lists also accept a `containers` array that declares all namespaces used by that resource type. Individual resources can override with their own `container` field.
+
+### Resource Reference
+
+#### Dummy
+
+```yaml
+resources:
+  dummy:
+    containers: []
+    dummies:
+      - name: dummy0
+        container:
+          docker: router1
+        addresses:
+          - cidr: "10.1.0.1/24"
+        vrf: vrf101
+```
+
+#### Veth
+
+```yaml
+resources:
+  veth:
+    containers: []
+    veth_pairs:
+      - name: veth0
+        container:
+          docker: router1
+        addresses:
+          - cidr: "10.1.1.1/30"
+        peer:
+          name: veth0-a
+          container:
+            docker: router2
+          addresses:
+            - cidr: "10.1.1.2/30"
+```
+
+A `stub: true` peer represents the remote end of a veth pair that lives in another netns and is managed by a separate spec.
+
+#### Bridge
+
+```yaml
+resources:
+  bridge:
+    containers: []
+    bridges:
+      - name: br0
+        container:
+          docker: router1
+        slave_interfaces:
+          - veth0-a
+          - vxlan101
+        addresses:
+          - cidr: "10.1.2.1/24"
+```
+
+#### VXLAN
+
+```yaml
+resources:
+  vxlan:
+    containers: []
+    vxlan_configs:
+      - name: vxlan101
+        container:
+          docker: router1
+        vxlan_id: 101
+        local_ip: "10.1.0.1"
+        dst_port: 4789
+        nolearning: true
+        dev: eth0
+```
+
+#### WireGuard
+
+```yaml
+resources:
+  wireguard:
+    containers: []
+    wireguard_configs:
+      - name: wg0
+        container:
+          docker: router1
+        privatekey: "..."
+        listen_port: 51820
+        peers:
+          - publickey: "..."
+            presharedkey: "..."
+            endpoint: "peer.example.com:51820"
+            allowedips:
+              - "0.0.0.0/0"
+              - "::/0"
+        addresses:
+          - cidr: "192.168.100.1/24"
+        vrf: vrf101
+        additionals:
+          asn: "4242420001"
+```
+
+#### VRF
+
+```yaml
+resources:
+  vrf_list:
+    containers: []
+    vrfs:
+      - name: vrf101
+        container:
+          docker: router1
+        table_id: 101
+        addresses:
+          - cidr: "10.1.0.1/24"
+```
+
+#### BIRD BGP
+
+```yaml
+resources:
+  bird_bgp:
+    target_config_directory: /etc/bird/peers
+    bird_socket_path: /var/run/bird/bird.ctl
+    ebgp_protocols:
+      - name: peer1
+        template: dnpeers_dualstack
+        interface: eth0
+        local_address: "fe80::1%eth0"
+        peer_address: "fe80::2%eth0"
+        local_asn: "4242420001"
+        peer_asn: "4242420002"
 ```
 
 ## How it Works
 
-Here's the main steps the program takes:
+1. **Parse** the YAML/JSON payload into a `NodeConfig`.
+2. **Detect changes** for each resource type by comparing the spec against the current netlink state.
+3. **Generate a changeset** containing resources to add, update, or remove.
+4. **Apply** the changeset in dependency order:
+   - VRF → Dummy → Veth → WireGuard → VXLAN → Bridge
+5. **Re-detect** changes and repeat until converged or a loop limit is reached.
 
-1. Parse the YAML file from stdin/file/URL, and yields an object of struct type [`GlobalConfig`](./pkg/models/types.go#L15) if success, which is simply a dictionary that maps node name to node's [`NodeConfig`](./pkg/models/types.go#L35) .
-2. Many golang receiver methods are bound to the [`NodeConfig`](./pkg/models/types.go#L35) struct type, it calls [`Up()`](./pkg/models/methods.go#L14) to realize the specified `NodeConfig` into current node. It detects the differences between the spec and the actual state in current node, and reconverges both.
-3. During the reconverging process, it may creates and starts necessary containers (using docker sdk), creates and setups necessary (virtual) network interfaces (using netlink), but it mainly relys on container to separate the affects from the host environments.
-4. You can clean all containers it ever created by invoke `netapply down --service-name <servicename>`, so that it stops and removes all containers it ever created.
+## Examples
 
-## Example configurations
+See the [`examples/`](./examples) directory for working manifests:
 
-### Experiment 1: Simple OSPF
+- [`dummy.yaml`](./examples/dummy.yaml) — Simple dummy interface
+- [`veth-bridge.yaml`](./examples/veth-bridge.yaml) — Veth pair + bridge topology
+- [`vxlan.yaml`](./examples/vxlan.yaml) — VXLAN tunnel
+- [`wireguard.yaml`](./examples/wireguard.yaml) — WireGuard tunnel in a netns
+- [`bird-bgp.yaml`](./examples/bird-bgp.yaml) — BIRD BGP peer configurations
+- [`wireguard-dn42.yaml`](./examples/wireguard-dn42.yaml) — Multi-peer WireGuard with metadata
 
-![topology1](./docs/imgs/topology1.drawio.png)
+## TLS and Authentication
 
-You will create two containers, 'lax1' and 'lax2', to simulate two nodes respectively, and create a container named 'ix' to simulate an Internet Exchange. The following network resources will be created:
+Both `serve-local` and `serve-collection` support client-side TLS and HTTP Basic Auth flags:
 
-1. Inside the container 'ix', create br0 of type bridge.
-2. Create a veth pair with one end in lax1 and the other in ix, named v-lax1-a and v-lax1-b respectively. Connect v-lax1-b to br0 and assign the IP address (in CIDR notation) 192.168.31.1/30 to v-lax1-a.
-3. Create a veth pair with one end in lax2 and the other in ix, named v-lax2-a and v-lax2-b respectively. Connect v-lax2-b to br0 and assign the IP address (in CIDR notation) 192.168.31.2/30 to v-lax2-a.
-4. In lax1, create a dummy-type interface dummy0 and assign the IP address (in CIDR notation) 10.1.0.0/16.
-5. In lax2, create a dummy-type interface dummy0 and assign the IP address (in CIDR notation) 10.2.0.0/16.
-6. Configure lax1 to advertise the stub subnet 10.1.0.0/16 to lax2 via OSPF.
-7. Configure lax2 to advertise the stub subnet 10.2.0.0/16 to lax1 via OSPF.
+- `--tls-trusted-ca-cert`
+- `--tls-client-cert`
+- `--tls-client-key`
+- `--http-basic-auth-username`
+- `--http-basic-auth-password`
 
-This is how you would do it in a declarative way, describing by YAML manifest:
+These are used when fetching remote configuration sources (e.g., HTTPS URLs).
 
-See [./examples/topology1.yaml](./examples/topology1.yaml)
+## License
 
-```yaml
-nodes:
-  testnode:
-    frr_containers:
-      - container_name: lax1
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax1
-      - container_name: lax2
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax2
-      - container_name: ix
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: ix
-    containers:
-      - lax1
-      - lax2
-      - ix
-    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
-    dataplane:
-      dummy:
-        - name: dummy0
-          container_name: lax1
-          addresses:
-            - cidr: "10.1.0.0/16"
-        - name: dummy0
-          container_name: lax2
-          addresses:
-            - cidr: "10.2.0.0/16"
-      veth:
-        - name: v-lax1-a
-          container_name: lax1
-          addresses:
-            - cidr: "192.168.31.1/30"
-          peer:
-            name: v-lax1-b
-            container_name: ix
-        - name: v-lax2-a
-          container_name: lax2
-          addresses:
-            - cidr: "192.168.31.2/30"
-          peer:
-            name: v-lax2-b
-            container_name: ix
-      bridge:
-        - name: br0
-          container_name: ix
-          slave_interfaces:
-            - v-lax1-b
-            - v-lax2-b
-    controlplane:
-      - container_name: lax1
-        debug_ospf_updates: true
-        ospfv2:
-          - vrf: default
-            router_id: "0.0.0.1"
-            interfaces:
-              - name: dummy0
-                area: "0.0.0.0"
-                passive: true
-              - name: v-lax1-a
-                area: "0.0.0.0"
-                network: point-to-multipoint
-            nbma_neighbors:
-              - "192.168.31.2"
-      - container_name: lax2
-        debug_ospf_updates: true
-        ospfv2:
-          - vrf: default
-            router_id: "0.0.0.2"
-            interfaces:
-              - name: dummy0
-                area: "0.0.0.0"
-                passive: true
-              - name: v-lax2-a
-                area: "0.0.0.0"
-                network: point-to-multipoint
-            nbma_neighbors:
-              - "192.168.31.1"
-```
-
-To apply above YAML manifest, simply run:
-
-```shell
-# (in project's root)
-go build -o bin/netapply ./main.go
-./bin/netapply up --service-name exp1 --node testnode --config ./examples/topology1.yaml
-```
-
-To clean up the test environment, invoke:
-
-```shell
-./bin/netapply down --service-name exp1
-```
-
-And this is how you would implement it using traditional linux shell commands (netlink, docker, etc.):
-
-```shell
-# use /etc/frr/daemons as a usable frr daemons config,
-# so this assume that your node have an already installed frr instance on host
-
-# create lax1, lax2, and ix
-for name in lax1 lax2 ix; do
-  docker run --rm -dit --name "$name" --hostname "$name" --cap-add net_admin --cap-add sys_admin -v /etc/frr/daemons:/etc/frr/daemons:ro quay.io/frrouting/frr:10.3.0
-done
-
-# getting container pid
-pidLax1=$(docker inspect lax1 --format {{.State.Pid}})
-pidLax2=$(docker inspect lax2 --format {{.State.Pid}})
-pidIx=$(docker inspect ix --format {{.State.Pid}})
-
-# creating veth pairs and bridge inside container
-ip l add v-lax1-a netns $pidLax1 type veth peer name v-lax1-b netns $pidIx
-ip l add v-lax2-a netns $pidLax2 type veth peer name v-lax2-b netns $pidIx
-ip l add br0 netns $pidIx type bridge
-ip l add dummy0 netns $pidLax1 type dummy
-ip l add dummy0 netns $pidLax2 type dummy
-
-# setting virtual interfaces up
-docker exec -it lax1 ip l set v-lax1-a up
-docker exec -it lax1 ip l set dummy0 up
-
-docker exec -it lax2 ip l set v-lax2-a up
-docker exec -it lax2 ip l set dummy0 up
-
-docker exec -it ix ip l set br0 up
-docker exec -it ix ip l set v-lax1-b up
-docker exec -it ix ip l set v-lax2-b up
-
-# connecting veth and bridge
-docker exec -it ix ip l set v-lax1-b master br0
-docker exec -it ix ip l set v-lax2-b master br0
-
-# checking connectivity
-docker exec -it lax1 ping -c3 ff02::1%v-lax1-a
-docker exec -it lax2 ping -c3 ff02::1%v-lax2-a
-
-# assigning ip addresses
-docker exec -it lax1 ip a add 192.168.31.1/30 dev v-lax1-a
-docker exec -it lax1 ip a add 10.1.0.0/16 dev dummy0
-docker exec -it lax2 ip a add 192.168.31.2/30 dev v-lax2-a
-docker exec -it lax2 ip a add 10.2.0.0/16 dev dummy0
-
-# checking connectivity again
-docker exec -it lax1 ping -c1 192.168.31.2
-docker exec -it lax2 ping -c1 192.168.31.1
-
-# checking routes
-docker exec -it lax1 ip r | grep '10.2.0.0'  # expects empty
-docker exec -it lax2 ip r | grep '10.1.0.0'  # expects empty
-```
-
-Configuring FRR on lax1:
-
-```vtysh
-lax1# configure terminal
-lax1(config)# router ospf
-lax1(config-router)# ospf router-id 0.0.0.1
-lax1(config-router)# neighbor 192.168.31.2
-lax1(config-router)# exit
-lax1(config)# interface v-lax1-a
-lax1(config-if)# ip ospf area 0.0.0.0
-lax1(config-if)# ip ospf network point-to-multipoint non-broadcast 
-lax1(config-if)# exit
-lax1(config)# interface dummy0 
-lax1(config-if)# ip ospf area 0.0.0.0
-lax1(config-if)# ip ospf passive 
-lax1(config-if)# exit
-lax1(config)# exit
-lax1# exit
-```
-
-Configuring FRR on lax2:
-
-```vtysh
-lax2# configure terminal
-lax2(config)# router ospf
-lax2(config-router)# ospf router-id 0.0.0.2
-lax2(config-router)# neighbor 192.168.31.1
-lax2(config-router)# exit
-lax2(config)# interface v-lax2-a
-lax2(config-if)# ip ospf area 0.0.0.0
-lax2(config-if)# ip ospf network point-to-multipoint non-broadcast 
-lax2(config-if)# exit
-lax2(config)# interface dummy0 
-lax2(config-if)# ip ospf area 0.0.0.0
-lax2(config-if)# ip ospf passive 
-lax2(config-if)# exit
-lax2(config)# exit
-lax2# exit
-```
-
-Checking routes again:
-
-```shell
-docker exec lax1 vtysh -c 'show ip ospf route' 2>/dev/null
-docker exec lax2 vtysh -c 'show ip ospf route' 2>/dev/null
-docker exec lax1 ip r | grep 10.2.0.0
-docker exec lax2 ip r | grep 10.1.0.0
-```
-
-Checking network connectivity:
-
-```shell
-docker exec -it lax1 ping -c3 10.2.0.0
-docker exec -it lax2 ping -c3 10.1.0.0
-```
-
-Clean up the test environments:
-
-```shell
-for name in lax1 lax2 ix; do
-  docker stop "$name"
-done
-```
-
-### Experiment 2: Simple BGP
-
-You will reuse the network topology from experiment 1. However, the control plane in experiment 2 differs, as it utilizes BGP instead of the OSPF used in experiment 1.
-
-You need to perform the following configurations:
-
-1. Configure the FRR on the lax1 node so that lax1 advertises 10.1.0.0/16 to lax2 via BGP.
-2. Configure the FRR on the lax2 node so that lax2 advertises 10.2.0.0/16 to lax1 via BGP.
-3. Verify that lax1 receives the route for 10.2.0.0/16 advertised by lax2 via BGP.
-4. Verify that lax2 receives the route for 10.1.0.0/16 advertised by lax1 via BGP.
-
-Before proceed to experiment 2, make sure that you have clean up the environment setup by experiment 1.
-
-In YAML, you can delcare it in this way:
-
-See [./examples/topology1-bgp.yaml](./examples/topology1-bgp.yaml)
-
-```yaml
-nodes:
-  testnode:
-    frr_containers:
-      - container_name: lax1
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax1
-      - container_name: lax2
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax2
-      - container_name: ix
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: ix
-    containers:
-      - lax1
-      - lax2
-      - ix
-    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
-    dataplane:
-      dummy:
-        - name: dummy0
-          container_name: lax1
-          addresses:
-            - cidr: "10.1.0.0/16"
-        - name: dummy0
-          container_name: lax2
-          addresses:
-            - cidr: "10.2.0.0/16"
-      veth:
-        - name: v-lax1-a
-          container_name: lax1
-          addresses:
-            - cidr: "192.168.31.1/30"
-          peer:
-            name: v-lax1-b
-            container_name: ix
-        - name: v-lax2-a
-          container_name: lax2
-          addresses:
-            - cidr: "192.168.31.2/30"
-          peer:
-            name: v-lax2-b
-            container_name: ix
-      bridge:
-        - name: br0
-          container_name: ix
-          slave_interfaces:
-            - v-lax1-b
-            - v-lax2-b
-    controlplane:
-      - container_name: lax1
-        debug_bgp_updates: true
-        route_maps:
-          - name: allow-all
-            policy: permit
-            order: 10
-        bgp:
-          - vrf: default
-            asn: 65001
-            router_id: "0.0.0.1"
-            address_families:
-              - afi: ipv4
-                safi: unicast
-                networks:
-                  - "10.1.0.0/16"
-                activate:
-                  - group1
-                route_maps:
-                  - name: allow-all
-                    direction: in
-                    peer: "group1"
-                  - name: allow-all
-                    direction: out
-                    peer: "group1"
-            peer_groups:
-              group1:
-                asn: 65002
-                peers:
-                  - "192.168.31.2"
-      - container_name: lax2
-        debug_bgp_updates: true
-        route_maps:
-          - name: allow-all
-            policy: permit
-            order: 10
-        bgp:
-          - vrf: default
-            asn: 65002
-            router_id: "0.0.0.2"
-            address_families:
-              - afi: ipv4
-                safi: unicast
-                networks:
-                  - "10.2.0.0/16"
-                activate:
-                  - group1
-                route_maps:
-                  - name: allow-all
-                    peer: "group1"
-                    direction: in
-                  - name: allow-all
-                    direction: out
-                    peer: "group1"
-            peer_groups:
-              group1:
-                asn: 65001
-                peers:
-                  - "192.168.31.1"
-```
-
-You can apply above YAML manifest by:
-
-```shell
-./bin/netapply up --service-name exp2 --node testnode --config ./examples/topology1-bgp.yaml
-```
-
-You can clean up above test environment by:
-
-```shell
-./bin/netapply down --service-name exp2
-```
-
-Alternatively, with CLI, you might also apply below configurations to vtysh of lax1 and lax2 respectively, to achieve equivalent effect:
-
-On vtysh of lax1:
-
-```vtysh
-lax1# configure terminal
-lax1(config)# route-map allow-all permit 10
-lax1(config-route-map)# exit
-lax1(config)# router bgp 65001
-lax1(config-router)# bgp router-id 0.0.0.1
-lax1(config-router)# neighbor group1 peer-group 
-lax1(config-router)# neighbor group1 remote-as 65001
-lax1(config-router)# neighbor 192.168.31.2 peer-group group1
-lax1(config-router)# address-family ipv4 unicast 
-lax1(config-router-af)# neighbor group1 activate 
-lax1(config-router-af)# neighbor group1 route-map allow-all in
-lax1(config-router-af)# neighbor group1 route-map allow-all out
-lax1(config-router-af)# network 10.1.0.0/16
-lax1(config-router-af)# exit-address-family 
-lax1(config-router)# exit
-lax1(config)# exit
-lax1# exit
-```
-
-On vtysh of lax2:
-
-```vtysh
-lax2# configure terminal
-lax2(config)# route-map allow-all permit 10
-lax2(config-route-map)# exit
-lax2(config)# router bgp 65002
-lax2(config-router)# bgp router-id 0.0.0.2
-lax2(config-router)# neighbor group1 peer-group 
-lax2(config-router)# neighbor group1 remote-as 65001
-lax2(config-router)# neighbor 192.168.31.1 peer-group group1
-lax2(config-router)# address-family ipv4 unicast 
-lax2(config-router-af)# neighbor group1 activate 
-lax2(config-router-af)# neighbor group1 route-map allow-all in
-lax2(config-router-af)# neighbor group1 route-map allow-all out
-lax2(config-router-af)# network 10.2.0.0/16
-lax2(config-router-af)# exit-address-family 
-lax2(config-router)# exit
-lax2(config)# exit
-lax2# exit
-```
-
-### Experiment 3: Simple WireGuard
-
-See [./examples/topology2-wg.yaml](./examples/topology2-wg.yaml)
-
-```yaml
-nodes:
-  testnode:
-    frr_containers:
-      - container_name: lax1
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax1
-      - container_name: lax2
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax2
-    containers:
-      - lax1
-      - lax2
-    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
-    dataplane:
-      wireguard:
-        - name: wg-lax1-1
-          listen_port: 14141
-          container_name: lax1
-          privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
-          peers:
-            - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
-              endpoint: "lax1.exploro.one:14142"
-              allowedips:
-                - "0.0.0.0/0"
-                - "::/0"
-          addresses:
-            - cidr: "10.1.0.1/30"
-          mtu: 1420
-        - name: wg-lax2-1
-          listen_port: 14142
-          container_name: lax2
-          privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
-          peers:
-            - publickey: "b9fucppbWxKLAWSxn8UJY5NlcnPF+Yz6s64XJwOdPAg="
-              allowedips:
-                - "0.0.0.0/0"
-                - "::/0"
-          addresses:
-            - cidr: "10.1.0.2/30"
-          mtu: 1420
-```
-
-To test inter-container wg connectivity:
-
-```shell
-docker exec -it lax1 ping -c3 10.1.0.2
-docker exec -it lax2 ping -c3 10.1.0.1
-```
-
-### Experiment 4: VxLAN over WireGuard
-
-The network topology will looks like this
-
-```
-+-------------+        +-------------+        +-------------+
-| lax1        |   wg   | lax2        |   wg   | rr          |
-| 10.1.0.1/24 | <====> | 10.1.0.2/24 | <====> | 10.1.0.3/24 |
-+-------------+        +-------------+        +-------------+
-```
-
-However we use the interconnected L3 network as a underlay, to support a VxLAN overlay build upon lax1 and lax2.
-
-Where 'rr' means 'BGP Route Reflector'.
-
-See [./examples/topology3-wg-vxlan.yaml](./examples/topology3-wg-vxlan.yaml)
-
-```yaml
-nodes:
-  testnode:
-    frr_containers:
-      - container_name: lax1
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax1
-      - container_name: lax2
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax2
-      - container_name: rr
-        image: quay.io/frrouting/frr:10.3.0
-        hostname: lax2
-    containers:
-      - lax1
-      - lax2
-      - rr
-    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
-    dataplane:
-      vxlan:
-        - name: vx101
-          container_name: lax1
-          vxlan_id: 101
-          local_ip: "10.1.0.1"
-          mtu: 1370
-          nolearning: true
-        - name: vx101
-          container_name: lax2
-          vxlan_id: 101
-          local_ip: "10.1.0.2"
-          mtu: 1370
-          nolearning: true
-      bridge:
-        - name: br101
-          container_name: lax1
-          slave_interfaces:
-            - vx101
-        - name: br101
-          container_name: lax2
-          slave_interfaces:
-            - vx101
-      wireguard:
-        - name: wg-lax1-1
-          listen_port: 15141
-          container_name: lax1
-          privatekey: "6DFfR3+61f/X+zGqeQ+ka7XxQG1ScqQvvZbk/0hgkWo="
-          peers:
-            - publickey: "vniXpqDKla2+K/RDZT+81H/MHrKvWwjPojCFP72GZHM="
-              endpoint: "wien1.exploro.one:15142"
-              allowedips:
-                - "0.0.0.0/0"
-                - "::/0"
-          addresses:
-            - local: "10.1.0.1"
-              peer: "10.1.0.2/24"
-          mtu: 1420
-        - name: wg-lax2-1
-          listen_port: 15142
-          container_name: lax2
-          privatekey: "EJNljli1ZIkW1j1WHzWlPUcnpzWHrtTqDAbJuF8KukQ="
-          peers:
-            - publickey: "b9fucppbWxKLAWSxn8UJY5NlcnPF+Yz6s64XJwOdPAg="
-              allowedips:
-                - "0.0.0.0/0"
-                - "::/0"
-              endpoint: "wien1.exploro.one:15141"
-          addresses:
-            - local: "10.1.0.2"
-              peer: "10.1.0.1/32"
-          mtu: 1420
-        - name: wg-lax2-2
-          listen_port: 15143
-          container_name: lax2
-          privatekey: "8I7sCBxyOuztvnjT711YQ8YfEeQTuDh/XPn386u1BEI="
-          peers:
-            - publickey: "1/CG4w+uLOgsk0G0Qiy9APyWsf8YJll7gExIQJb31h8="
-              allowedips:
-                - "0.0.0.0/0"
-                - "::/0"
-              endpoint: "wien1.exploro.one:15144"
-          addresses:
-            - local: "10.1.0.2"
-              peer: "10.1.0.3/32"
-          mtu: 1420
-        - name: wg-rr-1
-          listen_port: 15144
-          container_name: rr
-          privatekey: "8IGasID81IKbxG9SfUAgYbKp/U8aVmq3Xl8dmMYeLl8="
-          peers:
-            - publickey: "G9Xs9qtDdk2a4HHcR0xkTjDTKMXOyqlquWXbZI+WPxU="
-              allowedips:
-                - "0.0.0.0/0"
-                - "::/0"
-              endpoint: "wien1.exploro.one:15143"
-          addresses:
-            - local: "10.1.0.3"
-              peer: "10.1.0.2/24"
-          mtu: 1420
-    controlplane:
-      - container_name: rr
-        debug_bgp_updates: true
-        bgp:
-          - vrf: default
-            log_neighbor_changes: true
-            asn: 65001
-            router_id: "0.0.0.3"
-            cluster_id: "0.0.0.3"
-            no_ipv4_unicast: true
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                asn: 65001
-                listen_range: "10.1.0.0/16"
-            address_families:
-              - afi: l2vpn
-                safi: evpn
-                activate:
-                  - group1
-                route_reflector_client:
-                  - group1
-      - container_name: lax1
-        debug_bgp_updates: true
-        bgp:
-          - vrf: default
-            log_neighbor_changes: true
-            asn: 65001
-            router_id: "0.0.0.1"
-            no_ipv4_unicast: true
-            address_families:
-              - afi: l2vpn
-                safi: evpn
-                advertise_all_vni: true
-                advertise_svi_ip: true
-                activate:
-                  - group1
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                asn: 65001
-                peers:
-                  - "10.1.0.3"
-                update_source: "10.1.0.1"
-      - container_name: lax2
-        debug_bgp_updates: true
-        bgp:
-          - vrf: default
-            log_neighbor_changes: true
-            asn: 65001
-            router_id: "0.0.0.2"
-            no_ipv4_unicast: true
-            address_families:
-              - afi: l2vpn
-                safi: evpn
-                advertise_all_vni: true
-                advertise_svi_ip: true
-                activate:
-                  - group1
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                asn: 65001
-                peers:
-                  - "10.1.0.3"
-                update_source: "10.1.0.2"
-
-```
-
-To test effects:
-
-```shell
-# check bgp session establishment from view point of RR
-docker exec -it rr vtysh -c 'show bgp summary'
-
-# check evpn type 2 routes announcement
-docker exec -it rr vtysh -c 'show bgp l2vpn evpn route type macip'
-docker exec -it lax1 ip a show br101
-docker exec -it lax2 ip a show br101
-
-# check l2 connectivity
-docker exec -it lax1 ping -c3 ff02::1%br101
-docker exec -it lax2 ping -c3 ff02::1%br101
-```
-
-### Experiment 5: MP-BGP
-
-See [./examples/topology1-mpbgp.yaml](./examples/topology1-mpbgp.yaml)
-
-```yaml
-nodes:
-  testnode:
-    frr_containers:
-      - container_name: lax1
-        image: quay.io/frrouting/frr:10.4.0
-        hostname: lax1
-      - container_name: lax2
-        image: quay.io/frrouting/frr:10.4.0
-        hostname: lax2
-      - container_name: ix
-        image: quay.io/frrouting/frr:10.4.0
-        hostname: ix
-    containers:
-      - lax1
-      - lax2
-      - ix
-    stateful_dir: /root/projects/netapply/nodes/testnode/.go-reconciler-state
-    dataplane:
-      dummy:
-        - name: dummy0
-          container_name: lax1
-          addresses:
-            - cidr: "10.1.0.1/24"
-            - cidr: "10.1.0.2/24"
-            - cidr: "10.1.0.3/24"
-            - cidr: "2001:db8::/64"
-            - cidr: "2001:db8::1/64"
-            - cidr: "2001:db8::2/64"
-        - name: dummy0
-          container_name: lax2
-          addresses:
-            - cidr: "10.1.1.1/24"
-            - cidr: "10.1.1.2/24"
-            - cidr: "10.1.1.3/24"
-            - cidr: "2001:db8:1::/64"
-            - cidr: "2001:db8:1::1/64"
-            - cidr: "2001:db8:1::2/64"
-      veth:
-        - name: v-lax1-a
-          container_name: lax1
-          addresses:
-            - local: "2001:db8::1:1"
-              peer: "2001:db8:1::1:1/128"
-          peer:
-            name: v-lax1-b
-            container_name: ix
-        - name: v-lax2-a
-          container_name: lax2
-          addresses:
-            - local: "2001:db8:1::1:1"
-              peer: "2001:db8::1:1/128"
-          peer:
-            name: v-lax2-b
-            container_name: ix
-      bridge:
-        - name: br0
-          container_name: ix
-          slave_interfaces:
-            - v-lax1-b
-            - v-lax2-b
-    controlplane:
-      - container_name: lax1
-        log_level: debugging
-        debug_bgp_updates: true
-        debug_zebra_events: true
-        debug_zebra_dplane: true
-        debug_zebra_kernel: true
-        route_maps:
-          - name: allow-all
-            policy: permit
-            order: 10
-        bgp:
-          - vrf: default
-            log_neighbor_changes: true
-            no_ipv6_auto_ra: true
-            disable_ebgp_connected_route_check: true
-            asn: 65001
-            router_id: "0.0.0.1"
-            address_families:
-              - afi: ipv4
-                safi: unicast
-                networks:
-                  - "10.1.0.0/24"
-                activate:
-                  - "group1"
-                route_maps:
-                  - peer: "group1"
-                    name: allow-all
-                    direction: in
-                  - peer: "group1"
-                    name: allow-all
-                    direction: out
-              - afi: ipv6
-                safi: unicast
-                networks:
-                  - "2001:db8::/64"
-                activate:
-                  - "group1"
-                route_maps:
-                  - peer: "group1"
-                    name: allow-all
-                    direction: in
-                  - peer: "group1"
-                    name: allow-all
-                    direction: out
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                asn: 65002
-                peers:
-                  - "2001:db8:1::1:1"
-      - container_name: lax2
-        log_level: debugging
-        debug_bgp_updates: true
-        debug_zebra_events: true
-        debug_zebra_dplane: true
-        debug_zebra_kernel: true
-        route_maps:
-          - name: allow-all
-            policy: permit
-            order: 10
-        bgp:
-          - vrf: default
-            log_neighbor_changes: true
-            no_ipv6_auto_ra: true
-            disable_ebgp_connected_route_check: true
-            asn: 65002
-            router_id: "0.0.0.2"
-            address_families:
-              - afi: ipv4
-                safi: unicast
-                networks:
-                  - "10.1.1.0/24"
-                activate:
-                  - "group1"
-                route_maps:
-                  - peer: "group1"
-                    name: allow-all
-                    direction: in
-                  - peer: "group1"
-                    name: allow-all
-                    direction: out
-              - afi: ipv6
-                safi: unicast
-                route_maps:
-                  - peer: "group1"
-                    name: allow-all
-                    direction: in
-                  - peer: "group1"
-                    name: allow-all
-                    direction: out
-                networks:
-                  - "2001:db8:1::/64"
-                activate:
-                  - "group1"
-            peer_groups:
-              group1:
-                capabilities:
-                  - extended-nexthop
-                asn: 65001
-                peers:
-                  - "2001:db8::1:1"
-```
-
-## Experiment 6: WireGuard Cloud Config
-
-You can create a WireGuard network from cloud config:
-
-```shell
-./bin/netapply up \
-  --config https://demofiles.imsb.me/demo/configs/lax1-lax2.yaml \
-  --service-name exp1 \
-  --node testnode \
-  --http-basic-auth-username admin \
-  --http-basic-auth-password 123456
-```
-
-And you can easily tear down the test containers that just created:
-
-```shell
-./bin/netapply down --service-name exp1
-```
-
-Where the YAML manifest file, the private key and public key of WireGuard tunnels, (and possibly the TLS x509v2 certs), can all be placed at cloud and can be fetched via HTTPs.
-
-## Experiment 7: Setup a multi-nodes WireGuard Cluster
-
-Once configs and private keys are uploaded to the cloud and in-positioned, you can easily setup a multi-nodes WireGuard cluster using cloud-hosted configuration:
-
-Execute following command in node vie1:
-
-```shell
-./bin/netapply up \
-  --config https://demofiles.imsb.me/demo/configs/vie1.yaml \
-  --service-name exp1 \
-  --node vie1 \
-  --http-basic-auth-username admin \
-  --http-basic-auth-password 123456
-```
-
-Then execute following command in node lax1:
-
-```shell
-./bin/netapply up \
-  --config https://demofiles.imsb.me/demo/configs/lax1.yaml \
-  --service-name exp1 \
-  --node lax1 \
-  --http-basic-auth-username admin \
-  --http-basic-auth-password 123456
-```
-
-And you can easily tear down the test containers that just created:
-
-```shell
-# both in node lax1 and node vie1
-./bin/netapply down --service-name exp1
-```
-
-(More Example configuration YAMLs are coming ...)
-
-## Others
-
-About how to generate keys for OpenVPN2 serverside and clientside:
-
-1. Generate server's DH parameters by `./generate-dh-param.sh` if it is not generated yet;
-2. Generate client's cert pair by `./generate-client.sh`, modify the CN field for a different CommonName;
-3. Generate server's cert pair by `./generate-server.sh`, modify the CN field for a different CommonName.
-
-## Todos
-
-1. Resource-specific netns range
-2. Improved FRR configuration representation model
+MIT

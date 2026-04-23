@@ -1,0 +1,20 @@
+resources:
+  wireguard:
+    containers:
+      - netns_path: /run/netns/nstest
+    wireguard_configs:
+      - name: wg1
+        container:
+          netns_path: /run/netns/nstest
+        privatekey: "0MklEaEBCoaK6oKUFUb0yM5Ti9f8dmMhnU+I1NpqtUc="
+        listen_port: 51820
+        peers:
+          - publickey: "xTIBA5rboUvnH4htodjb6e697QjLERt1NAB4mZqp8Dg="
+            endpoint: "148.135.56.215:12121"
+            allowedips:
+              - "0.0.0.0/0"
+              - "::/0"
+        addresses:
+          - peer: "1.2.3.4/32"
+            local: "2.3.4.5"
+        mtu: 1420
