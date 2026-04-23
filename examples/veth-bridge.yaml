@@ -1,0 +1,41 @@
+resources:
+  vrf_list:
+    containers:
+      - docker: ftest
+    vrfs:
+      - name: vrf42
+        container:
+          docker: ftest
+        table_id: 42
+
+  bridge:
+    containers:
+      - docker: ftest
+    bridges:
+      - name: br42
+        container:
+          docker: ftest
+        slave_interfaces:
+          - veth0-a
+        addresses:
+          - cidr: "fdda:8ca4:1556:b000::1/64"
+        vrf: vrf42
+
+  veth:
+    containers:
+      - docker: ftest
+    veth_pairs:
+      - name: veth0-a
+        container:
+          docker: ftest
+        stub: true
+
+      - name: veth0
+        container:
+          docker: ftest
+        peer:
+          name: veth0-a
+          container:
+            docker: ftest
+        addresses:
+          - cidr: "fdda:8ca4:1556:b000::2/128"

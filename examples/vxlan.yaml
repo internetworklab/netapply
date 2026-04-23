@@ -1,0 +1,11 @@
+resources:
+  vxlan:
+    containers: []
+    vxlan_configs:
+      - name: vx101
+        vxlan_id: 101
+        local_ip: "10.1.0.1"
+        dst_port: 4789
+        nolearning: true
+        addresses:
+          - cidr: "10.101.0.1/24"

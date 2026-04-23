@@ -1,0 +1,8 @@
+resources:
+  dummy:
+    containers: []
+    dummies:
+      - name: dummy0
+        addresses:
+          - cidr: "10.0.0.1/24"
+          - cidr: "2001:db8::1/64"
